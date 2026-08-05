@@ -25,12 +25,12 @@ progress:
 ## Current Position
 
 - **Phase**: 1 - Environment Gate & Build Baseline
-- **Plan**: none yet
-- **Status**: Roadmap approved; ready to plan Phase 1
-- **Progress**: 0/4 phases complete
+- **Plan**: 01-01 complete (01-02 next)
+- **Status**: Plan 01-01 executed — gate script + build-baseline orchestrator + .gitignore created
+- **Progress**: 0/4 phases complete, 1/2 plans in Phase 1
 
 ```
-[ ] Phase 1: Environment Gate & Build Baseline
+[~] Phase 1: Environment Gate & Build Baseline (1/2 plans)
 [ ] Phase 2: Native RDPEI Touch Lifecycle
 [ ] Phase 3: Gestures & Session Stability
 [ ] Phase 4: Diagnostics, Packaging & Launch Configuration
@@ -40,7 +40,7 @@ progress:
 
 - **Phases completed**: 0/4
 - **Requirements mapped**: 19/19
-- **Plans completed**: 0
+- **Plans completed**: 1 (01-01)
 
 ## Accumulated Context
 
@@ -50,6 +50,9 @@ progress:
 - `Ctrl+wheel` pinch fallback is a branch inside the Phase 3 pinch recognizer, not a separate phase; it ships after RDPEI lifecycle correctness.
 - Diagnostics logging is added incrementally during Phases 2–3 and finalized/documented in Phase 4 (single DIAG-01 requirement lives there).
 - Reconnect/focus stability (STAB-01, STAB-02) ships with gestures in Phase 3 because the teardown checklist must enumerate gesture + contact state created in Phases 2–3.
+- Gate uses four-signal AND check (XDG_SESSION_TYPE, WAYLAND_DISPLAY, pgrep Xorg, pgrep Xwayland) — xdpyinfo vendor string is NOT a discriminator (reports "X.Org Foundation" under both Xorg and XWayland).
+- build-baseline.sh installs only freerdp3-x11_*_amd64.deb, never the broad freerdp3-* glob (avoids replacing freerdp3-wayland).
+- Rollback uses apt install --reinstall freerdp3-x11 with fallback to apt install freerdp3-x11/trixie.
 
 ### Todos
 
@@ -65,13 +68,13 @@ progress:
 
 ## Session Continuity
 
-**Last session:** 2026-08-05T17:00:20.911Z
-**Stopped at:** Phase 1 context gathered
-**Resume file:** .planning/phases/01-environment-gate-build-baseline/01-CONTEXT.md
+**Last session:** 2026-08-05T17:24:17Z
+**Stopped at:** Completed 01-01-PLAN.md (gate script + build-baseline orchestrator + .gitignore)
+**Resume file:** .planning/phases/01-environment-gate-build-baseline/01-02-PLAN.md
 
-- **Last action**: Roadmap approved; created ROADMAP.md and STATE.md and updated REQUIREMENTS.md traceability.
-- **Next action**: `/gsd-plan-phase 1`.
-- **Handoff note**: Begin with the X11 environment gate and unmodified Debian build baseline; do not patch touch behavior before those checks pass.
+- **Last action**: Executed Plan 01-01 — created scripts/check-x11-session.sh, scripts/build-baseline.sh, .gitignore. Gate verified live (hard-fails on Wayland with correct remediation).
+- **Next action**: Execute Plan 01-02 (on-device build/install/smoke/rollback on GNOME on Xorg session).
+- **Handoff note**: Switch to GNOME on Xorg session before running build-baseline.sh. The gate will block until the session is native X11.
 
 ---
 *State initialized: 2026-08-05*

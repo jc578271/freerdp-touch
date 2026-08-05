@@ -8,7 +8,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Environment Gate & Build Baseline** - Verify the X11 session, capture the device/source baseline, and prove the unmodified Debian FreeRDP source builds, launches, and rolls back before any patch.
+- [~] **Phase 1: Environment Gate & Build Baseline** - Verify the X11 session, capture the device/source baseline, and prove the unmodified Debian FreeRDP source builds, launches, and rolls back before any patch.
 - [ ] **Phase 2: Native RDPEI Touch Lifecycle** - Deliver complete, ordered, correctly located native RDPEI contacts through drag, multi-finger, lift, and cancel — with no duplicates or stuck contacts — before any gesture logic.
 - [ ] **Phase 3: Gestures & Session Stability** - Implement the three core gestures (long-press right-click, native pinch, Ctrl+wheel fallback pinch) and keep touch stable across window state, focus, and disconnect/reconnect.
 - [ ] **Phase 4: Diagnostics, Packaging & Launch Configuration** - Ship the verified patch as an installable Debian `.deb` with env-var-gated diagnostics and a documented, repeatable launch preset.
@@ -29,7 +29,7 @@
 **Plans**:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — X11 gate script + .gitignore + build-baseline orchestrator (capability; gate verifiable on current Wayland session)
+- [x] 01-01-PLAN.md — X11 gate script + .gitignore + build-baseline orchestrator (capability; gate verifiable on current Wayland session)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -81,7 +81,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Environment Gate & Build Baseline | 0/2 | Planned | - |
+| 1. Environment Gate & Build Baseline | 1/2 | In progress | - |
 | 2. Native RDPEI Touch Lifecycle | 0/0 | Not started | - |
 | 3. Gestures & Session Stability | 0/0 | Not started | - |
 | 4. Diagnostics, Packaging & Launch Configuration | 0/0 | Not started | - |
