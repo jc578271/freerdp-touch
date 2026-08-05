@@ -118,7 +118,7 @@ read -r WIN_TARGET
 # Stage 9: INSTALL (D-13)
 # ---------------------------------------------------------------------------
 printf '=== Stage 9: install built .deb ===\n' >&2
-sudo apt install -y "./$DEB"
+sudo apt install -y --allow-downgrades "./$DEB"
 DURING_VERSION=$(dpkg -l freerdp3-x11 2>/dev/null | awk '/^ii/{print $2, $3, $4}')
 printf 'Installed: %s\n' "$DURING_VERSION" >&2
 
