@@ -4,6 +4,7 @@
 **Domain:** Native X11 touchscreen-input patch for `xfreerdp3` (XInput2 -> RDPEI / mouse-keyboard fallback), delivered as a Debian quilt patch
 **Researched:** 2026-08-05
 **Confidence:** HIGH
+**Inputs synthesized:** `.planning/research/STACK.md`, `.planning/research/FEATURES.md`, `.planning/research/ARCHITECTURE.md`, `.planning/research/PITFALLS.md`
 
 ## Executive Summary
 
