@@ -27,13 +27,13 @@
   3. The developer can build and install the unmodified `freerdp3-x11` source package, launch it against the Windows target, and roll back to the stock Debian package using documented, verified commands.
 
 **Plans**:
-**Wave 1**
+2/2 plans executed
 
 - [x] 01-01-PLAN.md — X11 gate script + .gitignore + build-baseline orchestrator (capability; gate verifiable on current Wayland session)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Execute build/install/smoke/rollback on GNOME on Xorg and commit the sanitized baseline report (human-verified)
+- [x] 01-02-PLAN.md — Execute build/install/smoke/rollback on GNOME on Xorg and commit the sanitized baseline report (human-verified)
 
 ### Phase 2: Native RDPEI Touch Lifecycle
 
@@ -81,7 +81,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Environment Gate & Build Baseline | 1/2 | In progress | - |
+| 1. Environment Gate & Build Baseline | 2/2 | In Progress|  |
 | 2. Native RDPEI Touch Lifecycle | 0/0 | Not started | - |
 | 3. Gestures & Session Stability | 0/0 | Not started | - |
 | 4. Diagnostics, Packaging & Launch Configuration | 0/0 | Not started | - |
