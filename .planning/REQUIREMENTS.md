@@ -86,35 +86,36 @@ Explicitly excluded to keep the first milestone focused.
 
 ## Traceability
 
-Phase mapping is populated during roadmap creation.
+Phase mapping populated during roadmap creation (2026-08-05).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BASE-01 | TBD | Pending |
-| BASE-02 | TBD | Pending |
-| BASE-03 | TBD | Pending |
-| DIAG-01 | TBD | Pending |
-| XINP-01 | TBD | Pending |
-| XINP-02 | TBD | Pending |
-| COOR-01 | TBD | Pending |
-| RDPEI-01 | TBD | Pending |
-| RDPEI-02 | TBD | Pending |
-| RDPEI-03 | TBD | Pending |
-| GEST-01 | TBD | Pending |
-| GEST-02 | TBD | Pending |
-| GEST-03 | TBD | Pending |
-| GEST-04 | TBD | Pending |
-| STAB-01 | TBD | Pending |
-| STAB-02 | TBD | Pending |
-| PACK-01 | TBD | Pending |
-| PACK-02 | TBD | Pending |
-| CONF-01 | TBD | Pending |
+| BASE-01 | Phase 1 | Pending |
+| BASE-02 | Phase 1 | Pending |
+| BASE-03 | Phase 1 | Pending |
+| DIAG-01 | Phase 4 | Pending |
+| XINP-01 | Phase 2 | Pending |
+| XINP-02 | Phase 2 | Pending |
+| COOR-01 | Phase 2 | Pending |
+| RDPEI-01 | Phase 2 | Pending |
+| RDPEI-02 | Phase 2 | Pending |
+| RDPEI-03 | Phase 2 | Pending |
+| GEST-01 | Phase 3 | Pending |
+| GEST-02 | Phase 3 | Pending |
+| GEST-03 | Phase 3 | Pending |
+| GEST-04 | Phase 3 | Pending |
+| STAB-01 | Phase 3 | Pending |
+| STAB-02 | Phase 3 | Pending |
+| PACK-01 | Phase 4 | Pending |
+| PACK-02 | Phase 4 | Pending |
+| CONF-01 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 ⚠️
+- Mapped to phases: 19
+- Unmapped: 0
+- Duplicates: 0
 
 ---
 *Requirements defined: 2026-08-05*
-*Last updated: 2026-08-05 after initial definition*
+*Last updated: 2026-08-05 after roadmap creation*
