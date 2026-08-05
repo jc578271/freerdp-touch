@@ -23,7 +23,9 @@
   1. Running the prerequisite check blocks further implementation/testing unless the active desktop session is native X11 (not Wayland or XWayland).
   2. A captured baseline record exists covering the installed `xfreerdp3`/Debian package version, X11 window manager, touchscreen identity and capabilities, rotation/scale settings, current launch command, and Windows target.
   3. The developer can build and install the unmodified `freerdp3-x11` source package, launch it against the Windows target, and roll back to the stock Debian package using documented, verified commands.
-**Plans**: TBD
+**Plans**:
+- [ ] 01-01-PLAN.md — X11 gate script + .gitignore + build-baseline orchestrator (capability; gate verifiable on current Wayland session)
+- [ ] 01-02-PLAN.md — Execute build/install/smoke/rollback on GNOME on Xorg and commit the sanitized baseline report (human-verified)
 
 ### Phase 2: Native RDPEI Touch Lifecycle
 **Goal**: A finger touch reaches Windows as a complete, ordered, correctly located native RDPEI contact through a full drag, multi-finger, lift, and cancel — without duplicates or stuck contacts — before any gesture logic is added.
@@ -62,7 +64,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Environment Gate & Build Baseline | 0/0 | Not started | - |
+| 1. Environment Gate & Build Baseline | 0/2 | Planned | - |
 | 2. Native RDPEI Touch Lifecycle | 0/0 | Not started | - |
 | 3. Gestures & Session Stability | 0/0 | Not started | - |
 | 4. Diagnostics, Packaging & Launch Configuration | 0/0 | Not started | - |
