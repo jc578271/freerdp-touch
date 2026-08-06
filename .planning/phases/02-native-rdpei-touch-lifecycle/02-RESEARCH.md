@@ -410,16 +410,18 @@ if (contactId) *contactId = (INT32)contactIdlocal;
 
 All other claims are `[VERIFIED]` against the on-disk tarball with file:line citations.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does the OneMix 3 touchscreen's emulated pointer events actually carry `XIPointerEmulated`?**
    - What we know: the device has `XITouchClass` + `XIButtonClass` (baseline-report.md), so XI2 will emulate pointer events for touches.
    - What's unclear: whether Mutter's Xorg session sets the flag reliably. The X.org spec says it should.
    - Recommendation: Validation step — under native X11, `xinput test <id>` while touching, confirm emulated `XI_Motion`/`XI_ButtonPress` carry the flag; if not, fall back to suppressing button events while any touch sequence is active (a per-xfc boolean set on TouchBegin, cleared on TouchEnd).
+   - RESOLVED: Plan 02-01's `XIPointerEmulated` grep acceptance criterion verifies the flag is set on-device; if Mutter does not set the flag, the fallback is "suppress button events while any touch sequence is active" (per-xfc boolean set on TouchBegin, cleared on TouchEnd). Disposition: Plan 02-01 covers the primary `XIPointerEmulated` path; the fallback is noted in the plan action.
 
 2. **Should forced-cancel also call `rdpei->SuspendTouch`/`ResumeTouch`?**
    - What we know: D-05..D-08 specify `UP|CANCELED` + recovery gate; the vtable has Suspend/Resume (used for gesture disambiguation in later phases).
    - Recommendation: NOT in Phase 2. Cancellation + gate is sufficient; Suspend/Resume is a Phase 3 (gesture disambiguation) concern. Keep the seam minimal.
+   - RESOLVED: NO in Phase 2. `UP|CANCELED` + recovery gate is sufficient for D-05..D-08. SuspendTouch/ResumeTouch is deferred to Phase 3 (gesture disambiguation, STAB-02). Plan 02-02 does not call Suspend/Resume.
 
 ## Environment Availability
 
