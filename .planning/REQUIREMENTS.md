@@ -9,9 +9,9 @@ Requirements for the first daily-usable release. Each maps to exactly one roadma
 
 ### Environment and Baseline
 
-- [ ] **BASE-01**: Developer can run a prerequisite check that blocks implementation/testing unless the active desktop session is native X11 rather than Wayland or XWayland.
-- [ ] **BASE-02**: Developer can capture the installed `xfreerdp3`/Debian package version, X11 window manager, touchscreen identity and capabilities, rotation/scale settings, current launch command, and Windows target before modifying source.
-- [ ] **BASE-03**: Developer can build, install, launch, and roll back the unmodified Debian FreeRDP source package before applying the touch patch.
+- [x] **BASE-01**: Developer can run a prerequisite check that blocks implementation/testing unless the active desktop session is native X11 rather than Wayland or XWayland.
+- [x] **BASE-02**: Developer can capture the installed `xfreerdp3`/Debian package version, X11 window manager, touchscreen identity and capabilities, rotation/scale settings, current launch command, and Windows target before modifying source.
+- [x] **BASE-03**: Developer can build, install, launch, and roll back the unmodified Debian FreeRDP source package before applying the touch patch.
 
 ### Diagnostics
 
@@ -90,9 +90,9 @@ Phase mapping populated during roadmap creation (2026-08-05).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BASE-01 | Phase 1 | Pending |
-| BASE-02 | Phase 1 | Pending |
-| BASE-03 | Phase 1 | Pending |
+| BASE-01 | Phase 1 | Complete |
+| BASE-02 | Phase 1 | Complete |
+| BASE-03 | Phase 1 | Complete |
 | DIAG-01 | Phase 4 | Pending |
 | XINP-01 | Phase 2 | Pending |
 | XINP-02 | Phase 2 | Pending |
@@ -111,6 +111,7 @@ Phase mapping populated during roadmap creation (2026-08-05).
 | CONF-01 | Phase 4 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 19 total
 - Mapped to phases: 19
 - Unmapped: 0
