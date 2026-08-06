@@ -47,10 +47,10 @@
   3. Two simultaneous fingers reach Windows as two distinct native contacts in the same RDPEI frame, with neither contact lost or merged.
   4. Finger lift, gesture abort, focus loss, fullscreen/window transition, or disconnect cleanly ends every outstanding remote contact so no stuck or ghost touch remains.
 
-**Plans**: 2/2 plans
+**Plans**: 1/2 plans executed
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Tracer: single-finger tap to native RDPEI contact with #12174 fix, XI2 ownership, emulated suppression, content-bounds gate (Wave 1)
+- [x] 02-01-PLAN.md — Tracer: single-finger tap to native RDPEI contact with #12174 fix, XI2 ownership, emulated suppression, content-bounds gate (Wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -89,7 +89,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Environment Gate & Build Baseline | 2/2 | Complete    | 2026-08-06 |
-| 2. Native RDPEI Touch Lifecycle | 0/2 | Planned | - |
+| 2. Native RDPEI Touch Lifecycle | 1/2 | In Progress|  |
 | 3. Gestures & Session Stability | 0/0 | Not started | - |
 | 4. Diagnostics, Packaging & Launch Configuration | 0/0 | Not started | - |
 
