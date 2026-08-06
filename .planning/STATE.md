@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-stopped_at: Phase 2 context gathered
-last_updated: "2026-08-06T01:26:02.853Z"
+status: active
+stopped_at: Phase 2 executed — verification passed (source level), on-device UAT pending
+last_updated: "2026-08-06T03:35:00Z"
 progress:
-  total_phases: 2
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-current_phase_name: Native RDPEI Touch Lifecycle
+  total_phases: 4
+  completed_phases: 2
+  total_plans: 4
+  completed_plans: 4
+current_phase_name: Gestures & Session Stability
 ---
 
 # State: FreeRDP Touch for OneMix 3
@@ -25,23 +25,22 @@ current_phase_name: Native RDPEI Touch Lifecycle
 
 ## Current Position
 
-- **Phase**: 1 - Environment Gate & Build Baseline
-- **Plan**: 01-01 complete (01-02 next)
-- **Status**: Plan 01-01 executed — gate script + build-baseline orchestrator + .gitignore created
-- **Progress**: 0/4 phases complete, 1/2 plans in Phase 1
+- **Phase**: 2 - Native RDPEI Touch Lifecycle
+- **Status**: Phase 2 executed — 2/2 plans complete, source-level verification passed (6/6 requirements). On-device UAT pending.
+- **Progress**: 2/4 phases complete, 4/4 plans executed across Phases 1–2
 
 ```
-[~] Phase 1: Environment Gate & Build Baseline (1/2 plans)
-[ ] Phase 2: Native RDPEI Touch Lifecycle
+[x] Phase 1: Environment Gate & Build Baseline (2/2 plans)
+[x] Phase 2: Native RDPEI Touch Lifecycle (2/2 plans)
 [ ] Phase 3: Gestures & Session Stability
 [ ] Phase 4: Diagnostics, Packaging & Launch Configuration
 ```
 
 ## Performance Metrics
 
-- **Phases completed**: 0/4
+- **Phases completed**: 2/4
 - **Requirements mapped**: 19/19
-- **Plans completed**: 1 (01-01)
+- **Plans completed**: 4 (01-01, 01-02, 02-01, 02-02)
 
 ## Accumulated Context
 
@@ -69,13 +68,14 @@ current_phase_name: Native RDPEI Touch Lifecycle
 
 ## Session Continuity
 
-**Last session:** 2026-08-06T01:26:02.828Z
-**Stopped at:** Phase 2 context gathered
-**Resume file:** .planning/phases/02-native-rdpei-touch-lifecycle/02-CONTEXT.md
+**Last session:** 2026-08-06T03:35:00Z
+**Stopped at:** Phase 2 executed — verification passed (source level)
+**Resume file:** .planning/phases/02-native-rdpei-touch-lifecycle/02-VERIFICATION.md
 
-- **Last action**: Executed Plan 01-01 — created scripts/check-x11-session.sh, scripts/build-baseline.sh, .gitignore. Gate verified live (hard-fails on Wayland with correct remediation).
-- **Next action**: Execute Plan 01-02 (on-device build/install/smoke/rollback on GNOME on Xorg session).
-- **Handoff note**: Switch to GNOME on Xorg session before running build-baseline.sh. The gate will block until the session is native X11.
+- **Last action**: Executed Phase 2 (both plans). 02-01: single-tap RDPEI pipeline with #12174 fix, XI2 ownership, emulated suppression, content-bounds gate. 02-02: forced-cancel seam (5 hooks), recovery gate, idempotency, fallback latch. Build passes, .deb produced.
+- **Next action**: On-device UAT on OneMix 3 GNOME-on-Xorg session, then `/gsd-plan-phase 3` for Gestures & Session Stability.
+- **Code review**: 3 medium findings (M1: canceledIds[] sync bug, M2: WITH_XRENDER=OFF latent, M3: WITH_XI=OFF latent), 3 low. Review at 02-REVIEW.md.
+- **Handoff note**: Phase 2 source-level verification passed (6/6 requirements). Six on-device UAT items remain (02-VERIFICATION.md behavior_unverified_items). D-06 mid-session channel-only drop deferred to Phase 3.
 
 ---
 *State initialized: 2026-08-05*
