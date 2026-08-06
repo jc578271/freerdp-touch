@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: active
-stopped_at: Phase 3 planning complete
-last_updated: "2026-08-06T17:12:39+07:00"
+stopped_at: Phase 3 Plan 01 complete — long-press right-click with slop deadband
+last_updated: "2026-08-06T23:11:20+07:00"
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 7
-  completed_plans: 4
+  completed_plans: 5
 current_phase_name: Gestures & Session Stability
 ---
 
@@ -28,7 +28,7 @@ current_phase_name: Gestures & Session Stability
 
 - **Phase**: 3 - Gestures & Session Stability
 - **Status**: Phase 3 planned — 3 plans across 3 waves, verification passed. Ready to execute Wave 1.
-- **Progress**: 2/4 phases complete, 4/7 plans executed; 3 Phase 3 plans ready
+- **Progress**: 2/4 phases complete, 5/7 plans executed; 2 Phase 3 plans remaining
 
 ```
 [x] Phase 1: Environment Gate & Build Baseline (2/2 plans)
@@ -41,7 +41,7 @@ current_phase_name: Gestures & Session Stability
 
 - **Phases completed**: 2/4
 - **Requirements mapped**: 19/19
-- **Plans completed**: 4 (01-01, 01-02, 02-01, 02-02)
+- **Plans completed**: 5 (01-01, 01-02, 02-01, 02-02, 03-01)
 
 ## Accumulated Context
 
@@ -58,6 +58,7 @@ current_phase_name: Gestures & Session Stability
 - [Phase 2] Forced-cancel iterates cctx->contacts[] (authoritative native store), not xfc->contacts[] (local-gesture array); recovery gate at top of xf_input_handle_event_remote.
 - [Phase 2] Fallback latch is X11-client-only (xf_input_touch_remote); client/common/client.c unchanged — keeps SDL/Wayland policy separate.
 - [Phase 2 UAT] Long-press right-click broken: OneMix 3 touchscreen reports 1–3px jitter on a stationary finger; every jitter forwards as RDPEI MOTION and Windows cancels press-and-hold. Phase 3 must add a motion deadband (suppress sub-threshold MOTION during hold) so Windows sees a stationary contact. Root cause confirmed via on-device log.
+- [Phase 3 Plan 01] Short tap = deterministic mouse left-click (DOWN|BUTTON1 then BUTTON1) rather than depending on Windows' own tap-to-click, which proved unreliable on-device. Drag = cancel native + reuse fallback latch. Long-press reuses xf_touch_force_cancel for the cancel seam so a later physical End cannot overwrite. 30ms RDPEI cancel settle delay needed for stale contact visuals. Deadband pins sub-slop updates to down coordinate rather than dropping them.
 
 ### Todos
 
@@ -73,14 +74,12 @@ current_phase_name: Gestures & Session Stability
 
 ## Session Continuity
 
-**Last session:** 2026-08-06T17:12:39+07:00
-**Stopped at:** Phase 3 planning complete
-**Resume file:** .planning/phases/03-gestures-session-stability/03-01-PLAN.md
+**Last session:** 2026-08-06T23:11:20+07:00
+**Stopped at:** Completed 03-01-PLAN.md — long-press right-click with slop deadband
+**Resume file:** .planning/phases/03-gestures-session-stability/03-02-PLAN.md
 
-- **Last action**: Phase 3 research, pattern mapping, and planning completed. Three plans across three waves passed the plan checker; requirement coverage is 6/6 and decision coverage is 16/16.
-- **Next action**: `/gsd-execute-phase 3` to implement the Wave 1 long-press deadband tracer.
-- **Deferred to Phase 3**: (1) long-press right-click deadband, (2) touch smoothness/latency (RDPEI ~20ms batching + X11 jitter). Both are Phase 03 scope, not Phase 02 regressions.
-- **Cleanup note**: Two `/* DIAG: */` debug-log blocks were added to `build/.../xf_input.c` during UAT (touch_remote + force_cancel). They are NOT in the quilt patch and must be removed before building the final `.deb` for Phase 4.
+- **Last action**: Plan 03-01 finalized. Long-press state machine, slop deadband, deterministic short-tap/drag, force-cancel extension, and 3 CLI knobs verified and human-checked. Implementation lives in gitignored build/ tree.
+- **Next action**: `/gsd-execute-phase 3` for 03-02 pinch (native passthrough + Ctrl+wheel fallback).
 
 ---
 *State initialized: 2026-08-05*
