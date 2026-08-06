@@ -46,7 +46,8 @@
     "post_planning_gaps": true,
     "security_enforcement": true,
     "security_asvs_level": 1,
-    "security_block_on": "high"
+    "security_block_on": "high",
+    "_auto_chain_active": false
   },
   "ship": {
     "pr_body_sections": [
@@ -96,12 +97,12 @@
     "gsd-project-researcher": "sonnet",
     "gsd-research-synthesizer": "sonnet",
     "gsd-debugger": "sonnet",
-    "gsd-codebase-mapper": "sonnet",
+    "gsd-codebase-mapper": "haiku",
     "gsd-verifier": "sonnet",
     "gsd-plan-checker": "sonnet",
     "gsd-integration-checker": "sonnet",
     "gsd-nyquist-auditor": "sonnet",
-    "gsd-pattern-mapper": "sonnet",
+    "gsd-pattern-mapper": "haiku",
     "gsd-ui-researcher": "sonnet",
     "gsd-ui-checker": "sonnet",
     "gsd-ui-auditor": "sonnet",
@@ -112,7 +113,7 @@
     "gsd-assumptions-analyzer": "opus",
     "gsd-code-fixer": "haiku",
     "gsd-code-reviewer": "sonnet",
-    "gsd-debug-session-manager": "haiku",
+    "gsd-debug-session-manager": "sonnet",
     "gsd-doc-classifier": "sonnet",
     "gsd-doc-synthesizer": "sonnet",
     "gsd-domain-researcher": "opus",
