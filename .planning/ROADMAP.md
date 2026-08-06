@@ -68,7 +68,13 @@
   3. Touch remains usable without crashes, stale contacts, or duplicate events after switching between windowed/fullscreen states and after losing and regaining focus.
   4. Disconnecting or reconnecting during an active touch or gesture does not crash the client, and touch works again after reconnection.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+- [ ] 03-01-PLAN.md — Tracer: long-press right-click with slop deadband + force-cancel gesture-state extension + 3 settings/CLI knobs (Wave 1)
+
+- [ ] 03-02-PLAN.md — Pinch: native passthrough exclusivity guard + fallback Ctrl+wheel synthesizer with claiming, midpoint, detents, reversal hysteresis (Wave 2, depends on 03-01)
+
+- [ ] 03-03-PLAN.md — Channel-loss guard + end-of-phase on-device UAT for all 6 requirements across lifecycle + reconnect (Wave 3, depends on 03-01 + 03-02)
 
 ### Phase 4: Diagnostics, Packaging & Launch Configuration
 

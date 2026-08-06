@@ -1,0 +1,3 @@
+# Phase 03 — API Integration Coverage
+
+**No external API integration: Phase 3 (Gestures & Session Stability) integrates no external API or service.** The phase patches the already-pinned, already-built FreeRDP 3.15.0 X11 client source tree in-place using only in-tree C APIs (`freerdp_client_handle_touch`, `freerdp_client_send_button_event`, `freerdp_client_send_wheel_event`, `freerdp_input_send_keyboard_event`, `rdpei->TouchCancel`, `PubSub_SubscribeTimer`) and the C standard library (`math.h`, WinPR time). No network endpoint, third-party SDK, auth provider, LLM/AI service, webhook, or external data source is introduced. All input originates from the already-trusted local X11 socket and the already-trusted touchscreen. No API matrix is applicable.
