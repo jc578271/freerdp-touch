@@ -1,4 +1,8 @@
 ---
+status: passed
+---
+
+---
 phase: 02-native-rdpei-touch-lifecycle
 verified: 2026-08-06T03:30:00Z
 status: passed
@@ -7,12 +11,14 @@ behavior_unverified: 6
 overrides_applied: 0
 gaps: []
 behavior_unverified_items:
+
   - "On-device UAT: single-tap RDPEI trace (XINP-01, RDPEI-01)"
   - "On-device UAT: drag and two-finger distinctness (XINP-02)"
   - "On-device UAT: four-corner coordinate check (COOR-01)"
   - "On-device UAT: five interruption paths (RDPEI-02)"
   - "On-device UAT: fallback latch behavior (RDPEI-03)"
   - "On-device UAT: D-10 live-resize coordinate correctness"
+
 human_verification: []
 
 # Phase 02 Verification: Native RDPEI Touch Lifecycle
@@ -60,6 +66,7 @@ Union of plan frontmatter requirements = {XINP-01, XINP-02, COOR-01, RDPEI-01, R
 | #12174 lock race fixed: CriticalSection covers both reserve and AddContact publish | `rdpei_main.c`: `EnterCriticalSection` at 1063, `rdpei_contact` reserve at 1066, `context->AddContact` publish at 1126, `LeaveCriticalSection` at 1129. The only intermediate `LeaveCriticalSection` (line 1072) is the `contactIdlocal > UINT32_MAX` error-return branch, not the main path | PASS |
 
 **Plan 01 artifacts:**
+
 - `channels/rdpei/client/rdpei_main.c` — LeaveCriticalSection moved to line 1129 (after AddContact at 1126). Confirmed.
 - `client/X11/xf_input.c` — `XI_TouchOwnership` XISetMask at line 122; `case XI_TouchOwnership` at 1072 with `XIAllowTouchEvents` (count=2); `XIPointerEmulated` filter at 1096 (count=1); content-bounds gate at 669-676 before `xf_event_adjust_coordinates`. Confirmed.
 - `client/X11/xfreerdp.h` — 7 new xfContext fields (fallbackActive, fallbackFinger, recoveryGateArmed, canceledIds[], canceledIdCount, quarantinedFingers[], quarantinedCount) at lines 313-319. Confirmed (grep count=4 for the 4 named identifiers; fallbackFinger/canceledIdCount/quarantinedCount present at 314/317/319).
@@ -105,6 +112,7 @@ Union of plan frontmatter requirements = {XINP-01, XINP-02, COOR-01, RDPEI-01, R
 ## Cross-reference: claimed vs actual
 
 Both summaries' `requirements-completed` lists match the codebase evidence:
+
 - Plan 01 SUMMARY claims [XINP-01, XINP-02, COOR-01, RDPEI-01, RDPEI-03] — all verified present in source.
 - Plan 02 SUMMARY claims [XINP-02, RDPEI-02] — both verified present in source.
 

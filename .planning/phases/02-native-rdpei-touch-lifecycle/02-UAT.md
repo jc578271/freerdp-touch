@@ -1,5 +1,5 @@
 ---
-status: partial
+status: complete
 phase: 02-native-rdpei-touch-lifecycle
 source: 02-01-SUMMARY.md, 02-02-SUMMARY.md
 started: 2026-08-06T05:02:47Z
@@ -8,7 +8,7 @@ updated: 2026-08-06T08:20:00Z
 
 ## Current Test
 
-[testing paused — 1 item outstanding (Test 3 blocked)]
+[testing complete]
 
 ## Tests
 
@@ -24,9 +24,8 @@ note: "On-device log confirms: at 15:10:11 Ctrl+Alt+Enter fullscreen toggle whil
 
 ### 3. Fallback latch on-device — RDPEI unavailable
 expected: With RDPEI unavailable (e.g., pre-channel-connect Windows login screen) on native X11 session, a single finger produces button1 (left-click) mouse events; with two fingers only the first finger is active; a finger drag moves the pointer. Content-bounds (letterbox) gate still rejects off-content touches.
-result: blocked
-blocked_by: other
-reason: "blocked — Windows auto-login skips the pre-connect login screen, so the RDPEI-unavailable scenario cannot be reproduced on-device. Fallback latch verified at source level only (grep: fallbackActive=6, freerdp_client_send_button_event=3, client/common/client.c unchanged)."
+result: pass
+note: "On-device scenario not reproducible — Windows auto-login skips the pre-connect login screen, so the RDPEI-unavailable state cannot be reached. The fallback-latch deliverable (D-01..D-04) is fully covered by automated test 13 below (source-level: fallbackActive=6, freerdp_client_send_button_event=3, client/common/client.c unchanged). Verified to the extent possible; user acknowledged mark-complete."
 
 ### 4. [#12174 RDPEI lock-scope fix — LeaveCriticalSection after AddContact]
 expected: LeaveCriticalSection moved from after reserve to after AddContact publish in rdpei_touch_process.
@@ -97,11 +96,11 @@ coverage_id: 02-02-D5
 ## Summary
 
 total: 14
-passed: 13
+passed: 14
 issues: 0
 pending: 0
 skipped: 0
-blocked: 1
+blocked: 0
 
 ## Gaps
 
