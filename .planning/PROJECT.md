@@ -14,11 +14,10 @@ A OneMix 3 user can operate a normal Windows RDP session comfortably by touch, w
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ A short touch and one-finger drag reach Windows as native RDPEI touch input with complete, correctly ordered contact events. — Phase 2 (on-device UAT: native RDPEI path active, fallback never triggered, contact lifecycle correct)
 
 ### Active
 
-- [ ] A short touch and one-finger drag reach Windows as native RDPEI touch input with complete, correctly ordered contact events.
 - [ ] A configurable long press in the 500–700 ms range produces a reliable right-click without also producing an unwanted left-click.
 - [ ] A two-finger pinch uses native multitouch by default and can be configured to fall back to `Ctrl` + mouse wheel for applications that do not handle touch zoom well.
 - [ ] The patched `xfreerdp3` remains responsive and stable during ordinary fullscreen and windowed RDP sessions on the OneMix 3.
@@ -59,7 +58,8 @@ A OneMix 3 user can operate a normal Windows RDP session comfortably by touch, w
 |----------|-----------|---------|
 | Patch `xfreerdp3` directly instead of building a daemon | Lowest latency and direct access to RDPEI, fullscreen, and keyboard-grab behavior | — Pending |
 | Target OneMix 3 + Debian + X11 first | A narrow hardware/runtime target makes behavior measurable and gets to daily use sooner | — Pending |
-| Send one-finger interaction as native RDPEI touch | Native touch is the desired experience and preserves Windows/app touch semantics | — Pending |
+| Send one-finger interaction as native RDPEI touch | Native touch is the desired experience and preserves Windows/app touch semantics | ✓ Phase 2 — on-device log confirms native RDPEI path (rdpei non-nil on all touch events, fallback=0) |
+| Long-press right-click requires a motion deadband | On-device UAT (Phase 2) found the OneMix 3 touchscreen reports 1–3px jitter on a stationary finger; every jitter forwards as RDPEI MOTION and Windows cancels press-and-hold right-click. Phase 3 must suppress sub-threshold MOTION so Windows sees a stationary held contact. | — Phase 3 (root cause confirmed, spec ready) |
 | Use native multitouch pinch with configurable `Ctrl` + wheel fallback | Keeps native behavior while supporting desktop applications that only zoom through wheel shortcuts | — Pending |
 | Limit v1 to one-finger touch/drag, long press, and pinch | These cover the highest-value daily interactions without prematurely building the full gesture suite | — Pending |
 | Deliver a patch, Debian package, and launch configuration | Code alone is not usable enough; installation and repeatable operation are part of the product | — Pending |
@@ -82,4 +82,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-05 after initialization*
+*Last updated: 2026-08-06 after Phase 2*

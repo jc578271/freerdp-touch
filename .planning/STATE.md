@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: active
-stopped_at: Phase 2 executed — verification passed (source level), on-device UAT pending
-last_updated: "2026-08-06T03:35:00Z"
+stopped_at: Phase 2 executed — verification passed (source level)
+last_updated: "2026-08-06T08:41:14.886Z"
 progress:
-  total_phases: 4
+  total_phases: 2
   completed_phases: 2
   total_plans: 4
   completed_plans: 4
@@ -19,14 +19,15 @@ current_phase_name: Gestures & Session Stability
 
 - **Project**: FreeRDP Touch for OneMix 3
 - **Core Value**: A OneMix 3 user can operate a normal Windows RDP session comfortably by touch, with low latency and without needing an external mouse for common interactions.
+- **Current focus**: Phase 3 — Gestures & Session Stability (long-press deadband, pinch, reconnect/focus stability)
 - **Roadmap**: `.planning/ROADMAP.md`
 - **Requirements**: `.planning/REQUIREMENTS.md` (19 v1)
 - **Research**: `.planning/research/SUMMARY.md` (HIGH confidence)
 
 ## Current Position
 
-- **Phase**: 2 - Native RDPEI Touch Lifecycle
-- **Status**: Phase 2 executed — 2/2 plans complete, source-level verification passed (6/6 requirements). On-device UAT pending.
+- **Phase**: 3 - Gestures & Session Stability
+- **Status**: Phase 2 complete — 2/2 plans, on-device UAT passed (14/14), verification passed. Ready to plan Phase 3.
 - **Progress**: 2/4 phases complete, 4/4 plans executed across Phases 1–2
 
 ```
@@ -53,10 +54,14 @@ current_phase_name: Gestures & Session Stability
 - Gate uses four-signal AND check (XDG_SESSION_TYPE, WAYLAND_DISPLAY, pgrep Xorg, pgrep Xwayland) — xdpyinfo vendor string is NOT a discriminator (reports "X.Org Foundation" under both Xorg and XWayland).
 - build-baseline.sh installs only freerdp3-x11_*_amd64.deb, never the broad freerdp3-* glob (avoids replacing freerdp3-wayland).
 - Rollback uses apt install --reinstall freerdp3-x11 with fallback to apt install freerdp3-x11/trixie.
+- [Phase 2] #12174 RDPEI lock-race fixed with a recursive CriticalSection widened to cover reserve + AddContact publish (WinPR CriticalSection is recursive on Linux).
+- [Phase 2] Forced-cancel iterates cctx->contacts[] (authoritative native store), not xfc->contacts[] (local-gesture array); recovery gate at top of xf_input_handle_event_remote.
+- [Phase 2] Fallback latch is X11-client-only (xf_input_touch_remote); client/common/client.c unchanged — keeps SDL/Wayland policy separate.
+- [Phase 2 UAT] Long-press right-click broken: OneMix 3 touchscreen reports 1–3px jitter on a stationary finger; every jitter forwards as RDPEI MOTION and Windows cancels press-and-hold. Phase 3 must add a motion deadband (suppress sub-threshold MOTION during hold) so Windows sees a stationary contact. Root cause confirmed via on-device log.
 
 ### Todos
 
-- Plan Phase 1 with `/gsd-plan-phase 1`.
+- Plan Phase 3 with `/gsd-plan-phase 3` (long-press deadband is the highest-value Phase 3 item — root cause already specced).
 
 ### Blockers
 
@@ -68,14 +73,14 @@ current_phase_name: Gestures & Session Stability
 
 ## Session Continuity
 
-**Last session:** 2026-08-06T03:35:00Z
-**Stopped at:** Phase 2 executed — verification passed (source level)
-**Resume file:** .planning/phases/02-native-rdpei-touch-lifecycle/02-VERIFICATION.md
+**Last session:** 2026-08-06
+**Stopped at:** Phase 2 complete (on-device UAT passed), ready to plan Phase 3
+**Resume file:** None
 
-- **Last action**: Executed Phase 2 (both plans). 02-01: single-tap RDPEI pipeline with #12174 fix, XI2 ownership, emulated suppression, content-bounds gate. 02-02: forced-cancel seam (5 hooks), recovery gate, idempotency, fallback latch. Build passes, .deb produced.
-- **Next action**: On-device UAT on OneMix 3 GNOME-on-Xorg session, then `/gsd-plan-phase 3` for Gestures & Session Stability.
-- **Code review**: 3 medium findings (M1: canceledIds[] sync bug, M2: WITH_XRENDER=OFF latent, M3: WITH_XI=OFF latent), 3 low. Review at 02-REVIEW.md.
-- **Handoff note**: Phase 2 source-level verification passed (6/6 requirements). Six on-device UAT items remain (02-VERIFICATION.md behavior_unverified_items). D-06 mid-session channel-only drop deferred to Phase 3.
+- **Last action**: Phase 2 on-device UAT on OneMix 3 GNOME-on-Xorg session. Patch verified working: native RDPEI path active (rdpei non-nil on all 1367 touch events, fallback never triggered), forced-cancel fires correctly on fullscreen toggle with finger down (TouchCancel id=231 emitted), recovery gate works. 14/14 UAT passed.
+- **Next action**: `/gsd-plan-phase 3` for Gestures & Session Stability. Highest-value item: long-press motion deadband (root cause already confirmed — X11 jitter ±3px cancels Windows press-and-hold).
+- **Deferred to Phase 3**: (1) long-press right-click deadband, (2) touch smoothness/latency (RDPEI ~20ms batching + X11 jitter). Both are Phase 03 scope, not Phase 02 regressions.
+- **Cleanup note**: Two `/* DIAG: */` debug-log blocks were added to `build/.../xf_input.c` during UAT (touch_remote + force_cancel). They are NOT in the quilt patch and must be removed before building the final `.deb` for Phase 4.
 
 ---
 *State initialized: 2026-08-05*
