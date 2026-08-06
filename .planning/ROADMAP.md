@@ -48,8 +48,12 @@
   4. Finger lift, gesture abort, focus loss, fullscreen/window transition, or disconnect cleanly ends every outstanding remote contact so no stuck or ghost touch remains.
 
 **Plans**: 2/2 plans
+**Wave 1**
 
 - [ ] 02-01-PLAN.md — Tracer: single-finger tap to native RDPEI contact with #12174 fix, XI2 ownership, emulated suppression, content-bounds gate (Wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 02-02-PLAN.md — Forced-cancel seam across 5 lifecycle hooks + first-contact-only fallback latch + recovery gate (Wave 2, depends on 02-01)
 
 ### Phase 3: Gestures & Session Stability
