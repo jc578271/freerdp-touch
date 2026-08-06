@@ -69,10 +69,15 @@
   4. Disconnecting or reconnecting during an active touch or gesture does not crash the client, and touch works again after reconnection.
 
 **Plans**: 3 plans
+**Wave 1**
 
 - [ ] 03-01-PLAN.md — Tracer: long-press right-click with slop deadband + force-cancel gesture-state extension + 3 settings/CLI knobs (Wave 1)
 
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 03-02-PLAN.md — Pinch: native passthrough exclusivity guard + fallback Ctrl+wheel synthesizer with claiming, midpoint, detents, reversal hysteresis (Wave 2, depends on 03-01)
+
+**Wave 3** *(blocked on Wave 2 completion)*
 
 - [ ] 03-03-PLAN.md — Channel-loss guard + end-of-phase on-device UAT for all 6 requirements across lifecycle + reconnect (Wave 3, depends on 03-01 + 03-02)
 

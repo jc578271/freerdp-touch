@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: active
-stopped_at: Phase 3 context gathered
-last_updated: "2026-08-06T09:12:22.561Z"
+stopped_at: Phase 3 planning complete
+last_updated: "2026-08-06T17:12:39+07:00"
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 4
+  total_plans: 7
   completed_plans: 4
 current_phase_name: Gestures & Session Stability
 ---
@@ -27,8 +27,8 @@ current_phase_name: Gestures & Session Stability
 ## Current Position
 
 - **Phase**: 3 - Gestures & Session Stability
-- **Status**: Phase 2 complete — 2/2 plans, on-device UAT passed (14/14), verification passed. Ready to plan Phase 3.
-- **Progress**: 2/4 phases complete, 4/4 plans executed across Phases 1–2
+- **Status**: Phase 3 planned — 3 plans across 3 waves, verification passed. Ready to execute Wave 1.
+- **Progress**: 2/4 phases complete, 4/7 plans executed; 3 Phase 3 plans ready
 
 ```
 [x] Phase 1: Environment Gate & Build Baseline (2/2 plans)
@@ -61,7 +61,7 @@ current_phase_name: Gestures & Session Stability
 
 ### Todos
 
-- Plan Phase 3 with `/gsd-plan-phase 3` (long-press deadband is the highest-value Phase 3 item — root cause already specced).
+- Execute Phase 3 with `/gsd-execute-phase 3`; Wave 1 starts with the long-press deadband tracer.
 
 ### Blockers
 
@@ -73,12 +73,12 @@ current_phase_name: Gestures & Session Stability
 
 ## Session Continuity
 
-**Last session:** 2026-08-06T09:12:22.547Z
-**Stopped at:** Phase 3 context gathered
-**Resume file:** .planning/phases/03-gestures-session-stability/03-CONTEXT.md
+**Last session:** 2026-08-06T17:12:39+07:00
+**Stopped at:** Phase 3 planning complete
+**Resume file:** .planning/phases/03-gestures-session-stability/03-01-PLAN.md
 
-- **Last action**: Phase 2 on-device UAT on OneMix 3 GNOME-on-Xorg session. Patch verified working: native RDPEI path active (rdpei non-nil on all 1367 touch events, fallback never triggered), forced-cancel fires correctly on fullscreen toggle with finger down (TouchCancel id=231 emitted), recovery gate works. 14/14 UAT passed.
-- **Next action**: `/gsd-plan-phase 3` for Gestures & Session Stability. Highest-value item: long-press motion deadband (root cause already confirmed — X11 jitter ±3px cancels Windows press-and-hold).
+- **Last action**: Phase 3 research, pattern mapping, and planning completed. Three plans across three waves passed the plan checker; requirement coverage is 6/6 and decision coverage is 16/16.
+- **Next action**: `/gsd-execute-phase 3` to implement the Wave 1 long-press deadband tracer.
 - **Deferred to Phase 3**: (1) long-press right-click deadband, (2) touch smoothness/latency (RDPEI ~20ms batching + X11 jitter). Both are Phase 03 scope, not Phase 02 regressions.
 - **Cleanup note**: Two `/* DIAG: */` debug-log blocks were added to `build/.../xf_input.c` during UAT (touch_remote + force_cancel). They are NOT in the quilt patch and must be removed before building the final `.deb` for Phase 4.
 
