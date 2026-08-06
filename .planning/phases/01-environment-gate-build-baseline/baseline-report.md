@@ -446,7 +446,7 @@ RESOURCE_MANAGER(STRING) = "*customization:\t-color\nXft.dpi:\t192\nXft.antialia
 ## Launch Command (sanitized)
 
 ```
-xfreerdp3   /v:HOST-IP   /u:ngleh   /p:***   /f /smart-sizing:2560x1600 /scale-desktop:200   /clipboard   /sound:sys:pulse /microphone:sys:pulse   /drive:Onemix,"$HOME"   /cert:ignore
+xfreerdp3   /v:HOST-IP   /u:USER   /p:***   /f /smart-sizing:2560x1600 /scale-desktop:200   /clipboard   /sound:sys:pulse /microphone:sys:pulse   /drive:Onemix,"$HOME"   /cert:ignore
 ```
 
 ## Windows Target (sanitized)
