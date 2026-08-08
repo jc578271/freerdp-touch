@@ -11,7 +11,7 @@
 - [~] **Phase 1: Environment Gate & Build Baseline** - Verify the X11 session, capture the device/source baseline, and prove the unmodified Debian FreeRDP source builds, launches, and rolls back before any patch.
 - [x] **Phase 2: Native RDPEI Touch Lifecycle** - Deliver complete, ordered, correctly located native RDPEI contacts through drag, multi-finger, lift, and cancel — with no duplicates or stuck contacts — before any gesture logic.
 - [x] **Phase 3: Local-Only Gestures & Session Stability** - Deliver the non-multitouch/local-only gesture set: one-finger left-click/drag/long-press right-click, two-finger wheel scroll, bidirectional Ctrl+wheel pinch, and three-finger middle-button drag, with clean lifecycle recovery.
-- [ ] **Phase 4: Diagnostics, Packaging & Launch Configuration** - Ship the verified patch as an installable Debian `.deb` with env-var-gated diagnostics and a documented, repeatable launch preset.
+- [~] **Phase 4: Diagnostics, Packaging & Launch Configuration** - Ship the verified patch as an installable Debian `.deb` with env-var-gated diagnostics and a documented, repeatable launch preset.
 
 ## Phase Details
 
@@ -93,7 +93,16 @@
   3. The user can launch the patched client with a documented preset that keeps native multitouch disabled, enables the local-only gesture layer, exposes long-press/pinch calibration, and provides an explicit mouse-only escape hatch.
   4. The user can enable diagnostic logging that records touch begin/update/end/cancel events, gesture decisions, and RDPEI frame submission, while normal launches keep the logging disabled.
 
-**Plans**: TBD
+**Plans**: 3/3 plans
+
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Diagnostic gate + quilt patch + release build (DIAG-01, PACK-01)
+- [ ] 04-02-PLAN.md — Launch wrapper + menu delegation (CONF-01)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-03-PLAN.md — Operations documentation + on-device install/rollback verification (PACK-02, CONF-01)
 
 ## Progress
 
@@ -102,7 +111,7 @@
 | 1. Environment Gate & Build Baseline | 2/2 | Complete    | 2026-08-06 |
 | 2. Native RDPEI Touch Lifecycle | 2/2 | Complete    | 2026-08-06 |
 | 3. Local-Only Gestures & Session Stability | 3/3 | Complete | 2026-08-08 |
-| 4. Diagnostics, Packaging & Launch Configuration | 0/0 | Not started | - |
+| 4. Diagnostics, Packaging & Launch Configuration | 0/3 | Not started | - |
 
 ## Ordering Rationale
 
