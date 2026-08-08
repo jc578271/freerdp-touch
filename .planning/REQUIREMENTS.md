@@ -35,20 +35,20 @@ Requirements for the first daily-usable release. Each maps to exactly one roadma
 ### Gestures
 
 - [x] **GEST-01**: User can hold one finger for a configurable 500–700 ms threshold to produce one right-click at that position, with no left-click emitted afterward.
-- [x] **GEST-02**: Moving beyond a configurable slop distance before the threshold cancels long-press detection and continues as an ordinary native drag.
-- [ ] **GEST-03**: In native pinch mode, a two-finger pinch forwards native multitouch to Windows and emits no local wheel shortcut.
-- [ ] **GEST-04**: In fallback pinch mode selected before launch, a two-finger pinch emits `Ctrl` + wheel, never also emits native pinch, and releases `Ctrl` when the gesture ends or is interrupted.
+- [x] **GEST-02**: Moving beyond a configurable slop distance before the threshold cancels long-press detection and continues as a local left-button drag.
+- [x] **GEST-03**: With native multitouch disabled, two-finger translation emits wheel scroll and three-finger translation performs middle-button drag, without forwarding native RDPEI contacts.
+- [x] **GEST-04**: With native multitouch disabled, a two-finger pinch emits `Ctrl` + wheel in either direction within the same gesture and releases `Ctrl` when the gesture ends or is interrupted.
 
 ### Session Stability
 
 - [x] **STAB-01**: Touch remains usable without crashes, stale contacts, or duplicate events after switching between windowed/fullscreen states and after losing and regaining focus.
-- [ ] **STAB-02**: Disconnecting or reconnecting during an active touch or gesture does not crash the client, and touch works again after reconnection.
+- [x] **STAB-02**: Disconnecting, reconnecting, or interrupting an active local gesture releases every held local button/key state and allows the next touch gesture to start cleanly.
 
 ### Packaging and Use
 
 - [ ] **PACK-01**: Developer can reproducibly build an installable Debian `.deb` from the pinned `freerdp3-x11 3.15.0+dfsg-2.1+deb13u3` source using a documented quilt patch.
 - [ ] **PACK-02**: User can install the patched package and restore the stock Debian package using documented, verified commands.
-- [ ] **CONF-01**: User can launch the patched client with a documented preset that enables multitouch, exposes long-press and pinch-mode calibration, and provides an explicit mouse-only/multitouch-off escape hatch.
+- [ ] **CONF-01**: User can launch the patched client with a documented preset that keeps native multitouch disabled, enables the local-only gesture layer, exposes long-press/pinch calibration, and provides an explicit mouse-only escape hatch.
 
 ## v2 Requirements
 
@@ -102,10 +102,10 @@ Phase mapping populated during roadmap creation (2026-08-05).
 | RDPEI-03 | Phase 2 | Complete |
 | GEST-01 | Phase 3 | Complete |
 | GEST-02 | Phase 3 | Complete |
-| GEST-03 | Phase 3 | Pending |
-| GEST-04 | Phase 3 | Pending |
+| GEST-03 | Phase 3 | Complete |
+| GEST-04 | Phase 3 | Complete |
 | STAB-01 | Phase 3 | Complete |
-| STAB-02 | Phase 3 | Pending |
+| STAB-02 | Phase 3 | Complete |
 | PACK-01 | Phase 4 | Pending |
 | PACK-02 | Phase 4 | Pending |
 | CONF-01 | Phase 4 | Pending |
@@ -119,4 +119,4 @@ Phase mapping populated during roadmap creation (2026-08-05).
 
 ---
 *Requirements defined: 2026-08-05*
-*Last updated: 2026-08-05 after roadmap creation*
+*Last updated: 2026-08-08 — Phase 3 revised to the user-directed non-multitouch/local-only target*

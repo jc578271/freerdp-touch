@@ -10,7 +10,7 @@
 
 - [~] **Phase 1: Environment Gate & Build Baseline** - Verify the X11 session, capture the device/source baseline, and prove the unmodified Debian FreeRDP source builds, launches, and rolls back before any patch.
 - [x] **Phase 2: Native RDPEI Touch Lifecycle** - Deliver complete, ordered, correctly located native RDPEI contacts through drag, multi-finger, lift, and cancel — with no duplicates or stuck contacts — before any gesture logic.
-- [~] **Phase 3: Gestures & Session Stability** - Implement the three core gestures (long-press right-click, native pinch, Ctrl+wheel fallback pinch) and keep touch stable across window state, focus, and disconnect/reconnect.
+- [x] **Phase 3: Local-Only Gestures & Session Stability** - Deliver the non-multitouch/local-only gesture set: one-finger left-click/drag/long-press right-click, two-finger wheel scroll, bidirectional Ctrl+wheel pinch, and three-finger middle-button drag, with clean lifecycle recovery.
 - [ ] **Phase 4: Diagnostics, Packaging & Launch Configuration** - Ship the verified patch as an installable Debian `.deb` with env-var-gated diagnostics and a documented, repeatable launch preset.
 
 ## Phase Details
@@ -56,30 +56,30 @@
 
 - [x] 02-02-PLAN.md — Forced-cancel seam across 5 lifecycle hooks + first-contact-only fallback latch + recovery gate (Wave 2, depends on 02-01)
 
-### Phase 3: Gestures & Session Stability
+### Phase 3: Local-Only Gestures & Session Stability
 
-**Goal**: The three core touch gestures work reliably and touch remains stable across window state changes, focus loss, and disconnect/reconnect.
+**Goal**: With native multitouch disabled, the X11 client handles all touch locally: one-finger left-click/drag/long-press right-click, two-finger wheel scroll, bidirectional `Ctrl`+wheel pinch, and three-finger middle-button drag, while lifecycle interruptions release all held local input state cleanly.
 **Depends on**: Phase 2
 **Requirements**: GEST-01, GEST-02, GEST-03, GEST-04, STAB-01, STAB-02
 **Success Criteria** (what must be TRUE):
 
-  1. A configurable 500–700 ms long press produces one right-click at the touch position with no left-click emitted afterward; moving beyond a configurable slop distance before the threshold cancels long-press detection and continues as an ordinary native drag.
-  2. In native pinch mode a two-finger pinch forwards native multitouch to Windows and emits no local wheel shortcut; in fallback pinch mode (selected before launch) it emits `Ctrl` + wheel, never also emits native pinch, and releases `Ctrl` when the gesture ends or is interrupted.
-  3. Touch remains usable without crashes, stale contacts, or duplicate events after switching between windowed/fullscreen states and after losing and regaining focus.
-  4. Disconnecting or reconnecting during an active touch or gesture does not crash the client, and touch works again after reconnection.
+  1. A configurable 500–700 ms long press produces one right-click at the touch position with no left-click emitted afterward; moving beyond the slop distance cancels long-press and continues as a local left-button drag.
+  2. Two-finger translation emits wheel scroll; changing inter-finger distance emits `Ctrl`+wheel pinch and can reverse zoom direction without lifting; three-finger translation performs middle-button drag. None of these local gestures forwards native RDPEI contacts.
+  3. Window/fullscreen changes, focus loss, touch-count changes, and gesture cancellation release every held mouse button or `Ctrl` state without duplicate or stale input.
+  4. Disconnect/reconnect or another lifecycle interruption leaves the local recognizer clean so the next touch gesture starts normally.
 
-**Plans**: 3 plans
+**Plans**: 3/3 plans reconciled
 **Wave 1**
 
-- [x] 03-01-PLAN.md — Tracer: long-press right-click with slop deadband + force-cancel gesture-state extension + 3 settings/CLI knobs (Wave 1)
+- [x] 03-01-PLAN.md — Long-press right-click, slop deadband, and shared force-cancel gesture-state cleanup.
 
-**Wave 2** *(blocked on Wave 1 completion)*
+**Wave 2**
 
-- [ ] 03-02-PLAN.md — Pinch: native passthrough exclusivity guard + fallback Ctrl+wheel synthesizer with claiming, midpoint, detents, reversal hysteresis (Wave 2, depends on 03-01)
+- [x] 03-02-PLAN.md — Superseded by the user-directed local-only pivot delivered through quick tasks 260807-oz9, 260808-956, 260808-b11 and the pinch-direction-reversal debug fix.
 
-**Wave 3** *(blocked on Wave 2 completion)*
+**Wave 3**
 
-- [ ] 03-03-PLAN.md — Channel-loss guard + end-of-phase on-device UAT for all 6 requirements across lifecycle + reconnect (Wave 3, depends on 03-01 + 03-02)
+- [x] 03-03-PLAN.md — Superseded by the local-only lifecycle path and incremental on-device verification recorded by the completed quick/debug sessions.
 
 ### Phase 4: Diagnostics, Packaging & Launch Configuration
 
@@ -90,7 +90,7 @@
 
   1. The developer can reproducibly build an installable Debian `.deb` from the pinned `freerdp3-x11 3.15.0+dfsg-2.1+deb13u3` source using a documented quilt patch.
   2. The user can install the patched package and restore the stock Debian package using documented, verified commands.
-  3. The user can launch the patched client with a documented preset that enables multitouch, exposes long-press and pinch-mode calibration, and provides an explicit mouse-only/multitouch-off escape hatch.
+  3. The user can launch the patched client with a documented preset that keeps native multitouch disabled, enables the local-only gesture layer, exposes long-press/pinch calibration, and provides an explicit mouse-only escape hatch.
   4. The user can enable diagnostic logging that records touch begin/update/end/cancel events, gesture decisions, and RDPEI frame submission, while normal launches keep the logging disabled.
 
 **Plans**: TBD
@@ -101,14 +101,14 @@
 |-------|----------------|--------|-----------|
 | 1. Environment Gate & Build Baseline | 2/2 | Complete    | 2026-08-06 |
 | 2. Native RDPEI Touch Lifecycle | 2/2 | Complete    | 2026-08-06 |
-| 3. Gestures & Session Stability | 1/3 | In Progress | - |
+| 3. Local-Only Gestures & Session Stability | 3/3 | Complete | 2026-08-08 |
 | 4. Diagnostics, Packaging & Launch Configuration | 0/0 | Not started | - |
 
 ## Ordering Rationale
 
 - **Phase 1 first** because the device boots GNOME on Wayland by default; a wrong session makes every later result a lie. Zero code, maximum leverage, and it proves the build/rollback path before patching.
-- **Phase 2 before Phase 3** because RDPEI lifecycle correctness must precede gesture implementation. Native pinch (Phase 3) consumes the same multi-contact RDPEI path delivered here, and long-press suppression must coordinate with the RDPEI contact that armed it. The `Ctrl+wheel` fallback is a branch inside the Phase 3 pinch recognizer, not a substitute for fixing RDPEI first.
-- **Phase 3 after the lifecycle trio** because gesture disambiguation only makes sense once contacts are trustworthy; reconnect/focus stability must enumerate every piece of gesture and contact state created by Phases 2–3, so it ships with the gestures rather than before them.
+- **Phase 2 before Phase 3** established reliable XI2 contact identity, coordinate handling, duplicate suppression, and cancellation seams. Phase 3 reuses those foundations but deliberately routes active v1 touch behavior through the local-only recognizer instead of native RDPEI forwarding.
+- **Phase 3 after the lifecycle foundation** because local gesture disambiguation and cleanup only make sense once contacts are trustworthy. The user-directed pivot makes non-multitouch/local-only behavior canonical for v1.
 - **Phase 4 last** because packaging wraps a frozen, verified code state; diagnostics logging is added incrementally during Phases 2–3 and finalized/documented here.
 
 ---
