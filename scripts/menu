@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# Parse CLI arguments — accept only optional --mouse-only
+mouse_only=0
+for arg in "$@"; do
+	case "$arg" in
+		--mouse-only) mouse_only=1 ;;
+		*)
+			echo "ERROR: Unknown argument '$arg'" >&2
+			echo "Usage: $0 [--mouse-only]" >&2
+			exit 1
+			;;
+	esac
+done
+
+while true; do
+    clear
+    echo "======================"
+    echo "   Debian Mode Menu"
+    echo "======================"
+    echo "1. GNOME ON"
+    echo "2. GNOME OFF (Terminal only)"
+    echo "3. Start RDP Window"
+    echo "4. Battery"
+    echo "5. Brightness"
+    echo "6. Exit"
+    echo "======================"
+
+    read -p "Choose: " choice
+
+    case $choice in
+        1)
+            echo "Starting GNOME..."
+            sudo systemctl isolate graphical.target
+            ;;
+        2)
+            echo "Stopping GNOME, switching to terminal..."
+            sudo systemctl isolate multi-user.target
+            ;;
+        3)
+    echo "Starting RDP..."
+
+    IFS= read -r -s -p "RDP Password: " PASS
+    echo
+
+    # Construct the password argument
+    printf -v pass_arg '/p:%s' "$PASS"
+
+    # Private temporary xinitrc with cleanup
+    umask 077
+    xinitrc="$(mktemp /tmp/.xinitrc-rdp-XXXXXX)"
+    trap 'rm -f "$xinitrc"' EXIT INT HUP TERM
+    chmod 700 "$xinitrc"
+
+    # Serialize the password argument with Bash-safe quoting
+    pass_arg_q="$(printf '%q' "$pass_arg")"
+
+    cat > "$xinitrc" <<'XEOF'
+#!/usr/bin/env bash
+
+export XDG_SESSION_TYPE=x11
+XEOF
+
+    # Propagate diagnostic mode if enabled
+    if [ "${FREERDP_TOUCH_DIAG:-}" = "1" ]; then
+        printf 'export FREERDP_TOUCH_DIAG=1\n' >> "$xinitrc"
+    fi
+
+    cat >> "$xinitrc" <<XEOF
+
+xrandr --output eDP-1 --mode 1600x2560 --rotate left
+
+xinput set-prop "GXTP7386:00 27C6:0113" \
+"Coordinate Transformation Matrix" \
+0 -1 1 1 0 0 0 0 1
+
+XEOF
+
+    printf 'exec /home/hoang/freerdp-touch/scripts/launch-touch.sh' >> "$xinitrc"
+    if [ "$mouse_only" -eq 1 ]; then
+        printf ' --mouse-only' >> "$xinitrc"
+    fi
+    printf ' /v:192.168.1.10 /u:ngleh %s /f /smart-sizing:2560x1600 /scale-desktop:200 /clipboard /sound:sys:pulse /microphone:sys:pulse /drive:Onemix,$HOME /cert:ignore\n' "$pass_arg_q" >> "$xinitrc"
+
+    startx "$xinitrc"
+    rm -f "$xinitrc"
+
+    read
+    ;;
+	4)
+	    upower -i /org/freedesktop/UPower/devices/battery_BAT0
+	    read -r -p "Press Enter key to back menu..."
+	    ;;
+	5)
+	    read -r -p "Input brightess:" BRIGHT
+	    echo $BRIGHT | sudo tee /sys/class/backlight/intel_backlight/brightness
+	    ;;
+
+        6)
+            exit 0
+            ;;
+        *)
+            echo "Invalid option"
+            read
+            ;;
+    esac
+done
