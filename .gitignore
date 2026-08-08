@@ -8,3 +8,7 @@ build/
 *.changes
 run-rdp.sh
 rdp-debug.log
+dist
+.dist-bundle-*
+.dist.lock
+.dist-symlink-*
