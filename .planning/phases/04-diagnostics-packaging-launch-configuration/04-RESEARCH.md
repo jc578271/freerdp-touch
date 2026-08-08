@@ -78,9 +78,9 @@ Phase 4 is a release freeze, not another gesture phase. A clean-tree comparison 
 
 The decisive diagnostic fact is that the existing touch trace uses `WLog_DBG`, while the pinned WLog implementation defaults individual loggers to `WLOG_INFO`; DEBUG records therefore do not appear in a normal launch. [VERIFIED: build/freerdp3-3.15.0+dfsg/client/X11/xf_input.c:303-345; build/freerdp3-3.15.0+dfsg/winpr/libwinpr/utils/wlog/wlog.c:900-947] WLog's default console appender sends WARN-and-higher records to stderr, so a local, environment-gated `WLog_WARN` diagnostic helper meets the stderr requirement without turning on global `WLOG_LEVEL=DEBUG`. [VERIFIED: build/freerdp3-3.15.0+dfsg/winpr/libwinpr/utils/wlog/wlog.c:492-505; build/freerdp3-3.15.0+dfsg/winpr/libwinpr/utils/wlog/ConsoleAppender.c:112-136]
 
-The deployable runtime package closure is not just the X11 executable. The X11 package has an exact-version dependency on the client library, and the client library has an exact-version dependency on the core library; all three source components are modified by the release candidate. [VERIFIED: build/freerdp3-3.15.0+dfsg/debian/control:69-112; dpkg-deb metadata inspection, 2026-08-08] `freerdp3-dev` also ships changed headers, but is not part of the runtime closure and would pull a much larger exact-version development dependency family if installed. [VERIFIED: build/freerdp3-3.15.0+dfsg/debian/freerdp3-dev.install:1-12; dpkg-deb metadata inspection, 2026-08-08]
+The deployable runtime package closure is not just the X11 executable. The X11 package has an exact-version dependency on the client library, the client library has an exact-version dependency on the core library, and the core library has an exact-version dependency on `libwinpr3-3`; all four runtime packages must ship at the same `+onemix1` version. [VERIFIED: build/freerdp3-3.15.0+dfsg/debian/control:68-105; dpkg-deb metadata inspection, 2026-08-08] `freerdp3-dev` also ships changed headers, but is not part of the runtime closure and would pull a much larger exact-version development dependency family if installed. [VERIFIED: build/freerdp3-3.15.0+dfsg/debian/freerdp3-dev.install:1-12; dpkg-deb metadata inspection, 2026-08-08]
 
-**Primary recommendation:** Create one repo-tracked quilt patch from a fresh pinned source tree, make only gate-and-record diagnostic edits to the frozen code, build a three-package runtime bundle through the existing Debian rules, and use one credential-free Bash wrapper for normal, diagnostic, and mouse-only launches. [VERIFIED: build/freerdp3-3.15.0+dfsg/debian/source/format:1; build/freerdp3-3.15.0+dfsg/debian/rules:18-58; ASSUMED: proposed wrapper/file names]
+**Primary recommendation:** Create one repo-tracked quilt patch from a fresh pinned source tree, make only gate-and-record diagnostic edits to the frozen code, build a four-package runtime bundle through the existing Debian rules, and use one credential-free Bash wrapper for normal, diagnostic, and mouse-only launches. [VERIFIED: build/freerdp3-3.15.0+dfsg/debian/source/format:1; build/freerdp3-3.15.0+dfsg/debian/rules:18-58; ASSUMED: proposed wrapper/file names]
 
 ## Architectural Responsibility Map
 
@@ -252,9 +252,9 @@ Use one patch, one release script, one wrapper, and one operations document; do 
 
 ### Pattern 4: Explicit runtime manifest and security-friendly upgrade behavior
 
-**What:** Have `build-release.sh` select exactly `freerdp3-x11`, `libfreerdp-client3-3`, and `libfreerdp3-3` from the fresh build output, validate their package metadata/version, then create `SHA256SUMS` over that explicit list. [ASSUMED: proposed script name; VERIFIED: dpkg-deb metadata inspection, 2026-08-08]
+**What:** Have `build-release.sh` select exactly `libwinpr3-3`, `libfreerdp3-3`, `libfreerdp-client3-3`, and `freerdp3-x11` from the fresh build output, validate their package metadata/version, then create `SHA256SUMS` over that explicit list. [ASSUMED: proposed script name; VERIFIED: dpkg-deb metadata inspection, 2026-08-08]
 
-**Why:** The installed X11 package requires the client library at the exact same binary version, and the client library requires the core library at the exact same binary version. [VERIFIED: build/freerdp3-3.15.0+dfsg/debian/control:69-112; dpkg-deb metadata inspection, 2026-08-08]
+**Why:** The installed X11 package requires the client library at the exact same binary version, the client library requires the core library at the exact same binary version, and the core library requires `libwinpr3-3` at the exact same binary version. [VERIFIED: build/freerdp3-3.15.0+dfsg/debian/control:68-105; dpkg-deb metadata inspection, 2026-08-08]
 
 **Upgrade policy:** Do not create an APT hold or pin. Local `dpkg --compare-versions` checks show the locked local version sorts above the pinned base but below representative next stable-update, Debian-revision, and upstream versions; newer Debian security releases can therefore replace it. [VERIFIED: `dpkg --compare-versions`, 2026-08-08; CITED: https://www.debian.org/doc/debian-policy/ch-controlfields.html]
 
@@ -300,9 +300,9 @@ Use one patch, one release script, one wrapper, and one operations document; do 
 
 ### Pitfall 4: Shipping only `freerdp3-x11`
 
-**What goes wrong:** The executable's package has an exact-version dependency on `libfreerdp-client3-3`, which in turn has an exact-version dependency on `libfreerdp3-3`; a one-file installer leaves a mixed local/stock set or fails dependency resolution. [VERIFIED: build/freerdp3-3.15.0+dfsg/debian/control:69-112; dpkg-deb metadata inspection, 2026-08-08]
+**What goes wrong:** The executable's package has an exact-version dependency on `libfreerdp-client3-3`, which has an exact-version dependency on `libfreerdp3-3`, which has an exact-version dependency on `libwinpr3-3`; a one-file installer leaves a mixed local/stock set or fails dependency resolution. [VERIFIED: build/freerdp3-3.15.0+dfsg/debian/control:68-105; dpkg-deb metadata inspection, 2026-08-08]
 
-**How to avoid:** Select and checksum the explicit three-package runtime closure after every build, and install it in one APT transaction. [ASSUMED: exact release-script selection implementation; VERIFIED: dpkg-deb metadata inspection, 2026-08-08]
+**How to avoid:** Select and checksum the explicit four-package runtime closure after every build, and install it in one APT transaction. [ASSUMED: exact release-script selection implementation; VERIFIED: dpkg-deb metadata inspection, 2026-08-08]
 
 **Warning sign:** `apt` proposes removing packages, cannot satisfy an exact version, or the local X11 package is installed alongside a stock client/core library. [ASSUMED: package-install failure symptoms]
 
@@ -391,7 +391,7 @@ Use it only in the new source tree after the release script has copied the proje
 | Global `WLOG_LEVEL=DEBUG` in a full handwritten menu command. [VERIFIED: /usr/local/bin/menu:44-60] | `FREERDP_TOUCH_DIAG=1` gates only compact touch records and lets WLog WARN use stderr. [ASSUMED: Phase 4 implementation recommendation] | Phase 4 | Diagnostics become opt-in, focused, and safe to tee without broad debug noise. [ASSUMED: expected impact] |
 | Ignored mutable source tree is the only carrier of touch changes. [VERIFIED: .gitignore:1-11; clean-tree diff inventory, 2026-08-08] | One quilt patch applies to a newly extracted pinned source tree. [CITED: https://www.debian.org/doc/manuals/debmake-doc/ch13.en.html] | Phase 4 | The release is reproducible and reviewable without committing generated source/build output. [ASSUMED: expected impact] |
 | Menu captures a password and writes a full RDP command to a temporary X init script. [VERIFIED: /usr/local/bin/menu:27-66] | Menu delegates to a credential-free wrapper; FreeRDP receives caller-provided connection/session arguments. [ASSUMED: Phase 4 implementation recommendation] | Phase 4 | Password handling is returned to FreeRDP and no release artifact contains a stored secret. [ASSUMED: expected impact] |
-| Treating `freerdp3-x11` as the sole package artifact. [VERIFIED: scripts/build-baseline.sh:60-67] | Explicit X11 + client + core runtime closure with checksums. [VERIFIED: dpkg-deb metadata inspection, 2026-08-08] | Phase 4 | The local package versions remain dependency-consistent. [ASSUMED: expected impact] |
+| Treating `freerdp3-x11` as the sole package artifact. [VERIFIED: scripts/build-baseline.sh:60-67] | Explicit X11 + client + core + winpr runtime closure with checksums. [VERIFIED: dpkg-deb metadata inspection, 2026-08-08] | Phase 4 | The local package versions remain dependency-consistent. [ASSUMED: expected impact] |
 
 **Deprecated/outdated for this phase:**
 
@@ -408,19 +408,15 @@ Use it only in the new source tree after the release script has copied the proje
 | A3 | Accept a conservative slop range of `4`–`16` px. | Pattern 3 | Too narrow rejects a useful calibration; too broad can make drag activation feel wrong. |
 | A4 | Emit enabled diagnostics at WARN to obtain default stderr routing without global debug. | Pattern 2 | Records will be semantically labeled WARN; a tag-specific appender design would be needed only if that presentation is unacceptable. |
 | A5 | D-10 means the minimal runnable closure (`freerdp3-x11`, `libfreerdp-client3-3`, `libfreerdp3-3`), not a development-SDK release. | Existing Source-to-Package Map | If the user expects an installable modified SDK, its larger exact dependency closure needs an explicit separate bundle. |
-| A6 | A user-managed native FreeRDP connection argument/file is an acceptable non-secret handoff for menu option 3. | Open Questions | The menu may otherwise lack a credential-free way to know the target connection. |
+| A6 | A user-managed native FreeRDP connection argument/file is an acceptable non-secret handoff for menu option 3. | Open Questions | RESOLVED by D-22/D-23: the menu preserves the TTY password prompt and passes connection args (including /p:$PASS) through the wrapper as opaque arguments. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **How should `/usr/local/bin/menu` receive the user's connection/session arguments after its credential-bearing command is removed?**
-   - What we know: The live option 3 reads a password and writes a complete command to `/tmp/.xinitrc-rdp`; the locked wrapper must not own credentials and must forward connection/session arguments unchanged. [VERIFIED: /usr/local/bin/menu:27-66; .planning/phases/04-diagnostics-packaging-launch-configuration/04-CONTEXT.md:43-48]
-   - What's unclear: The context does not select a non-secret target handoff for an interactive menu that currently has no arguments. [VERIFIED: /usr/local/bin/menu:1-88]
-   - Recommendation: Make the wrapper itself the canonical documented CLI; have menu option 3 forward a user-supplied FreeRDP-native connection argument (for example, `connection.rdp`) rather than embedding a new parser, password prompt, or duplicate command. Confirm the desired daily menu invocation before implementation. [VERIFIED: `xfreerdp3 /help`, 2026-08-08; ASSUMED: menu invocation design]
+   - **RESOLVED (D-22, D-23):** The menu preserves the current interaction and startup flow. It still prompts for the password with `read -s` and passes it as `/p:$PASS` through the wrapper as an opaque argument to `/usr/bin/xfreerdp3`. The wrapper does not own, store, or persist credentials; it forwards connection/session arguments unchanged via `"$@"`. The menu delegates only the FreeRDP invocation (touch options + installed binary) to the wrapper. No new parser, credential store, or duplicate command is introduced. [VERIFIED: /usr/local/bin/menu:27-66; .planning/phases/04-diagnostics-packaging-launch-configuration/04-CONTEXT.md D-22, D-23]
 
 2. **Must the TTY-only `startx`/rotation path be preserved as part of menu option 3?**
-   - What we know: The current menu starts a temporary X init script that configures display/touch rotation before launching RDP, while the product's required runtime is a native X11 session. [VERIFIED: /usr/local/bin/menu:33-66; .claude/CLAUDE.md:13-21]
-   - What's unclear: The Phase 4 decisions require delegation but do not say whether that legacy terminal-to-X startup flow is a release requirement. [ASSUMED: gap analysis]
-   - Recommendation: Do not move those session-specific commands into the touch wrapper, because it must own only the touch preset. If TTY startup is required, retain it as a tiny credential-free launcher adapter and verify it manually; otherwise make option 3 a one-line delegate in the native X11 session. [ASSUMED: minimal launch architecture]
+   - **RESOLVED (D-22):** Yes. The user operates FreeRDP only from a TTY; `startx` is mandatory. The canonical operating flow is TTY → startx → rotation → wrapper → installed `/usr/bin/xfreerdp3`. The menu preserves the TTY password prompt, `startx`, display/touch rotation (`xrandr` + `xinput`), and existing connection/session behavior. The xinitrc calls the wrapper instead of the raw build-tree binary and sets `XDG_SESSION_TYPE=x11` so the native-X11 gate passes in the startx session. Do not replace this with a GNOME-on-Xorg or direct-desktop launch path. [VERIFIED: .planning/phases/04-diagnostics-packaging-launch-configuration/04-CONTEXT.md D-22, D-23]
 
 ## Environment Availability
 
@@ -492,13 +488,13 @@ Use it only in the new source tree after the release script has copied the proje
 
 ### Tertiary (LOW confidence)
 
-- Proposed script/documentation paths, override names, slop bounds, log prefix/field order, and menu argument handoff are deliberately marked `[ASSUMED]` pending the planner's implementation choice or user confirmation.
+- Proposed script/documentation paths, override names, slop bounds, and log prefix/field order are deliberately marked `[ASSUMED]` pending the planner's implementation choice. The menu argument handoff and TTY/startx flow are now resolved (D-22, D-23). [VERIFIED: .planning/phases/04-diagnostics-packaging-launch-configuration/04-CONTEXT.md D-22, D-23]
 
 ## Metadata
 
 **Confidence breakdown:**
 - Standard stack: HIGH — pinned source, installed tools, package metadata, and build dependencies were checked locally; `quilt` is the one explicit missing prerequisite. [VERIFIED: local command audits, 2026-08-08]
-- Architecture: MEDIUM — source ownership and package closure are verified, but the credential-free menu argument handoff needs a final operator decision. [VERIFIED: /usr/local/bin/menu:27-66; ASSUMED: menu design]
+- Architecture: HIGH — source ownership, package closure, and menu/startx handoff are all resolved (D-22, D-23). [VERIFIED: /usr/local/bin/menu:27-66; .planning/phases/04-diagnostics-packaging-launch-configuration/04-CONTEXT.md D-22, D-23]
 - Pitfalls: HIGH — the logger level/routing, frame debug guard, local-only routing, package dependencies, and menu secret exposure were read from the exact target sources. [VERIFIED: build/freerdp3-3.15.0+dfsg/winpr/libwinpr/utils/wlog/ConsoleAppender.c:112-136; build/freerdp3-3.15.0+dfsg/channels/rdpei/client/rdpei_main.c:587-667; /usr/local/bin/menu:27-66]
 
 **Research date:** 2026-08-08  

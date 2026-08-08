@@ -46,6 +46,10 @@ This phase must not redesign gesture behavior, restore native multitouch/RDPEI f
 - **D-20:** The wrapper provides an explicit `--mouse-only` escape hatch. That mode uses the same connection arguments but omits all local touch activation/calibration options; it does not roll back or switch binaries.
 - **D-21:** Diagnostic launch uses the same wrapper with `FREERDP_TOUCH_DIAG=1`. The wrapper creates the XDG-state log and tees output; normal and diagnostic launches must not drift into separate command definitions.
 
+### Launch session and menu hygiene
+- **D-22:** The user operates FreeRDP only from a TTY. `startx` is mandatory. The canonical operating flow is: TTY login → menu option 3 → TTY password prompt → `startx` with a private xinitrc → display/touch rotation (`xrandr` + `xinput`) → `scripts/launch-touch.sh` → installed `/usr/bin/xfreerdp3`. Do not replace this with a GNOME-on-Xorg or direct-desktop launch path. The native-X11 gate must pass inside the startx session; the xinitrc sets `XDG_SESSION_TYPE=x11` before calling the wrapper.
+- **D-23:** Menu changes are minimal. Option 3 delegates the actual FreeRDP invocation to the wrapper while preserving the current interaction and startup flow: TTY password prompt (`read -s`), `startx`, rotation, and existing non-secret connection/session arguments. The menu still reads the password and passes it as `/p:$PASS` through the wrapper as an opaque argument; the wrapper does not own, store, or persist credentials (D-19). Apply minimum non-UX-changing file hygiene: create the xinitrc with `umask 077` and `mktemp` (not a predictable world-readable path), remove `WLOG_LEVEL=DEBUG`, and clean up the temp file reliably after `startx` returns. Diagnostics must not echo credentials.
+
 ### Claude's Discretion
 - Exact script names, quilt patch filename, wrapper path within the repository, timestamp format, log prefix, and documentation filenames.
 - Exact names of the two calibration environment variables and the conservative accepted slop range, provided defaults remain 600 ms/8 px and invalid values fail before launch.
@@ -114,7 +118,7 @@ No external gesture specification applies; the project documents, final summarie
 - Convert every verified source edit across X11, common settings/CLI, and RDPEI into the integrated quilt patch; append it to `debian/patches/series` and add the local changelog version.
 - Derive the required installable package set from the modified-file package ownership and generated dependencies, then have the build script copy only that exact set to `dist/` and generate `SHA256SUMS`.
 - Have the repository wrapper invoke the installed system `xfreerdp3`, prepend the frozen local-touch options, validate two calibration env vars, strip those options under `--mouse-only`, and pass remaining arguments unchanged.
-- Update menu option 3 to call the wrapper, and document a normal, diagnostic, mouse-only, install, verification, security-update replacement, and stock rollback path.
+- Update menu option 3 to delegate the FreeRDP invocation to the wrapper while preserving the TTY/startx/rotation flow (D-22, D-23), and document a normal, diagnostic, mouse-only, install, verification, security-update replacement, and stock rollback path.
 
 </code_context>
 
@@ -122,7 +126,7 @@ No external gesture specification applies; the project documents, final summarie
 ## Specific Ideas
 
 - The user's explicit release rule is: **do not bring multitouch back; the source code currently works very well.** Planning and review should treat any gesture-logic diff beyond diagnostic gating as a regression risk requiring explicit user approval.
-- Normal daily launch should be silent and one-step through menu option 3. Diagnostics are exceptional and opt-in through one environment variable.
+- Normal daily launch goes through the TTY → startx → rotation → wrapper flow (D-22). Diagnostics are exceptional and opt-in through one environment variable.
 - A future Debian security update replacing the local package is expected and preferable to silently blocking security fixes; the touch package can then be rebuilt on the newer source.
 - Mouse-only mode is a launch-mode escape hatch in the same patched binary, not a package rollback.
 
