@@ -155,7 +155,17 @@ dpkg-query -W -f='${Version}\n' \
   || echo "ALL STOCK -- safe to launch"
 ```
 
-Launch stock FreeRDP to confirm mouse works.
+After rollback, confirm stock FreeRDP works via the explicit locked
+invocation:
+
+```
+menu --mouse-only
+```
+
+Choose option 3. Stock FreeRDP does not understand the patched touch
+options composed by plain `menu` (they would cause an unrecognized-option
+error), so `--mouse-only` is required. Verify the desktop is reached and
+the mouse/touchpad works normally.
 
 ## Security-update replacement
 
