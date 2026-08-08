@@ -93,12 +93,12 @@
   3. The user can launch the patched client with a documented preset that keeps native multitouch disabled, enables the local-only gesture layer, exposes long-press/pinch calibration, and provides an explicit mouse-only escape hatch.
   4. The user can enable diagnostic logging that records touch begin/update/end/cancel events, gesture decisions, and RDPEI frame submission, while normal launches keep the logging disabled.
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 
 **Wave 1**
 
 - [x] 04-01-PLAN.md — Diagnostic gate + quilt patch + release build (DIAG-01, PACK-01)
-- [ ] 04-02-PLAN.md — Launch wrapper + menu delegation (CONF-01)
+- [x] 04-02-PLAN.md — Launch wrapper + menu delegation (CONF-01)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -111,7 +111,7 @@
 | 1. Environment Gate & Build Baseline | 2/2 | Complete    | 2026-08-06 |
 | 2. Native RDPEI Touch Lifecycle | 2/2 | Complete    | 2026-08-06 |
 | 3. Local-Only Gestures & Session Stability | 3/3 | Complete | 2026-08-08 |
-| 4. Diagnostics, Packaging & Launch Configuration | 1/3 | In Progress|  |
+| 4. Diagnostics, Packaging & Launch Configuration | 2/3 | In Progress|  |
 
 ## Ordering Rationale
 
