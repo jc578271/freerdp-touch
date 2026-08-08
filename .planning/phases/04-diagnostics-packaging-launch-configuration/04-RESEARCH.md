@@ -407,7 +407,7 @@ Use it only in the new source tree after the release script has copied the proje
 | A2 | Use `FREERDP_TOUCH_LONG_PRESS_MS` and `FREERDP_TOUCH_SLOP_PX` as the two wrapper override names. | Pattern 3 | Documentation/wrapper names could differ from user preference. |
 | A3 | Accept a conservative slop range of `4`–`16` px. | Pattern 3 | Too narrow rejects a useful calibration; too broad can make drag activation feel wrong. |
 | A4 | Emit enabled diagnostics at WARN to obtain default stderr routing without global debug. | Pattern 2 | Records will be semantically labeled WARN; a tag-specific appender design would be needed only if that presentation is unacceptable. |
-| A5 | D-10 means the minimal runnable closure (`freerdp3-x11`, `libfreerdp-client3-3`, `libfreerdp3-3`), not a development-SDK release. | Existing Source-to-Package Map | If the user expects an installable modified SDK, its larger exact dependency closure needs an explicit separate bundle. |
+| A5 | D-10 means the minimal runnable closure (`libwinpr3-3`, `libfreerdp3-3`, `libfreerdp-client3-3`, `freerdp3-x11`), not a development-SDK release. | Existing Source-to-Package Map | If the user expects an installable modified SDK, its larger exact dependency closure needs an explicit separate bundle. |
 | A6 | A user-managed native FreeRDP connection argument/file is an acceptable non-secret handoff for menu option 3. | Open Questions | RESOLVED by D-22/D-23: the menu preserves the TTY password prompt and passes connection args (including /p:$PASS) through the wrapper as opaque arguments. |
 
 ## Open Questions (RESOLVED)
