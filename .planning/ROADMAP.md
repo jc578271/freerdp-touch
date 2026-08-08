@@ -93,7 +93,7 @@
   3. The user can launch the patched client with a documented preset that keeps native multitouch disabled, enables the local-only gesture layer, exposes long-press/pinch calibration, and provides an explicit mouse-only escape hatch.
   4. The user can enable diagnostic logging that records touch begin/update/end/cancel events, gesture decisions, and RDPEI frame submission, while normal launches keep the logging disabled.
 
-**Plans**: 3/3 plans executed
+**Plans**: 6 plans (3 executed, 3 gap closure)
 
 **Wave 1**
 
@@ -104,6 +104,12 @@
 
 - [x] 04-03-PLAN.md — Operations documentation + on-device install/rollback verification (PACK-02, CONF-01)
 
+**Gap Closure** *(Wave 1 parallel, then Wave 2)*
+
+- [ ] 04-04-PLAN.md — Source defect fixes: XI_TouchOwnership cast, quarantine gate, bounds End, pinch float, parser overflow, fallback cancel diagnostics (DIAG-01, CONF-01)
+- [ ] 04-05-PLAN.md — Script/doc/menu fixes: overlong calibration, signal-safe build, /cert:tofu, README checksum/rollback (CONF-01, PACK-01, PACK-02)
+- [ ] 04-06-PLAN.md — Rebuild 4-package bundle + rerun automated and native-device verification (DIAG-01, PACK-01, PACK-02, CONF-01)
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -111,7 +117,7 @@
 | 1. Environment Gate & Build Baseline | 2/2 | Complete    | 2026-08-06 |
 | 2. Native RDPEI Touch Lifecycle | 2/2 | Complete    | 2026-08-06 |
 | 3. Local-Only Gestures & Session Stability | 3/3 | Complete | 2026-08-08 |
-| 4. Diagnostics, Packaging & Launch Configuration | 3/3 | Complete    | 2026-08-08 |
+| 4. Diagnostics, Packaging & Launch Configuration | 3/6 | Gaps found — gap closure planned | 2026-08-08 |
 
 ## Ordering Rationale
 
