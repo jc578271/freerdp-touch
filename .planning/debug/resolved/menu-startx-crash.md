@@ -2,7 +2,7 @@
 status: resolved
 trigger: "bị crash, không vào đc windows rdp"
 created: 2026-08-08T09:55:25Z
-updated: 2026-08-08T10:45:36Z
+updated: 2026-08-08T10:47:24Z
 ---
 
 ## Current Focus
@@ -10,7 +10,7 @@ updated: 2026-08-08T10:45:36Z
 hypothesis: Confirmed root cause: the former host-global Xwayland check rejected a valid tty3/startx Xorg display when GNOME Xwayland was also running.
 test: Native-device verification completed through tty3: run `menu`, choose option 3, and reach the Windows RDP desktop while Xorg remains open.
 expecting: Confirmed by the user: the current-DISPLAY Xorg proof permits the valid session despite unrelated GNOME Xwayland.
-next_action: Commit the archived debug session and prevention-backed knowledge-base entry; leave phase4-install.sh untracked.
+next_action: Archive complete; no further debugging action is pending.
 bug_class: bohrbug (deterministic whenever a concurrent Xwayland process exists)
 reasoning_checkpoint:
   hypothesis: "The global Xwayland process check rejects a valid startx-created Xorg session because it observes an unrelated GNOME Xwayland process rather than the server that owns the current DISPLAY."
@@ -181,6 +181,11 @@ started: First observed during Phase 4 Plan 04-03 on-device verification after i
   checked: Knowledge-base archival and MemPalace indexing availability.
   found: The prevention-backed entry was written to .planning/debug/knowledge-base.md. MemPalace indexing is skipped because state.load reports mempalace.enabled=false.
   implication: The durable knowledge-base entry is the recurrence-recall mechanism for this session.
+
+- timestamp: 2026-08-08T10:47:24Z
+  checked: Scope cleanup of the temporary checkpoint helper.
+  found: The untracked phase4-install.sh helper was removed and was not committed.
+  implication: The resolved fix remains limited to the native-X11 gate and its regression check.
 
 ## Resolution
 
