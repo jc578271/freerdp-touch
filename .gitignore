@@ -6,3 +6,5 @@ build/
 *.build
 *.buildinfo
 *.changes
+run-rdp.sh
+rdp-debug.log
