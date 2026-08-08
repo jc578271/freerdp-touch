@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: active
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-08-08T09:37:38.857Z"
+status: complete
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-08-08T13:48:42.000Z"
 last_activity: 2026-08-08
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 10
-  completed_plans: 9
+  completed_plans: 10
 current_phase_name: diagnostics-packaging-launch-configuration
 last_activity_desc: Closed Phase 3 under the user-directed non-multitouch/local-only target.
 ---
@@ -30,20 +30,20 @@ last_activity_desc: Closed Phase 3 under the user-directed non-multitouch/local-
 
 - **Phase**: 4 - Diagnostics, Packaging & Launch Configuration
 - **Status**: Phase 3 complete. Non-multitouch/local-only is now the canonical v1 touch mode; Phase 4 is next.
-- **Progress**: 3/4 phases complete, 7/7 currently planned phase plans reconciled or executed.
+- **Progress**: 4/4 phases complete, 10/10 currently planned phase plans reconciled or executed.
 
 ```
 [x] Phase 1: Environment Gate & Build Baseline (2/2 plans)
 [x] Phase 2: Native RDPEI Touch Lifecycle (2/2 plans)
 [x] Phase 3: Local-Only Gestures & Session Stability
-[ ] Phase 4: Diagnostics, Packaging & Launch Configuration
+[x] Phase 4: Diagnostics, Packaging & Launch Configuration
 ```
 
 ## Performance Metrics
 
-- **Phases completed**: 3/4
+- **Phases completed**: 4/4
 - **Requirements mapped**: 19/19
-- **Plans completed**: 7 (01-01, 01-02, 02-01, 02-02, 03-01; 03-02 and 03-03 reconciled as superseded by the local-only pivot)
+- **Plans completed**: 10 (01-01, 01-02, 02-01, 02-02, 03-01, 04-01, 04-02, 04-03; 03-02 and 03-03 reconciled as superseded by the local-only pivot)
 
 **Per-Plan Metrics:**
 
@@ -51,6 +51,7 @@ last_activity_desc: Closed Phase 3 under the user-directed non-multitouch/local-
 |------|----------|-------|-------|
 | Phase 04 P01 | 52 | 3 tasks | 3 files |
 | Phase 04-diagnostics-packaging-launch-configuration P04-02 | 5 | 2 tasks | 2 files |
+| Phase 04-diagnostics-packaging-launch-configuration P04-03 | 1 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -73,10 +74,12 @@ last_activity_desc: Closed Phase 3 under the user-directed non-multitouch/local-
 - [Phase ?]: Quilt patch uses diff --git headers matching Debian convention
 - [Phase ?]: Four-package closure: libwinpr3-3, libfreerdp3-3, libfreerdp-client3-3, freerdp3-x11 at exact +onemix1 version
 - [Phase ?]: Atomic publication with flock -n and publication-aware trap (readlink -f comparison, no fragile published flag)
+- [Phase 4 Plan 03]: Verification record uses deterministic 10x5 state-machine grammar with inline Python/stdlib parser — raw byte inspection before decode, no framework dependency
+- [Phase 4 Plan 03]: Stock rollback launch documentation uses menu --mouse-only because plain menu composes patched touch options that stock FreeRDP rejects
 
 ### Todos
 
-- Plan Phase 4: diagnostics, Debian packaging, rollback documentation, and the final local-only launch preset.
+None — all four phases complete.
 
 ### Blockers
 
@@ -97,9 +100,8 @@ last_activity_desc: Closed Phase 3 under the user-directed non-multitouch/local-
 
 ## Session Continuity
 
-**Last session:** 2026-08-08T09:37:38.802Z
-**Last activity:** 2026-08-08
-**Stopped at:** Completed 04-02-PLAN.md
+**Last session:** 2026-08-08T13:48:42.000Z
+**Stopped at:** Completed 04-03-PLAN.md
 **Resume file:** None
 
 - **Last action**: Restored project context and confirmed all three Phase 4 plans are ready with no interrupted work.

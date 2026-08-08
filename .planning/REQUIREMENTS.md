@@ -47,7 +47,7 @@ Requirements for the first daily-usable release. Each maps to exactly one roadma
 ### Packaging and Use
 
 - [x] **PACK-01**: Developer can reproducibly build an installable Debian `.deb` from the pinned `freerdp3-x11 3.15.0+dfsg-2.1+deb13u3` source using a documented quilt patch.
-- [ ] **PACK-02**: User can install the patched package and restore the stock Debian package using documented, verified commands.
+- [x] **PACK-02**: User can install the patched package and restore the stock Debian package using documented, verified commands.
 - [x] **CONF-01**: User can launch the patched client with a documented preset that keeps native multitouch disabled, enables the local-only gesture layer, exposes long-press/pinch calibration, and provides an explicit mouse-only escape hatch.
 
 ## v2 Requirements
@@ -107,7 +107,7 @@ Phase mapping populated during roadmap creation (2026-08-05).
 | STAB-01 | Phase 3 | Complete |
 | STAB-02 | Phase 3 | Complete |
 | PACK-01 | Phase 4 | Complete |
-| PACK-02 | Phase 4 | Pending |
+| PACK-02 | Phase 4 | Complete |
 | CONF-01 | Phase 4 | Complete |
 
 **Coverage:**
