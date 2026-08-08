@@ -1,0 +1,12 @@
+# Step 7 Pre-Snapshot: Normal Quiet-Launch Diagnostic Directory State
+# Captured: 2026-08-08T13:12:03Z (before Step 7 normal launch)
+# Purpose: Fresh continuation compares after-state against this snapshot.
+# PASS criteria: file_count unchanged AND zero touch-diag: markers in session output.
+
+dir_exists: true
+dir_perm: 700
+file_count: 4
+FILE: name=touch-20260808T122241Z-F1vT0l.log size=1464004 inode=1179808 mtime=1786191914
+FILE: name=touch-20260808T123843Z-QfIyKp.log size=663133 inode=1179893 mtime=1786192790
+FILE: name=touch-20260808T124112Z-bAxfjn.log size=129306 inode=1179898 mtime=1786192913
+FILE: name=touch-20260808T124216Z-eLibY6.log size=567106 inode=1203743 mtime=1786192985
