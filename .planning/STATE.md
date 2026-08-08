@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: active
-stopped_at: Phase 4 context gathered
-last_updated: "2026-08-08T03:02:39.336Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-08-08T09:05:20.902Z"
 last_activity: 2026-08-08
-last_activity_desc: Closed Phase 3 under the user-directed non-multitouch/local-only target.
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
-current_phase_name: Diagnostics, Packaging & Launch Configuration
+  total_plans: 10
+  completed_plans: 8
+current_phase_name: diagnostics-packaging-launch-configuration
+last_activity_desc: Closed Phase 3 under the user-directed non-multitouch/local-only target.
 ---
 
 # State: FreeRDP Touch for OneMix 3
@@ -45,6 +45,12 @@ current_phase_name: Diagnostics, Packaging & Launch Configuration
 - **Requirements mapped**: 19/19
 - **Plans completed**: 7 (01-01, 01-02, 02-01, 02-02, 03-01; 03-02 and 03-03 reconciled as superseded by the local-only pivot)
 
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 04 P01 | 52 | 3 tasks | 3 files |
+
 ## Accumulated Context
 
 ### Decisions
@@ -63,6 +69,9 @@ current_phase_name: Diagnostics, Packaging & Launch Configuration
 - [Phase 3 Plan 01] Short tap = deterministic mouse left-click (DOWN|BUTTON1 then BUTTON1) rather than depending on Windows' own tap-to-click, which proved unreliable on-device. Drag = cancel native + reuse fallback latch. Long-press reuses xf_touch_force_cancel for the cancel seam so a later physical End cannot overwrite. 30ms RDPEI cancel settle delay needed for stale contact visuals. Deadband pins sub-slop updates to down coordinate rather than dropping them.
 - [Quick 260807-oz9] Native RDPEI touch forwarding is disabled. `+touch-pinch-wheel-fallback` now activates local XI2 capture without `+multitouch`: one finger maps to left-click/drag or long-press right-click, two-finger translation maps to middle-button pan, and pinch maps to Ctrl+wheel. Lifecycle cancellation releases and quarantines all held gesture state.
 - [Phase 3 closure] Non-multitouch/local-only is the canonical v1 touch target: one-finger left-click/drag/long-press right-click, two-finger wheel scroll, bidirectional Ctrl+wheel pinch, and three-finger middle-button drag. Native pinch/RDPEI is removed from the Phase 3 target; 03-02 and 03-03 are reconciled as superseded by the completed quick/debug work.
+- [Phase ?]: Quilt patch uses diff --git headers matching Debian convention
+- [Phase ?]: Four-package closure: libwinpr3-3, libfreerdp3-3, libfreerdp-client3-3, freerdp3-x11 at exact +onemix1 version
+- [Phase ?]: Atomic publication with flock -n and publication-aware trap (readlink -f comparison, no fragile published flag)
 
 ### Todos
 
@@ -87,13 +96,13 @@ current_phase_name: Diagnostics, Packaging & Launch Configuration
 
 ## Session Continuity
 
-**Last session:** 2026-08-08T03:02:39.316Z
-**Last activity:** 2026-08-08 - Closed Phase 3 under the user-directed non-multitouch/local-only target.
-**Stopped at:** Phase 4 context gathered
-**Resume file:** .planning/phases/04-diagnostics-packaging-launch-configuration/04-CONTEXT.md
+**Last session:** 2026-08-08T09:05:20.868Z
+**Last activity:** 2026-08-08
+**Stopped at:** Completed 04-01-PLAN.md
+**Resume file:** .planning/phases/04-diagnostics-packaging-launch-configuration/04-02-PLAN.md
 
-- **Last action**: Reconciled the Phase 3 roadmap and requirements to the delivered local-only gesture behavior and marked the phase complete.
-- **Next action**: Plan Phase 4 diagnostics, packaging, rollback, and launch documentation.
+- **Last action**: Restored project context and confirmed all three Phase 4 plans are ready with no interrupted work.
+- **Next action**: Execute Phase 4, starting with Wave 1 plans 04-01 and 04-02.
 
 ---
 *State initialized: 2026-08-05*

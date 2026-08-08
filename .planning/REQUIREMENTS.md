@@ -15,7 +15,7 @@ Requirements for the first daily-usable release. Each maps to exactly one roadma
 
 ### Diagnostics
 
-- [ ] **DIAG-01**: User can enable diagnostic logging that records touch begin/update/end/cancel events, gesture decisions, and RDPEI frame submission, while normal launches keep the logging disabled.
+- [x] **DIAG-01**: User can enable diagnostic logging that records touch begin/update/end/cancel events, gesture decisions, and RDPEI frame submission, while normal launches keep the logging disabled.
 
 ### XInput2 Capture
 
@@ -46,7 +46,7 @@ Requirements for the first daily-usable release. Each maps to exactly one roadma
 
 ### Packaging and Use
 
-- [ ] **PACK-01**: Developer can reproducibly build an installable Debian `.deb` from the pinned `freerdp3-x11 3.15.0+dfsg-2.1+deb13u3` source using a documented quilt patch.
+- [x] **PACK-01**: Developer can reproducibly build an installable Debian `.deb` from the pinned `freerdp3-x11 3.15.0+dfsg-2.1+deb13u3` source using a documented quilt patch.
 - [ ] **PACK-02**: User can install the patched package and restore the stock Debian package using documented, verified commands.
 - [ ] **CONF-01**: User can launch the patched client with a documented preset that keeps native multitouch disabled, enables the local-only gesture layer, exposes long-press/pinch calibration, and provides an explicit mouse-only escape hatch.
 
@@ -93,7 +93,7 @@ Phase mapping populated during roadmap creation (2026-08-05).
 | BASE-01 | Phase 1 | Complete |
 | BASE-02 | Phase 1 | Complete |
 | BASE-03 | Phase 1 | Complete |
-| DIAG-01 | Phase 4 | Pending |
+| DIAG-01 | Phase 4 | Complete |
 | XINP-01 | Phase 2 | Complete |
 | XINP-02 | Phase 2 | Complete |
 | COOR-01 | Phase 2 | Complete |
@@ -106,7 +106,7 @@ Phase mapping populated during roadmap creation (2026-08-05).
 | GEST-04 | Phase 3 | Complete |
 | STAB-01 | Phase 3 | Complete |
 | STAB-02 | Phase 3 | Complete |
-| PACK-01 | Phase 4 | Pending |
+| PACK-01 | Phase 4 | Complete |
 | PACK-02 | Phase 4 | Pending |
 | CONF-01 | Phase 4 | Pending |
 
