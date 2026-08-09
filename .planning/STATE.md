@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
-status: executing
-stopped_at: Completed 04-06-PLAN.md
-last_updated: "2026-08-09T16:31:41.146Z"
-last_activity: 2026-08-09
-last_activity_desc: Plan 04-06 completed; GAP-07 remains USER-DEFERRED under D-25.
+status: verifying
+stopped_at: Completed 04-07-PLAN.md
+last_updated: "2026-08-09T23:11:05.882Z"
+last_activity: 2026-08-10
+last_activity_desc: Plan 04-07 completed; targeted dispatcher and quilt gaps closed; GAP-07 remains USER-DEFERRED under D-25.
 progress:
   total_phases: 4
   completed_phases: 4
   total_plans: 14
-  completed_plans: 13
+  completed_plans: 14
 ---
 
 # State: FreeRDP Touch for OneMix 3
@@ -30,9 +30,9 @@ progress:
 ## Current Position
 
 Phase: 4 of 4 (Diagnostics, Packaging & Launch Configuration)
-Plan: 6 of 6 in current phase
-Status: Ready to execute
-Last activity: 2026-08-09 — Plan 04-06 completed; GAP-07 remains USER-DEFERRED under D-25.
+Plan: 7 of 7 in current phase
+Status: Phase complete — ready for verification
+Last activity: 2026-08-10 — Plan 04-07 completed; targeted dispatcher and quilt gaps closed; GAP-07 remains USER-DEFERRED under D-25.
 
 Progress: [██████████] 100%
 
@@ -40,14 +40,14 @@ Progress: [██████████] 100%
 [x] Phase 1: Environment Gate & Build Baseline (2/2 plans)
 [x] Phase 2: Native RDPEI Touch Lifecycle (2/2 plans)
 [x] Phase 3: Local-Only Gestures & Session Stability
-[~] Phase 4: Diagnostics, Packaging & Launch Configuration (6/6 plans complete; phase verification remains in progress)
+[~] Phase 4: Diagnostics, Packaging & Launch Configuration (7/7 plans complete; phase verification remains in progress)
 ```
 
 ## Performance Metrics
 
 - **Phases completed**: 3/4
 - **Requirements mapped**: 19/19
-- **Plans completed**: 13/13 (01-01, 01-02, 02-01, 02-02, 03-01, 04-01, 04-02, 04-03, 04-04, 04-05, 04-06; 03-02 and 03-03 reconciled as superseded by the local-only pivot)
+- **Plans completed**: 14/14 (01-01, 01-02, 02-01, 02-02, 03-01, 04-01, 04-02, 04-03, 04-04, 04-05, 04-06, 04-07; 03-02 and 03-03 reconciled as superseded by the local-only pivot)
 
 **Per-Plan Metrics:**
 
@@ -59,6 +59,7 @@ Progress: [██████████] 100%
 | Phase 04 P04 | 623 | 2 tasks | 5 files |
 | Phase 04 P05 | 1371 | 3 tasks | 9 files |
 | Phase 04 P06 | 182 | 4 tasks | 7 files |
+| Phase 04 P07 | 12 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,9 @@ Progress: [██████████] 100%
 - [Phase ?]: Task 4 used the owner-confirmed ten-check physical-device result without repeating package installation, rollback, menu launches, or physical tests.
 - [Phase ?]: GAP-07 remains USER-DEFERRED under D-25; /cert:ignore is expected and server certificate identity remains unverified.
 - [Phase ?]: The v1 diagnostic record remains local-only with native_count=0 on hardware and no required hardware native-cancel record.
+- [Phase ?]: Exercise the production xf_input_handle_event dispatcher with synthetic XI2 cookies and linker-wrapped XGetEventData/XFreeEventData, not a copied state model.
+- [Phase ?]: Keep the canonical local-only configuration in the regression: FreeRDP_TouchPinchWheelFallback=true and FreeRDP_MultiTouchInput=false.
+- [Phase ?]: Refresh one integrated onemix-touch.patch and require a second clean dpkg-source/quilt extraction to match the repaired X11 source and pass the dispatcher regression.
 
 ### Todos
 
@@ -116,11 +120,11 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Last session:** 2026-08-09T14:34:47.737Z
-**Stopped at:** Completed 04-06-PLAN.md
+**Last session:** 2026-08-09T23:11:05.859Z
+**Stopped at:** Completed 04-07-PLAN.md
 **Resume file:** None
 
-- **Last action**: Completed Plan 04-06: verified the owner-confirmed ten-check record, exact package identity manifests, live PRE/POST snapshots, and D-25 wording without repeating device operations.
+- **Last action**: Completed Plan 04-07: exercised the real XI2 dispatcher, repaired canonical cancellation diagnostics, and synchronized the fresh Debian quilt source proof.
 - **Next action**: Complete the Phase 4 verification/ship audit; GAP-07 remains USER-DEFERRED and server certificate identity remains unverified.
 
 ---
