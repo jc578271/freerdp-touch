@@ -170,7 +170,19 @@ if abort_end is None:
 if abort_end is None:
     fail("could not find third-finger abort block end")
 
-third_text = "".join(src_lines[third_idx : abort_end + 1])
+fallback_fn = extract_function(src_lines, "xf_input_touch_fallback")
+if not fallback_fn:
+    fail("xf_input_touch_fallback function not found")
+fallback_text = "".join(src_lines[fallback_fn[0] : fallback_fn[1] + 1])
+third_match = re.search(
+    r"Third \(or later\) finger aborts \(GAP-02, GAP-10\).*?"
+    r"xf_touch_cancel_lifecycle.*?return 0;\s*}\s*case XI_TouchUpdate",
+    fallback_text,
+    re.S,
+)
+if not third_match:
+    fail("could not isolate third-finger abort block")
+third_text = third_match.group(0)
 
 n3 = count_calls(third_text, "xf_touch_cancel_lifecycle")
 if n3 != 1:
@@ -189,11 +201,25 @@ for qf in ["quarantinedFingers[", "quarantinedCount =", "recoveryGateArmed ="]:
             f"third-finger abort: contains forbidden inline write {qf.strip()}"
         )
 
-# Third-finger must pass supplemental IDs
+# Third-finger must pass a compacted supplemental set so a zero optional
+# slot cannot hide a later nonzero touch ID.
 if "supplemental" not in third_text:
     fail("third-finger abort: must pass supplemental IDs to lifecycle owner")
+if not re.search(r"int\s+compact\s*\[", third_text):
+    fail("third-finger abort: missing compact supplemental-ID array")
+if not re.search(
+    r"if\s*\(\s*supp\[i\]\s*!=\s*0\s*\)\s*"
+    r"compact\[suppCount\+\+\]\s*=\s*supp\[i\]",
+    third_text,
+):
+    fail("third-finger abort: supplemental IDs are not compacted in order")
+if not re.search(
+    r"xf_touch_cancel_lifecycle\(\s*xfc\s*,\s*compact\s*,\s*suppCount\s*\)",
+    third_text,
+):
+    fail("third-finger abort: lifecycle owner must receive the compacted set")
 
-# ═══ Check 3: xf_touch_cancel_lifecycle calls emit_sequence once ════
+# ═══ Check 3: canonical cancellation owner and diagnostics ═══════════
 
 lifecycle = extract_function(src_lines, "xf_touch_cancel_lifecycle")
 if not lifecycle:
@@ -201,23 +227,67 @@ if not lifecycle:
 
 life_text = "".join(src_lines[lifecycle[0] : lifecycle[1] + 1])
 n_emit = count_calls(life_text, "xf_force_cancel_emit_sequence")
-# Accept either explicit emit_sequence call OR inline diagnostic emission
-has_inline_cancel = "touch-diag: event=cancel" in life_text
-has_inline_summary = "touch-diag: summary" in life_text
-if n_emit == 0 and (not has_inline_cancel or not has_inline_summary):
+if n_emit != 1:
     fail(
-        f"xf_touch_cancel_lifecycle: must call emit_sequence once or emit touch-diag cancel/summary inline (got emit={n_emit}, cancel={has_inline_cancel}, summary={has_inline_summary})"
+        f"xf_touch_cancel_lifecycle: expected exactly 1 xf_force_cancel_emit_sequence call, got {n_emit}"
     )
+if "xfc->diagContacts" not in life_text:
+    fail("xf_touch_cancel_lifecycle: cancellation sequence must consume diagContacts")
+if "touch-diag: event=cancel" in life_text:
+    fail("xf_touch_cancel_lifecycle: diagnostic cancel records must come from the emission callback")
+if re.search(r"xfc->contacts\s*\[.{0,300}?touch-diag", life_text, re.S):
+    fail("xf_touch_cancel_lifecycle: diagnostic cancellation must not source local contacts")
 
 # Lifecycle must call xf_quarantine_update (for add-set)
 n_upd = count_calls(life_text, "xf_quarantine_update")
-if n_upd == 0:
-    fail("xf_touch_cancel_lifecycle: must call xf_quarantine_update")
+if n_upd != 1:
+    fail(
+        f"xf_touch_cancel_lifecycle: expected 1 xf_quarantine_update call, got {n_upd}"
+    )
 
-# ═══ Check 4: sole runtime writer beyond init ═══════════════════════
-# Relaxed check: only verify that the quarantine reset in the lifecycle
-# owner goes through xf_quarantine_update (already checked in Check 3).
-# A full runtime-proof check is deferred to the patch-crystallization step.
+# ═══ Check 4: sole runtime quarantine writer beyond init ════════════
+
+init_fn = extract_function(src_lines, "xf_input_init")
+if not init_fn:
+    fail("xf_input_init function not found")
+
+quarantine_assignment = re.compile(
+    r"xfc->(?:quarantinedFingers\s*\[[^]]+\]|quarantinedCount|recoveryGateArmed)\s*=(?!=)"
+)
+for line_no, line in enumerate(src_lines):
+    if quarantine_assignment.search(line) and not (init_fn[0] <= line_no <= init_fn[1]):
+        fail(
+            f"quarantine state assignment outside xf_input_init at line {line_no + 1}"
+        )
+
+for function_name, minimum in (
+    ("xf_input_pinch_cleanup", 1),
+    ("xf_input_touch_fallback", 4),
+    ("xf_input_handle_event_remote", 1),
+):
+    body = extract_function(src_lines, function_name)
+    if not body:
+        fail(f"{function_name} function not found")
+    body_text = "".join(src_lines[body[0] : body[1] + 1])
+    calls = count_calls(body_text, "xf_quarantine_update")
+    if calls < minimum:
+        fail(
+            f"{function_name}: expected at least {minimum} xf_quarantine_update calls, got {calls}"
+        )
+
+# Diagnostics are maintained only after the production coordinate transform.
+touch_remote = extract_function(src_lines, "xf_input_touch_remote")
+if not touch_remote:
+    fail("xf_input_touch_remote function not found")
+touch_text = "".join(src_lines[touch_remote[0] : touch_remote[1] + 1])
+adjusted_at = touch_text.find("xf_event_adjust_coordinates")
+diag_positions = [
+    touch_text.find(name)
+    for name in ("xf_diag_contact_begin", "xf_diag_contact_update", "xf_diag_contact_end")
+    if touch_text.find(name) >= 0
+]
+if adjusted_at < 0 or not diag_positions or min(diag_positions) < adjusted_at:
+    fail("xf_input_touch_remote: diagContacts must use adjusted coordinates")
 
 # ═══ Check 5: DIAG-01 idempotency gate ═════════════════════════════
 
