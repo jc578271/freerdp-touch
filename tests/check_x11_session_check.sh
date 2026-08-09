@@ -45,3 +45,24 @@ expect_failure() {
 expect_success ':2' '100 /usr/lib/xorg/Xorg :2 vt3' 1
 expect_failure ':2' '101 /usr/lib/xorg/Xorg :3 vt4' 0
 printf 'PASS: check-x11-session display scoping\n'
+
+# WR-03: Wayland-negative cases — a matching Xorg process with
+# Wayland indicators must still be rejected.
+
+# XDG_SESSION_TYPE=wayland with matching Xorg → must fail
+(
+  PATH="$td:$PATH" \
+    XDG_SESSION_TYPE=wayland WAYLAND_DISPLAY= \
+    DISPLAY=':2' MOCK_XORG_LINES='100 /usr/lib/xorg/Xorg :2 vt3' MOCK_XORG_PRESENT=1 \
+    MOCK_XWAYLAND_PRESENT=0 "$gate" >/dev/null 2>&1
+) && { printf 'FAIL: XDG_SESSION_TYPE=wayland should fail even with matching Xorg\n' >&2; exit 1; }
+
+# WAYLAND_DISPLAY set with matching Xorg → must fail
+(
+  PATH="$td:$PATH" \
+    XDG_SESSION_TYPE=x11 WAYLAND_DISPLAY=wayland-0 \
+    DISPLAY=':2' MOCK_XORG_LINES='100 /usr/lib/xorg/Xorg :2 vt3' MOCK_XORG_PRESENT=1 \
+    MOCK_XWAYLAND_PRESENT=0 "$gate" >/dev/null 2>&1
+) && { printf 'FAIL: WAYLAND_DISPLAY=wayland-0 should fail even with matching Xorg\n' >&2; exit 1; }
+
+printf 'PASS: check-x11-session wayland-negative rejection\n'

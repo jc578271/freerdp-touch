@@ -45,9 +45,12 @@ printf 'Lock acquired.\n' >&2
 # Cleanup state variables (initialized BEFORE trap, set during execution)
 bundle_dir=""
 tmp_link=""
+classifier_bin=""
 
 # Publication-aware cleanup trap: never deletes a bundle that dist currently
 # resolves to. Old-bundle sweep happens explicitly after swap success.
+# Registered for EXIT only; INT/HUP/TERM get independent handlers that exit
+# with 128+signal so the resulting EXIT trap runs once and preserves status.
 cleanup() {
   local rc=$?
   if [ -n "$bundle_dir" ] && [ -d "$bundle_dir" ]; then
@@ -58,9 +61,13 @@ cleanup() {
     fi
   fi
   rm -f "$tmp_link"
+  [ -n "$classifier_bin" ] && rm -f "$classifier_bin"
   exit $rc
 }
-trap cleanup EXIT INT HUP TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 129' HUP
+trap 'exit 143' TERM
 
 # ---------------------------------------------------------------------------
 # Stage 3: fresh extraction from pinned .dsc
@@ -125,14 +132,16 @@ printf 'Version assertion OK: %s\n' "$ACTUAL_VER" >&2
 # Stage 6: classifier regression check
 # ---------------------------------------------------------------------------
 printf '=== Stage 6: classifier regression check ===\n' >&2
-cc -DWITH_XI -o /tmp/test_scroll_classifier \
+classifier_bin=$(mktemp "${TMPDIR:-/tmp}/freerdp-touch-classifier.XXXXXX")
+cc -DWITH_XI -o "$classifier_bin" \
   "${WORKDIR}/client/X11/test_scroll_classifier.c" -lm
-CLASSIFIER_OUT=$(/tmp/test_scroll_classifier)
+CLASSIFIER_OUT=$("$classifier_bin")
 if [ "$CLASSIFIER_OUT" != "OK" ]; then
   printf 'ERROR: classifier regression check failed: %s\n' "$CLASSIFIER_OUT" >&2
   exit 1
 fi
-rm -f /tmp/test_scroll_classifier
+rm -f "$classifier_bin"
+classifier_bin=""
 printf 'Classifier check: OK.\n' >&2
 
 # ---------------------------------------------------------------------------
