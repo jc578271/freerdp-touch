@@ -36,26 +36,40 @@ if [ "$mouse_only" -eq 0 ]; then
 		esac
 	}
 
+	validate_calibration() {
+		raw="$1"
+		min="$2"
+		max="$3"
+		label="$4"
+
+		if ! validate_digits "$raw"; then
+			echo "ERROR: $label must be an unsigned integer, got '$raw'" >&2
+			exit 1
+		fi
+
+		# Reject overlong values before arithmetic (GAP-05 shell)
+		if [ "${#raw}" -gt 10 ]; then
+			echo "ERROR: $label value too long (max 10 digits), got $raw" >&2
+			exit 1
+		fi
+
+		# Reject noncanonical leading-zero multi-digit values
+		if [ "${#raw}" -gt 1 ] && [ "${raw#0}" != "$raw" ]; then
+			echo "ERROR: $label must not have a leading zero, got '$raw'" >&2
+			exit 1
+		fi
+
+		if [ "$raw" -lt "$min" ] || [ "$raw" -gt "$max" ]; then
+			echo "ERROR: $label must be in $min-$max, got $raw" >&2
+			exit 1
+		fi
+	}
+
 	lp_raw="${FREERDP_TOUCH_LONG_PRESS_MS:-600}"
 	slop_raw="${FREERDP_TOUCH_SLOP_PX:-8}"
 
-	if ! validate_digits "$lp_raw"; then
-		echo "ERROR: FREERDP_TOUCH_LONG_PRESS_MS must be an unsigned integer, got '$lp_raw'" >&2
-		exit 1
-	fi
-	if [ "$lp_raw" -lt 500 ] || [ "$lp_raw" -gt 700 ]; then
-		echo "ERROR: FREERDP_TOUCH_LONG_PRESS_MS must be in 500-700, got $lp_raw" >&2
-		exit 1
-	fi
-
-	if ! validate_digits "$slop_raw"; then
-		echo "ERROR: FREERDP_TOUCH_SLOP_PX must be an unsigned integer, got '$slop_raw'" >&2
-		exit 1
-	fi
-	if [ "$slop_raw" -lt 4 ] || [ "$slop_raw" -gt 16 ]; then
-		echo "ERROR: FREERDP_TOUCH_SLOP_PX must be in 4-16, got $slop_raw" >&2
-		exit 1
-	fi
+	validate_calibration "$lp_raw" 500 700 "FREERDP_TOUCH_LONG_PRESS_MS"
+	validate_calibration "$slop_raw" 4 16 "FREERDP_TOUCH_SLOP_PX"
 
 	lp_ms="$lp_raw"
 	slop_px="$slop_raw"

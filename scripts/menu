@@ -83,7 +83,11 @@ XEOF
     printf ' /v:192.168.1.10 /u:ngleh %s /f /smart-sizing:2560x1600 /scale-desktop:200 /clipboard /sound:sys:pulse /microphone:sys:pulse /drive:Onemix,$HOME /cert:ignore\n' "$pass_arg_q" >> "$xinitrc"
 
     startx "$xinitrc"
+    startx_rc=$?
     rm -f "$xinitrc"
+    if [ "$startx_rc" -ne 0 ]; then
+        exit "$startx_rc"
+    fi
 
     read
     ;;

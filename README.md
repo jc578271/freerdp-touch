@@ -13,6 +13,19 @@ actions -- no external mouse needed for common interactions.
 - Three-finger translation = middle-button drag
 - Mouse-only escape hatch (bypasses all touch handling)
 
+## Security warning
+
+<!-- BEGIN: accepted-cert-risk -->
+**Server certificate identity is NOT verified.** v1 intentionally retains
+`/cert:ignore`, disabling server certificate validation for all RDP
+launches. The owner acknowledges and accepts HIGH risk of server
+impersonation and man-in-the-middle attack during RDP sessions.
+
+This is a known deferred gap (GAP-07). Reconsideration requires a
+future owner-requested requirement or phase. Do not claim that server
+certificate identity is protected.
+<!-- END: accepted-cert-risk -->
+
 ## Prerequisites
 
 - Debian trixie (13) on amd64
@@ -44,18 +57,35 @@ expected pin.
 Verify checksums first:
 
 ```
-cd "$(readlink -f dist)" && sha256sum -c SHA256SUMS
+# BEGIN: checksum-verify
+(cd "$(readlink -f dist)" && sha256sum -c SHA256SUMS)
+# END: checksum-verify
 ```
 
 Then install the exact four-package closure in one transaction (never
 use a `freerdp3-*.deb` glob):
 
 ```
+# BEGIN: install-four-package
+# Resolve each glob to exactly one .deb — fail closed on zero or multiple.
+libwinpr3_deb=$(echo ./dist/libwinpr3-3_*_amd64.deb)
+libfreerdp3_deb=$(echo ./dist/libfreerdp3-3_*_amd64.deb)
+libclient_deb=$(echo ./dist/libfreerdp-client3-3_*_amd64.deb)
+x11_deb=$(echo ./dist/freerdp3-x11_*_amd64.deb)
+
+for pkg in "$libwinpr3_deb" "$libfreerdp3_deb" "$libclient_deb" "$x11_deb"; do
+  if [ ! -f "$pkg" ]; then
+    echo "ERROR: missing package file: $pkg" >&2
+    exit 1
+  fi
+done
+
 sudo apt install -y --allow-downgrades \
-  ./dist/libwinpr3-3_*_amd64.deb \
-  ./dist/libfreerdp3-3_*_amd64.deb \
-  ./dist/libfreerdp-client3-3_*_amd64.deb \
-  ./dist/freerdp3-x11_*_amd64.deb
+  "$libwinpr3_deb" \
+  "$libfreerdp3_deb" \
+  "$libclient_deb" \
+  "$x11_deb"
+# END: install-four-package
 ```
 
 Verify all four packages show `+onemix1`:
@@ -149,11 +179,29 @@ sudo apt install -y --allow-downgrades \
 Assert all four are stock before launch:
 
 ```
-dpkg-query -W -f='${Version}\n' \
-  freerdp3-x11 libfreerdp-client3-3 libfreerdp3-3 libwinpr3-3 \
-  | grep -q '+onemix1' && echo "STILL PATCHED -- retry trixie closure" \
-  || echo "ALL STOCK -- safe to launch"
-```
+# BEGIN: rollback-check
+pkg_versions="$(dpkg-query -W -f='${Package} ${Version}\n' \
+  freerdp3-x11 libfreerdp-client3-3 libfreerdp3-3 libwinpr3-3)" || {
+  echo "DPKG-QUERY FAILED — cannot determine package state" >&2
+  exit 1
+}
+
+# Require exactly four results
+pkg_count="$(echo "$pkg_versions" | wc -l)"
+if [ "$pkg_count" -ne 4 ]; then
+  echo "INCOMPLETE CLOSURE — expected 4 packages, got $pkg_count:" >&2
+  echo "$pkg_versions" >&2
+  exit 1
+fi
+
+# All four must be stock (no +onemix1)
+if echo "$pkg_versions" | grep -q '+onemix1'; then
+  echo "STILL PATCHED — retry trixie closure"
+  exit 1
+fi
+
+echo "ALL STOCK — safe to launch"
+# END: rollback-check
 
 After rollback, confirm stock FreeRDP works via the explicit locked
 invocation:
