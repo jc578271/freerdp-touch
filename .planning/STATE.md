@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: complete
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-08-08T13:48:42.000Z"
-last_activity: 2026-08-08
+status: in_progress
+stopped_at: Phase 4 gap-closure plans ready for execution with user override
+last_updated: "2026-08-09T07:18:02.115Z"
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 10
+  total_plans: 13
   completed_plans: 10
 current_phase_name: diagnostics-packaging-launch-configuration
-last_activity_desc: Closed Phase 3 under the user-directed non-multitouch/local-only target.
+last_activity: 2026-08-09
+last_activity_desc: Phase 4 gap-closure plans ready; final checker overridden by user and GAP-07 deferred under D-25.
 ---
 
 # State: FreeRDP Touch for OneMix 3
@@ -29,21 +29,21 @@ last_activity_desc: Closed Phase 3 under the user-directed non-multitouch/local-
 ## Current Position
 
 - **Phase**: 4 - Diagnostics, Packaging & Launch Configuration
-- **Status**: Phase 3 complete. Non-multitouch/local-only is now the canonical v1 touch mode; Phase 4 is next.
-- **Progress**: 4/4 phases complete, 10/10 currently planned phase plans reconciled or executed.
+- **Status**: Phase 4 gap closure ready to execute. The owner overrode the final planning-checker pass; GAP-07 is deferred under D-25 and `/cert:ignore` remains for v1.
+- **Progress**: 3/4 phases complete; 10/13 plans completed, with Phase 4 plans 04-04 through 04-06 pending.
 
 ```
 [x] Phase 1: Environment Gate & Build Baseline (2/2 plans)
 [x] Phase 2: Native RDPEI Touch Lifecycle (2/2 plans)
 [x] Phase 3: Local-Only Gestures & Session Stability
-[x] Phase 4: Diagnostics, Packaging & Launch Configuration
+[ ] Phase 4: Diagnostics, Packaging & Launch Configuration (3/6 plans complete; gap closure ready)
 ```
 
 ## Performance Metrics
 
-- **Phases completed**: 4/4
+- **Phases completed**: 3/4
 - **Requirements mapped**: 19/19
-- **Plans completed**: 10 (01-01, 01-02, 02-01, 02-02, 03-01, 04-01, 04-02, 04-03; 03-02 and 03-03 reconciled as superseded by the local-only pivot)
+- **Plans completed**: 10/13 (01-01, 01-02, 02-01, 02-02, 03-01, 04-01, 04-02, 04-03; 03-02 and 03-03 reconciled as superseded by the local-only pivot)
 
 **Per-Plan Metrics:**
 
@@ -79,11 +79,12 @@ last_activity_desc: Closed Phase 3 under the user-directed non-multitouch/local-
 
 ### Todos
 
-None — all four phases complete.
+- Execute Phase 4 gap-closure plans 04-04, 04-05, and 04-06.
 
 ### Blockers
 
-- None.
+- Planning verification override: the owner chose to execute without the final checker verdict after the last three plan fixes.
+- GAP-07 certificate hardening is deferred under D-25; `/cert:ignore` remains with accepted HIGH MITM/server-impersonation risk.
 
 ### Quick Tasks Completed
 
@@ -100,12 +101,12 @@ None — all four phases complete.
 
 ## Session Continuity
 
-**Last session:** 2026-08-08T13:48:42.000Z
-**Stopped at:** Completed 04-03-PLAN.md
+**Last session:** 2026-08-09
+**Stopped at:** Phase 4 gap-closure plans ready for execution with user override
 **Resume file:** None
 
-- **Last action**: Restored project context and confirmed all three Phase 4 plans are ready with no interrupted work.
-- **Next action**: Execute Phase 4, starting with Wave 1 plans 04-01 and 04-02.
+- **Last action**: Replanned Phase 4 gap closure as plans 04-04 through 04-06, deferred GAP-07 under D-25, and accepted the final checker override.
+- **Next action**: Execute Phase 4 gap closure, starting with Wave 1 plans 04-04 and 04-05.
 
 ---
 *State initialized: 2026-08-05*

@@ -106,9 +106,11 @@
 
 **Gap Closure** *(Wave 1 parallel, then Wave 2)*
 
-- [ ] 04-04-PLAN.md — Source defect fixes: XI_TouchOwnership cast, quarantine gate, bounds End, pinch float, parser overflow, fallback cancel diagnostics (DIAG-01, CONF-01)
-- [ ] 04-05-PLAN.md — Script/doc/menu fixes: overlong calibration, signal-safe build, /cert:tofu, README checksum/rollback (CONF-01, PACK-01, PACK-02)
-- [ ] 04-06-PLAN.md — Rebuild 4-package bundle + rerun automated and native-device verification (DIAG-01, PACK-01, PACK-02, CONF-01)
+- [ ] 04-04-PLAN.md — X11 lifecycle, parser, and diagnostic defect closure: one-owner recovery, cached/idempotent diagnostics, local-only cancellation truth, exact four-package loader-isolated parser fixture, and gated RDPEI frame-record preservation (DIAG-01, CONF-01) — Wave 1, depends_on []
+- [ ] 04-05-PLAN.md — Release script, wrapper/menu, docs, and deployment closure: deterministic repeated calibration validation, signal-safe publication fixture, repeatable exact four-package install/rollback docs, fail-closed incomplete identities, and deployed-menu parity (CONF-01, PACK-01, PACK-02) — Wave 1, depends_on []
+- [ ] 04-06-PLAN.md — Final non-certificate rebuild and verification: two separately runnable clean builds with durable identity manifests, all automated regressions, separate process-aware live PRE/POST interruption invocations, repeated install/rollback, local-only native_count=0 diagnostics, native-device checks, and deployed-menu parity (DIAG-01, PACK-01, PACK-02, CONF-01) — Wave 2, depends_on [04-04, 04-05]
+
+**Gap-closure security note:** GAP-07 is deferred by the owner per D-25. The current `/cert:ignore` behavior remains for v1, with accepted HIGH server-impersonation/MITM exposure. It is not counted as closed and no verification may claim server certificate identity protection.
 
 ## Progress
 
@@ -117,7 +119,7 @@
 | 1. Environment Gate & Build Baseline | 2/2 | Complete    | 2026-08-06 |
 | 2. Native RDPEI Touch Lifecycle | 2/2 | Complete    | 2026-08-06 |
 | 3. Local-Only Gestures & Session Stability | 3/3 | Complete | 2026-08-08 |
-| 4. Diagnostics, Packaging & Launch Configuration | 3/6 | Gaps found — gap closure planned | 2026-08-08 |
+| 4. Diagnostics, Packaging & Launch Configuration | 3/6 | Gaps found — 3-plan closure ready; GAP-07 owner-deferred | 2026-08-08 |
 
 ## Ordering Rationale
 

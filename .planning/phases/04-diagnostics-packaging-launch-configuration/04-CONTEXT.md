@@ -51,6 +51,9 @@ This phase must not redesign gesture behavior, restore native multitouch/RDPEI f
 - **D-23:** Menu changes are minimal. Option 3 delegates the actual FreeRDP invocation to the wrapper while preserving the current interaction and startup flow: TTY password prompt (`read -s`), `startx`, rotation, and existing non-secret connection/session arguments. The menu still reads the password and passes it as `/p:$PASS` through the wrapper as an opaque argument; the wrapper does not own, store, or persist credentials (D-19). Apply minimum non-UX-changing file hygiene: create the xinitrc with `umask 077` and `mktemp` (not a predictable world-readable path), remove `WLOG_LEVEL=DEBUG`, and clean up the temp file reliably after `startx` returns. Diagnostics must not echo credentials.
 - **D-24:** The concrete invocation contract is locked. All three launch modes go through the same TTY → `read -s` password prompt → `startx` → display/touch rotation → wrapper → installed `xfreerdp3` path via menu option 3: (a) Normal: run `menu`, choose option 3. (b) Diagnostic: run `FREERDP_TOUCH_DIAG=1 menu`, choose option 3. (c) Mouse-only: run `menu --mouse-only`, choose option 3. Default menu behavior (the interactive option loop) remains unchanged. The menu accepts only the optional `--mouse-only` CLI argument; unknown CLI arguments must fail clearly with a diagnostic message rather than becoming FreeRDP arguments. Option 3 safely appends the `--mouse-only` wrapper flag when set while preserving every opaque connection argument including `/p:$PASS`. Diagnostic mode propagates the exact `FREERDP_TOUCH_DIAG=1` value through the generated private xinit material/environment to the wrapper; unset, `0`, `false`, or any other value remains off. On-device verification must never invoke the wrapper bare from the TTY — use these three menu invocations only.
 
+### Post-verification accepted security exception
+- **D-25 (locked, 2026-08-09):** GAP-07 certificate hardening is deferred outside v1. Preserve the current `/cert:ignore` behavior unchanged. The owner explicitly accepts the resulting HIGH risk that v1 is vulnerable to server impersonation and man-in-the-middle attack. No Phase 4 plan, verification record, or completion claim may state that server certificate identity is protected or that GAP-07 is closed. Revisit this policy only through a future follow-up requirement or phase if the owner requests it.
+
 ### Claude's Discretion
 - Exact script names, quilt patch filename, wrapper path within the repository, timestamp format, log prefix, and documentation filenames.
 - Exact names of the two calibration environment variables and the conservative accepted slop range, provided defaults remain 600 ms/8 px and invalid values fail before launch.
@@ -136,7 +139,8 @@ No external gesture specification applies; the project documents, final summarie
 <deferred>
 ## Deferred Ideas
 
-None — discussion stayed within Phase 4 scope. Additional classifier knobs, native multitouch restoration, runtime mode switching, and broader-device calibration remain outside v1.
+- GAP-07 certificate hardening is explicitly deferred outside v1 per D-25. The current `/cert:ignore` behavior remains in place, with its accepted server-impersonation/MITM exposure. It may return only as a future follow-up requirement or phase requested by the owner.
+- Additional classifier knobs, native multitouch restoration, runtime mode switching, and broader-device calibration remain outside v1.
 
 </deferred>
 
