@@ -1,209 +1,198 @@
 ---
 phase: 04-diagnostics-packaging-launch-configuration
-reviewed: 2026-08-08T14:17:15Z
+reviewed: 2026-08-09T15:08:55Z
 depth: standard
-files_reviewed: 9
+files_reviewed: 22
 files_reviewed_list:
   - .gitignore
-  - patches/onemix-touch.patch
   - README.md
+  - new.md
+  - patches/onemix-touch.patch
   - scripts/build-release.sh
   - scripts/check-x11-session.sh
   - scripts/launch-touch.sh
   - scripts/menu
+  - rdp-debug-gestures.log
+  - rdp-debug-native.log
+  - temp
+  - temp.conf
+  - tests/build_release_signal_check.sh
+  - tests/check_third_finger_owner.py
   - tests/check_x11_session_check.sh
+  - tests/gap01_ownership_layout.c
+  - tests/gap05_parser_check.sh
   - tests/menu_diagnostic_env_check.sh
+  - tests/pinch_reversal_check.c
+  - tests/readme_doc_regression.sh
+  - tests/wrapper_production_check.sh
+  - tests/xf_touch_internal_check.c
 findings:
-  critical: 9
+  critical: 6
   warning: 4
-  info: 0
-  total: 13
+  info: 1
+  total: 11
 status: issues_found
 ---
 
 # Phase 04: Code Review Report
 
-**Reviewed:** 2026-08-08T14:17:15Z  
+**Reviewed:** 2026-08-09T15:08:55Z  
 **Depth:** standard  
-**Files Reviewed:** 9  
+**Files Reviewed:** 22  
 **Status:** issues_found
 
 ## Summary
 
-The patch applies cleanly to a fresh temporary Debian-source extraction and its standalone classifier prints `OK`; the two committed shell tests and shell syntax checks also pass. Those checks do not cover several input-lifecycle, packaging-interruption, security, documentation, and test-reliability defects. The implementation is not ready to ship.
+The review traced the delivered quilt patch through the patched FreeRDP source, launch scripts, packaging flow, diagnostic logs, and regression checks. Six release-blocking security or input-lifecycle defects remain, along with four reliability warnings and one stale-documentation item. Existing checks passed, but several are structural or do not exercise the failing runtime paths.
+
+The accepted D-25 exception for `/cert:ignore` and unverified server identity was deliberately not counted as a defect.
 
 ## Narrative Findings (AI reviewer)
 
 ## Critical Issues
 
-### BL-01: `XI_TouchOwnership` is treated as an `XIDeviceEvent`
+### CR-01: RDP password remains exposed in the long-lived client command line
 
 **Classification:** BLOCKER  
-**File:** `/home/hoang/freerdp-touch/patches/onemix-touch.patch:1249-1287,1304-1311` (`client/X11/xf_input.c` hunk)  
-**Impact:** A touch-ownership event can read beyond its event object, causing a crash or arbitrary coordinates to enter input handling.
+**Files:** `/home/hoang/freerdp-touch/scripts/menu:43-56,79-85`; `/home/hoang/freerdp-touch/scripts/launch-touch.sh:18-23,106-110`
 
-**Issue:** `XI_TouchOwnership` is delivered as `XITouchOwnershipEvent`, but the new branches cast it to `XIDeviceEvent` and pass it to `xf_input_touch_remote()`. That handler unconditionally reads `event_x` and `event_y`. The installed XI2 headers show `sizeof(XITouchOwnershipEvent) == 96`, while `offsetof(XIDeviceEvent, event_x) == 104`; the coordinate access is out of bounds.
+**Issue:** `menu` reads the password, builds `/p:<password>`, writes it into the temporary xinitrc, and the wrapper forwards it unchanged to `xfreerdp3`. The password consequently remains in `xfreerdp3`'s argv for the whole RDP session. The private xinitrc mode does not protect process arguments from principals able to inspect process argv, such as through `/proc/<pid>/cmdline` under the normal system policy.
 
-**Evidence:** A temporary compile-time layout probe confirmed the incompatible sizes and offsets. The unsafe outer ownership branch runs even when diagnostics are disabled because coordinate extraction is unconditional.
+**Fix:** Stop generating or forwarding `/p:`. Use a supported non-argv FreeRDP credential source, such as `/from-stdin:force` with a protected one-shot pipe or `FREERDP_ASKPASS`. Add a regression assertion that the recorded client argv never contains the supplied password.
 
-**Recommended fix:** Handle ownership with `const XITouchOwnershipEvent*`, use only `deviceid` and `touchid` for `XIAllowTouchEvents`, and do not pass ownership events to `xf_input_touch_remote()`. Make the recovery-gate ownership branch use the same event type.
-
-### BL-02: Repeated forced cancellation permanently locks out touch input
+### CR-02: Tracked diagnostic logs disclose sensitive connection and session metadata
 
 **Classification:** BLOCKER  
-**File:** `/home/hoang/freerdp-touch/patches/onemix-touch.patch:1172-1230,1243-1298` (`client/X11/xf_input.c` hunk)  
-**Impact:** A second lifecycle cancellation before the original finger lifts can make every future touch event get discarded until the client restarts.
+**Files:** `/home/hoang/freerdp-touch/rdp-debug-gestures.log:287,561,567`; `/home/hoang/freerdp-touch/rdp-debug-native.log:286,557,563`; `/home/hoang/freerdp-touch/.gitignore:10`
 
-**Issue:** `xf_touch_force_cancel()` resets `quarantinedCount` but only ever sets `recoveryGateArmed` to true; it never clears the flag when no IDs remain. After a first cancellation arms the recovery gate, a second cancellation wipes the quarantine IDs while retaining the armed flag. The recovery gate then sees an empty list, treats every event as an unrecognized touch, and returns without a path that can clear the gate.
+**Issue:** Both tracked logs disclose a private peer address, account/domain identity, and server auto-reconnect verifier data. These values are distributed to every clone and remain reachable through Git history. `.gitignore` ignores only `rdp-debug.log`, so neither tracked diagnostic variant is prevented from recurring.
 
-**Evidence:** Fullscreen, focus, configure, and disconnect all call the same cancellation seam, so two calls before a queued `XI_TouchEnd` are plausible. The gate's only disarm path requires removing an ID from the now-empty list.
+**Fix:** Remove the logs from the repository and, if the repository was shared, scrub reachable history according to the publication policy. Add a broad ignore rule such as `rdp-debug*.log`. Replace retained evidence with minimal redacted fixtures and treat exposed session metadata as sensitive.
 
-**Recommended fix:** Preserve and deduplicate existing quarantined IDs across repeated cancellations, append newly active IDs, and always set `recoveryGateArmed = (quarantinedCount > 0)`. Add a regression case that forces cancellation twice before End, then verifies a new touch reaches the recognizer.
-
-### BL-03: The content-bounds gate drops End events and can leave remote input held
+### CR-03: Release assembly can publish an unvalidated package from shared `/tmp`
 
 **Classification:** BLOCKER  
-**File:** `/home/hoang/freerdp-touch/patches/onemix-touch.patch:1035-1052` (`client/X11/xf_input.c` hunk)  
-**Impact:** A drag or pinch ending over a letterbox border can leave BUTTON1 or Ctrl held on the remote host.
+**File:** `/home/hoang/freerdp-touch/scripts/build-release.sh:82-84,163-175,213-215`
 
-**Issue:** The content-bounds test returns before fallback dispatch for every event type, including `XI_TouchEnd`. A contact accepted inside the scaled region but lifted outside it never reaches the fallback cleanup paths that release a drag or call pinch cleanup.
+**Issue:** `mktemp -u` reserves no directory, and package artifacts are written into the shared `/tmp` parent. Stage 8 validates one `DEB_FILE`, but Stage 9 independently selects the first broad glob match and copies it. A concurrent process or local untrusted user can place a matching same-version filename that sorts first after validation. The substituted package is then checksummed and atomically published, so `SHA256SUMS` validates the substituted payload rather than protecting against it.
 
-**Evidence:** The return at the bounds gate precedes the only call to `xf_input_touch_fallback()`, while release handling is inside that fallback state machine.
+**Fix:** Use an owned private build root created with `mktemp -d`, extract beneath it, retain the exact Stage-8 validated package paths, and copy only those paths into the bundle. Remove the private build root from the exit cleanup path, including on failed builds. For example:
 
-**Recommended fix:** Never discard lifecycle completion for an accepted contact. Restrict the admission bounds check to Begin, or explicitly route End through state cleanup using the last valid tracked coordinates.
+```bash
+build_root=$(mktemp -d "${TMPDIR:-/tmp}/onemix-build.XXXXXX")
+WORKDIR="$build_root/source"
+# Append each validated DEB_FILE to deb_files[]
+cp -- "${deb_files[@]}" "$bundle_dir/"
+```
 
-### BL-04: Pinch wheel accumulation discards fractional movement indefinitely
-
-**Classification:** BLOCKER  
-**File:** `/home/hoang/freerdp-touch/patches/onemix-touch.patch:300-343,1397-1405` (`client/X11/xf_input.c` and `client/X11/xfreerdp.h` hunks)  
-**Impact:** Valid diagonal, sequential two-finger pinches can claim pinch but never generate a Ctrl+wheel event.
-
-**Issue:** `pinchAccum` is `INT32`, and each `double delta` is cast to `INT32` before accumulation. For a symmetric diagonal pinch, pinch claims at about 8.725 px, then subsequent per-contact updates can be 0.747 and 0.750 px. Each is truncated to zero, so the accumulator never reaches a wheel detent.
-
-**Evidence:** A numerical reproduction of the production formula showed repeated nonzero per-event deltas each contributing zero after the cast.
-
-**Recommended fix:** Store the accumulator, or at least a residual, as `double`; use `fabs()` for the threshold comparison and subtract the wheel step as a floating-point value. Add a sequential diagonal-pinch regression case that exercises the production wheel path.
-
-### BL-05: Oversized calibration values bypass validation and reach unchecked `atoi()`
+### CR-04: Recovery quarantine is disarmed while cancelled fingers are still down
 
 **Classification:** BLOCKER  
-**Files:** `/home/hoang/freerdp-touch/scripts/launch-touch.sh:31-58`; `/home/hoang/freerdp-touch/patches/onemix-touch.patch:1537-1551` (`client/common/cmdline.c` hunk)  
-**Impact:** Untrusted environment input that should be rejected reaches FreeRDP with an invalid setting; the downstream conversion has overflow/undefined behavior.
+**File:** `/home/hoang/freerdp-touch/patches/onemix-touch.patch:1520-1526,1580-1600,1754-1807`
 
-**Issue:** Digits-only values larger than Bash's integer range make both `[ "$value" -lt ... ]` comparisons return an integer-expression error. Because those failures are conditions inside `if`, the wrapper continues and invokes the client. The new command-line parser uses `atoi()` and casts the result to `UINT32` without validating syntax or range.
+**Issue:** `xf_quarantine_update()` correctly derives `recoveryGateArmed` from the remaining quarantined-contact count. The production code then defeats that invariant in two ways. `xf_touch_cancel_lifecycle()` resets `quarantinedCount` before every cancellation, so a repeated focus/fullscreen/geometry cancellation can discard fingers still awaiting `XI_TouchEnd`. The recovery-event path also unconditionally assigns `recoveryGateArmed = FALSE`, including after a quarantined Update or Ownership event and after only one of several End events. A cancelled multi-finger gesture can therefore admit a new touch before every pre-cancel physical contact has lifted.
 
-**Evidence:** A temporary mocked-wrapper run with an 84-digit `FREERDP_TOUCH_LONG_PRESS_MS` emitted `integer expression expected`, exited zero, invoked the mock client, and forwarded the oversized `/touch-long-press:` argument.
+**Fix:** Make `xf_quarantine_update()` the actual sole owner after initialization. Remove the unconditional gate assignment, preserve existing quarantine entries during a repeated cancellation, and only add or remove IDs through the helper. Add a runtime regression that cancels two fingers, sends an Update, sends one End, forces cancellation again, and verifies a new Begin remains blocked until the final old End.
 
-**Recommended fix:** Reject overlong values before arithmetic or use exact bounded decimal patterns for the supported ranges. Replace `atoi()` with checked `strtoul`/`strtoumax` parsing that verifies complete consumption, overflow, and the permitted range for both switches.
-
-### BL-06: Interrupted release builds return success
+### CR-05: Third-finger abort omits the arriving finger from quarantine
 
 **Classification:** BLOCKER  
-**File:** `/home/hoang/freerdp-touch/scripts/build-release.sh:52-63`  
-**Impact:** Automation can treat an interrupted build as successful and deploy a stale prior bundle.
+**File:** `/home/hoang/freerdp-touch/patches/onemix-touch.patch:822-839,1478-1526`
 
-**Issue:** One `cleanup` function is registered for `EXIT`, `INT`, `HUP`, and `TERM`, then executes `exit $rc`. A signal delivered while Bash waits for a child can enter the trap with `$? == 0`, so an interrupted build exits successfully. The EXIT trap then invokes cleanup again.
+**Issue:** The supplemental array is `{ fingerA, fingerB, savedC, touchId }`, but `suppCount` counts nonzero IDs without compacting the array. In the common active-two-finger case this becomes `{ A, B, 0, C }` with `suppCount == 3`; the lifecycle receives only `{ A, B, 0 }`, so the newly arriving third finger is omitted and not quarantined.
 
-**Evidence:** A minimal probe using the same trap structure returned exit code 0 after `TERM` and executed the cleanup handler twice.
+**Fix:** The lifecycle already skips zero IDs, so pass the full array:
 
-**Recommended fix:** Register cleanup only for EXIT. Register separate signal handlers that exit with `128 + signal`; the EXIT cleanup should preserve that nonzero status. Add pre- and post-publication TERM tests that assert both nonzero status and a valid `dist` target.
+```c
+xf_touch_cancel_lifecycle(xfc, supp, ARRAYSIZE(supp));
+```
 
-### BL-07: Certificate validation is disabled for every RDP launch
+Alternatively compact nonzero IDs before passing the count. Add a regression that starts a two-finger gesture, begins a third touch, and asserts all three IDs enter quarantine.
 
-**Classification:** BLOCKER  
-**File:** `/home/hoang/freerdp-touch/scripts/menu:83`  
-**Impact:** An on-path attacker can impersonate the RDP server and capture or relay the TTY-entered password.
-
-**Issue:** The menu unconditionally forwards `/cert:ignore`, disabling server certificate validation in normal, diagnostic, and mouse-only modes.
-
-**Evidence:** The option is part of the single generated wrapper invocation and no later layer removes it.
-
-**Recommended fix:** Remove `/cert:ignore`; validate and pin the expected certificate/fingerprint, or use a reviewed first-connection TOFU process followed by pinning.
-
-### BL-08: README checksum instructions break the following install command
+### CR-06: Three-finger pending state survives a pre-claim finger lift
 
 **Classification:** BLOCKER  
-**File:** `/home/hoang/freerdp-touch/README.md:46-58`  
-**Impact:** A sequential copy/paste of the documented package-install flow fails to locate every `.deb`.
+**File:** `/home/hoang/freerdp-touch/patches/onemix-touch.patch:1078-1112`
 
-**Issue:** The checksum command uses `cd "$(readlink -f dist)"`, leaving the shell in the resolved bundle directory. The next command references `./dist/...`, which then resolves to a nonexistent `bundle/dist/...` path.
+**Issue:** On an End while `threeFingerPending` is set, the code quarantines the remaining IDs but returns without clearing `threeFingerPending`, `pinchFingerA`, `pinchFingerB`, `midFingerC`, or their coordinates. Later End events are consumed by recovery handling, so this stale state remains. The next clean one-finger Begin is then interpreted as a “third or later” finger and aborted; stale IDs can also re-arm quarantine with no physical contacts left.
 
-**Evidence:** No command returns to the repository root between the checksum and installation sections.
-
-**Recommended fix:** Run checksum verification in a subshell, such as `(cd "$(readlink -f dist)" && sha256sum -c SHA256SUMS)`, or explicitly change back to the repository root before installation.
-
-### BL-09: README rollback assertion fails open when a closure package is absent
-
-**Classification:** BLOCKER  
-**File:** `/home/hoang/freerdp-touch/README.md:152-155`  
-**Impact:** A partially removed or broken four-package closure can be declared “safe to launch.”
-
-**Issue:** The stock assertion pipelines `dpkg-query` into `grep`. If `dpkg-query` fails because a package is missing, `grep` sees no `+onemix1` match and the `||` branch prints `ALL STOCK -- safe to launch`.
-
-**Evidence:** The pipeline's result is only grep's status; there is no independent check that all four queries succeeded or returned four installed packages.
-
-**Recommended fix:** Capture `dpkg-query -W` output only after requiring success, require all four package results, then test those versions for the local suffix. Treat query failure or an incomplete closure as unsafe.
+**Fix:** After building the remaining-ID set and before returning, clear all three-finger-pending fields. Add an end-to-end regression: begin three touches, lift one before pan claim, lift the other two, then verify a fresh one-finger tap is accepted.
 
 ## Warnings
 
-### WR-01: Classifier regression test is disconnected from the production classifier
+### WR-01: Diagnostic cancellation uses the wrong contact store and leaks diagnostic state
 
 **Classification:** WARNING  
-**Files:** `/home/hoang/freerdp-touch/patches/onemix-touch.patch:1666-1671`; `/home/hoang/freerdp-touch/scripts/build-release.sh:128-136`  
-**Impact:** A production classifier regression can ship while the standalone test continues to print `OK`.
+**File:** `/home/hoang/freerdp-touch/patches/onemix-touch.patch:1296-1322,1344-1416,1495-1526,1953-1985`
 
-**Issue:** `test_scroll_classifier.c` copies the rule and hardcodes its constants rather than calling the real `xf_input_two_finger_resolve()` logic. Its comment claims a static guard catches drift, but the release script only compiles and runs the independent model.
+**Issue:** Fallback touch events are recorded in `diagContacts`, but cancellation emits per-contact records from `xfc->contacts` and snapshots `cctx->contacts`; fallback mode populates neither store. It also does not retire `diagContacts`, while quarantined End events are intercepted before `xf_diag_contact_end()` runs. Diagnostic summaries retain phantom contacts, omit expected cancel lines, and can exhaust diagnostic contact capacity after repeated cancellations.
 
-**Evidence:** Changing the production dominance ratio or claim order without changing the model would leave the test unchanged and passing.
+**Fix:** Snapshot and emit cancellation records from `xfc->diagContacts`, then clear its slots and set `diagContactCount = 0`. Keep native RDPEI cancellation accounting separate. Test the production cancellation path rather than only `xf_force_cancel_emit_sequence()` in isolation.
 
-**Recommended fix:** Extract the production decision into a small helper used by both runtime and test code, or build a harness that exercises the actual production implementation.
-
-### WR-02: Menu regression test bypasses the real wrapper and direct xinitrc execution
+### WR-02: Failed rotation or touch calibration still launches the RDP session
 
 **Classification:** WARNING  
-**File:** `/home/hoang/freerdp-touch/tests/menu_diagnostic_env_check.sh:32-42,59-69`  
-**Impact:** Regressions in the wrapper, native-X11 gate, diagnostic tee, executable mode, and shebang path are not detected.
+**File:** `/home/hoang/freerdp-touch/scripts/menu:58-85`
 
-**Issue:** The test replaces `launch-touch.sh` with a mock and invokes the rendered xinitrc through `bash`. The deployed flow executes the xinitrc through `startx` and then invokes the real wrapper.
+**Issue:** The generated xinitrc has neither `set -e` nor explicit checks for `xrandr` and `xinput`. If display rotation or touchscreen transformation fails, it still executes the wrapper and can report a successful RDP launch with unusable orientation or touch mapping.
 
-**Evidence:** The only wrapper observed by the test is the generated mock at lines 32-42; line 69 explicitly runs `bash "$RENDERED_XINITRC"`.
+**Fix:** Add strict error handling before the setup commands, for example:
 
-**Recommended fix:** Add a committed wrapper test with mocked gate/client binaries, and make the menu test execute the rendered xinitrc directly after checking its mode and shebang. Cover oversized calibration values, mouse-only behavior, opaque arguments, diagnostics, and exit-status propagation.
+```bash
+#!/usr/bin/env bash
+set -eu
+```
 
-### WR-03: Native-X11 regression test does not verify Wayland fail-closed behavior
+Add a test where mocked `xrandr` and `xinput` fail and assert that the wrapper is not invoked.
 
-**Classification:** WARNING  
-**File:** `/home/hoang/freerdp-touch/tests/check_x11_session_check.sh:24-28,45-46`  
-**Impact:** A future removal or inversion of the production Wayland rejection can pass the full committed test suite.
-
-**Issue:** Every test invocation fixes `XDG_SESSION_TYPE=x11` and clears `WAYLAND_DISPLAY`. The test covers the unrelated-Xwayland false rejection but never executes the conditions that must reject Wayland.
-
-**Evidence:** `run_gate()` always supplies the passing session variables, and the two assertions only test matching and nonmatching Xorg display strings.
-
-**Recommended fix:** Add negative cases where a matching Xorg process exists but `XDG_SESSION_TYPE=wayland`, and where `WAYLAND_DISPLAY=wayland-0`; both must fail.
-
-### WR-04: Canonical local-only diagnostics report zero contacts and omit cancellation evidence
+### WR-03: Wrapper idempotency regression does not execute or evaluate the cases it claims
 
 **Classification:** WARNING  
-**File:** `/home/hoang/freerdp-touch/patches/onemix-touch.patch:442-443,458,573,593,1088-1108` (`client/X11/xf_input.c` hunk)  
-**Impact:** Diagnostic state and force-cancel records are misleading in the only supported local-only runtime path.
+**File:** `/home/hoang/freerdp-touch/tests/wrapper_production_check.sh:268-307`
 
-**Issue:** The fallback recognizer tracks `lpFinger`, `pinchFingerA/B`, and `midFingerC`, but does not populate `xfc->contacts[]` or increment `active_contacts`. The new diagnostic records report that stale count, so active fallback gestures show `contacts=0`; the per-contact cancel loop emits nothing for the canonical mode.
+**Issue:** In the valid cases, `env -i ... \ rc1=0` is a command with an environment assignment, not a prefix for the wrapper invocation on the next line. The subsequent `|| rc1=0` normalizes wrapper failures to success, then `rc1=$?` captures that successful compound status. The invalid cases similarly use `|| true`, so both captured statuses are always zero. The test passes without validating deterministic exit behavior or the intended sterile environment.
 
-**Evidence:** The state and force-cancel records use `active_contacts`, while the cancellation evidence loop iterates only `xfc->contacts[]`.
+**Fix:** Capture the command result directly and assert expected values:
 
-**Recommended fix:** Derive diagnostic-only contact counts and IDs from the existing fallback state fields and emit cancel records from those fields. Keep the correction observational so it does not alter frozen gesture routing.
+```bash
+rc1=0
+env -i FIXTURE_LOG="$fixture_log" HOME="$td" XDG_STATE_HOME="$td/state" \
+  PATH="$td:$PATH" "$wrapper_fixture" >"$td/idem1.out" 2>"$td/idem1.err" \
+  || rc1=$?
+```
+
+Apply the same pattern to the second valid run and both invalid runs; assert the expected success or rejection status rather than merely comparing two forced-zero values.
+
+### WR-04: Documented launch command is not installed or reproducible from the repository instructions
+
+**Classification:** WARNING  
+**Files:** `/home/hoang/freerdp-touch/README.md:107-141`; `/home/hoang/freerdp-touch/scripts/menu:79`; `/home/hoang/freerdp-touch/scripts/build-release.sh:167-215`
+
+**Issue:** README instructs users to run bare `menu`, but the build produces only the four FreeRDP packages and installs no `menu` command. The available launcher is `scripts/menu`, and it generates an xinitrc that hard-codes `/home/hoang/freerdp-touch/scripts/launch-touch.sh`. A checkout at another path, or an installation followed only by the documented package steps, cannot reproduce the launch flow.
+
+**Fix:** Either package and install an explicit launcher command, or document `./scripts/menu` and resolve `launch-touch.sh` relative to the menu script’s directory rather than a fixed checkout path.
+
+## Info
+
+### IN-01: `new.md` is an unreferenced, contradictory design document
+
+**Classification:** INFO  
+**Files:** `/home/hoang/freerdp-touch/new.md:3,15-17,24-31,62,86`; `/home/hoang/freerdp-touch/README.md:255-261`
+
+**Issue:** `new.md` describes native RDPEI forwarding, direct-touch mode switching, and three-finger Alt+Tab. The shipped implementation explicitly disables native RDPEI forwarding, has no runtime mode switch, and maps three-finger motion to middle-button drag. Its generic name and lack of archival context make it misleading operational documentation.
+
+**Fix:** Delete it, or label it clearly as archived historical exploration and link readers to the current README.
 
 ## Validation Performed
 
-- `/home/hoang/freerdp-touch/tests/check_x11_session_check.sh` passed.
-- `/home/hoang/freerdp-touch/tests/menu_diagnostic_env_check.sh` passed.
-- The quilt patch applied to a fresh temporary Debian-source extraction; the standalone classifier printed `OK`.
-- Shell syntax checks passed for the reviewed shell scripts.
+- Reviewed all 22 files in the supplied scope and traced the quilt patch into the patched FreeRDP X11 and RDPEI call paths.
+- `tests/build_release_signal_check.sh`, `tests/check_third_finger_owner.py`, `tests/check_x11_session_check.sh`, `tests/gap05_parser_check.sh`, `tests/menu_diagnostic_env_check.sh`, `tests/readme_doc_regression.sh`, and `tests/wrapper_production_check.sh` passed.
+- `tests/gap01_ownership_layout.c`, `tests/pinch_reversal_check.c`, and `tests/xf_touch_internal_check.c` compiled and passed.
+- Existing tests do not cover the recovery-state sequences above; `wrapper_production_check.sh` has the ineffective status assertions described in WR-03.
 - No source files were modified and no commit was created.
 
 ---
 
-_Reviewed: 2026-08-08T14:17:15Z_  
+_Reviewed: 2026-08-09T15:08:55Z_  
 _Reviewer: Claude (gsd-code-reviewer)_  
 _Depth: standard_
