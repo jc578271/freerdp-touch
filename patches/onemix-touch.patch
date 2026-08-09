@@ -479,7 +479,7 @@ Index: src/client/X11/xf_input.c
  	}
  
  	return 0;
-@@ -638,6 +807,785 @@ static void xf_input_show_cursor(xfConte
+@@ -638,6 +807,795 @@ static void xf_input_show_cursor(xfConte
  #endif
  }
  
@@ -622,9 +622,11 @@ Index: src/client/X11/xf_input.c
 +	 * mode. Quarantine it until its End so it cannot become a tap. */
 +	if (remainingId != 0)
 +	{
-+		xfc->quarantinedFingers[0] = remainingId;
-+		xfc->quarantinedCount = 1;
-+		xfc->recoveryGateArmed = TRUE;
++		xf_quarantine_update(xfc->quarantinedFingers,
++		                     &xfc->quarantinedCount,
++		                     (int*)&xfc->recoveryGateArmed,
++		                     &remainingId, 1, NULL, 0,
++		                     FREERDP_MAX_TOUCH_CONTACTS);
 +	}
 +}
 +
@@ -829,11 +831,14 @@ Index: src/client/X11/xf_input.c
 +					 * or mutate quarantine/gate inline. */
 +					{
 +						const int supp[4] = { fingerA, fingerB, savedC, touchId };
++						int compact[ARRAYSIZE(supp)];
 +						size_t suppCount = 0;
 +						for (size_t i = 0; i < ARRAYSIZE(supp); i++)
++						{
 +							if (supp[i] != 0)
-+								suppCount++;
-+						xf_touch_cancel_lifecycle(xfc, supp, suppCount);
++								compact[suppCount++] = supp[i];
++						}
++						xf_touch_cancel_lifecycle(xfc, compact, suppCount);
 +					}
 +    if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: state quarantine=%d contacts=%d", xfc->quarantinedCount, xfc->active_contacts);
 +					return 0;
@@ -1084,29 +1089,41 @@ Index: src/client/X11/xf_input.c
 +				    touchId == xfc->pinchFingerB ||
 +				    touchId == xfc->midFingerC)
 +				{
-+						/* GAP-02: route through sole runtime quarantine owner. */
-+						{
-+							int addSet[3];
-+							int addCount = 0;
-+							if (xfc->pinchFingerA != 0 && xfc->pinchFingerA != touchId)
-+								addSet[addCount++] = xfc->pinchFingerA;
-+							if (xfc->pinchFingerB != 0 && xfc->pinchFingerB != touchId)
-+								addSet[addCount++] = xfc->pinchFingerB;
-+							if (xfc->midFingerC != 0 && xfc->midFingerC != touchId)
-+								addSet[addCount++] = xfc->midFingerC;
-+							xfc->quarantinedCount = 0;
-+							xf_quarantine_update(xfc->quarantinedFingers,
-+							                     &xfc->quarantinedCount,
-+							                     (int*)&xfc->recoveryGateArmed,
-+							                     addSet, addCount, NULL, 0,
-+							                     FREERDP_MAX_TOUCH_CONTACTS);
-+						}
-+						WLog_DBG(TAG,
-+						    "three-finger: pending lift id=%d",
-+						    touchId);
-+					WLog_DBG(TAG,
-+					    "three-finger: pending lift id=%d",
-+					    touchId);
++					int addSet[3];
++					int addCount = 0;
++					if (xfc->pinchFingerA != 0 && xfc->pinchFingerA != touchId)
++						addSet[addCount++] = xfc->pinchFingerA;
++					if (xfc->pinchFingerB != 0 && xfc->pinchFingerB != touchId)
++						addSet[addCount++] = xfc->pinchFingerB;
++					if (xfc->midFingerC != 0 && xfc->midFingerC != touchId)
++						addSet[addCount++] = xfc->midFingerC;
++					xf_quarantine_update(xfc->quarantinedFingers,
++					                     &xfc->quarantinedCount,
++					                     (int*)&xfc->recoveryGateArmed,
++					                     addSet, addCount, NULL, 0,
++					                     FREERDP_MAX_TOUCH_CONTACTS);
++
++					xfc->threeFingerPending = FALSE;
++					xfc->pinchActive = FALSE;
++					xfc->pinchClaimed = FALSE;
++					xfc->pinchFingerA = 0;
++					xfc->pinchFingerB = 0;
++					xfc->pinchFingerAx = 0;
++					xfc->pinchFingerAy = 0;
++					xfc->pinchFingerBx = 0;
++					xfc->pinchFingerBy = 0;
++					xfc->midFingerC = 0;
++					xfc->midFingerCx = 0;
++					xfc->midFingerCy = 0;
++					xfc->twoStartMidX = 0;
++					xfc->twoStartMidY = 0;
++					xfc->pinchFirstDist = 0.0;
++					xfc->pinchLastDist = 0.0;
++					xfc->pinchAccum = 0.0;
++					xfc->pinchDir = 0;
++					xfc->pinchMidpointDone = FALSE;
++					xfc->pinchWheelActive = FALSE;
++					WLog_DBG(TAG, "three-finger: pending lift id=%d", touchId);
 +				}
 +				return 0;
 +			}
@@ -1130,7 +1147,6 @@ Index: src/client/X11/xf_input.c
 +					xfc->twoStartMidY = 0;
 +						if (remainingId != 0)
 +						{
-+							xfc->quarantinedCount = 0;
 +							xf_quarantine_update(xfc->quarantinedFingers,
 +							                     &xfc->quarantinedCount,
 +							                     (int*)&xfc->recoveryGateArmed,
@@ -1161,7 +1177,6 @@ Index: src/client/X11/xf_input.c
 +					xfc->twoStartMidY = 0;
 +						if (remainingId != 0)
 +						{
-+							xfc->quarantinedCount = 0;
 +							xf_quarantine_update(xfc->quarantinedFingers,
 +							                     &xfc->quarantinedCount,
 +							                     (int*)&xfc->recoveryGateArmed,
@@ -1201,7 +1216,6 @@ Index: src/client/X11/xf_input.c
 +								addSet[addCount++] = xfc->pinchFingerB;
 +							if (xfc->midFingerC != 0 && xfc->midFingerC != touchId)
 +								addSet[addCount++] = xfc->midFingerC;
-+							xfc->quarantinedCount = 0;
 +							xf_quarantine_update(xfc->quarantinedFingers,
 +							                     &xfc->quarantinedCount,
 +							                     (int*)&xfc->recoveryGateArmed,
@@ -1215,11 +1229,7 @@ Index: src/client/X11/xf_input.c
 +						xfc->midFingerCy = 0;
 +						xfc->twoStartMidX = 0;
 +						xfc->twoStartMidY = 0;
-+					xfc->twoStartMidX = 0;
-+					xfc->twoStartMidY = 0;
-+					xfc->recoveryGateArmed =
-+					    xfc->quarantinedCount > 0;
-+				}
++									}
 +				return 0;
 +			}
 +
@@ -1265,7 +1275,7 @@ Index: src/client/X11/xf_input.c
  static int xf_input_touch_remote(xfContext* xfc, XIDeviceEvent* event, int evtype)
  {
  	int x = 0;
-@@ -645,31 +1593,256 @@ static int xf_input_touch_remote(xfConte
+@@ -645,31 +1603,271 @@ static int xf_input_touch_remote(xfConte
  	int touchId = 0;
  	RdpeiClientContext* rdpei = xfc->common.rdpei;
  
@@ -1293,52 +1303,74 @@ Index: src/client/X11/xf_input.c
 +		}
 +#endif
 +
-+		/* GAP-10: gated diagnostic lifecycle store (observational only).
-+		 * Duplicate Begin refreshes existing slot without double-counting;
-+		 * Update/End refresh or retire; DIAG-01 idempotency holds. */
-+		if (xfc->touchDiagEnabled)
-+		{
-+			switch (evtype)
-+			{
-+				case XI_TouchBegin:
-+					xf_diag_contact_begin(xfc->diagContacts,
-+					    &xfc->diagContactCount,
-+					    FREERDP_MAX_TOUCH_CONTACTS,
-+					    touchId, x, y);
-+					break;
-+				case XI_TouchUpdate:
-+					xf_diag_contact_update(xfc->diagContacts,
-+					    xfc->diagContactCount,
-+					    touchId, x, y);
-+					break;
-+				case XI_TouchEnd:
-+					xf_diag_contact_end(xfc->diagContacts,
-+					    &xfc->diagContactCount,
-+					    touchId);
-+					break;
-+				default:
-+					break;
-+			}
-+		}
-+
  	xf_event_adjust_coordinates(xfc, &x, &y);
  
 -	switch (evtype)
--	{
++	/* GAP-10: keep diagnostics in the same adjusted coordinate frame as
++	 * the local recognizer. Duplicate Begin refreshes an existing slot;
++	 * Update/End refresh or retire it. */
++	if (xfc->touchDiagEnabled)
+ 	{
 -		case XI_TouchBegin:
 -			freerdp_client_handle_touch(&xfc->common, FREERDP_TOUCH_DOWN, touchId, 0, x, y);
--			break;
--		case XI_TouchUpdate:
--			freerdp_client_handle_touch(&xfc->common, FREERDP_TOUCH_MOTION, touchId, 0, x, y);
--			break;
--		case XI_TouchEnd:
--			freerdp_client_handle_touch(&xfc->common, FREERDP_TOUCH_UP, touchId, 0, x, y);
--			break;
--		default:
--			break;
++		switch (evtype)
++		{
++			case XI_TouchBegin:
++				xf_diag_contact_begin(xfc->diagContacts,
++				    &xfc->diagContactCount,
++				    FREERDP_MAX_TOUCH_CONTACTS,
++				    touchId, x, y);
++				break;
++			case XI_TouchUpdate:
++				xf_diag_contact_update(xfc->diagContacts,
++				    xfc->diagContactCount,
++				    touchId, x, y);
++				break;
++			case XI_TouchEnd:
++				xf_diag_contact_end(xfc->diagContacts,
++				    &xfc->diagContactCount,
++				    touchId);
++				break;
++			default:
++				break;
++		}
++	}
++
 +	/* All touch is consumed locally by the fallback gesture recognizer.
 +	 * No native RDPEI touch contacts are forwarded (per user decision). */
 +	return xf_input_touch_fallback(xfc, evtype, x, y, touchId);
++}
++
++static void xf_touch_cancel_emit(xfFcPhase phase, int touchId, int x, int y,
++                                  int diagCount, int nativeCount, int quarantined,
++                                  void* context)
++{
++	xfContext* xfc = (xfContext*)context;
++
++	switch (phase)
++	{
++		case XF_FC_PHASE_DIAG_CANCEL:
++			WLog_WARN(TAG, "touch-diag: event=cancel id=%d x=%d y=%d", touchId, x, y);
+ 			break;
+-		case XI_TouchUpdate:
+-			freerdp_client_handle_touch(&xfc->common, FREERDP_TOUCH_MOTION, touchId, 0, x, y);
++		case XF_FC_PHASE_SUMMARY:
++			WLog_WARN(TAG,
++			          "touch-diag: summary diag_count=%d native_count=%d quarantined=%d",
++			          diagCount, nativeCount, quarantined);
+ 			break;
+-		case XI_TouchEnd:
+-			freerdp_client_handle_touch(&xfc->common, FREERDP_TOUCH_UP, touchId, 0, x, y);
++		case XF_FC_PHASE_NATIVE_CANCEL:
++			WLog_WARN(TAG, "touch-diag: event=native-cancel id=%d x=%d y=%d", touchId, x, y);
+ 			break;
+-		default:
++		case XF_FC_PHASE_GESTURE_CLEAR:
+ 			break;
+ 	}
+ 
+-	return 0;
++	WINPR_UNUSED(xfc);
 +}
 +
 +/* Lifecycle cancellation owner (GAP-02, GAP-10).
@@ -1378,14 +1410,15 @@ Index: src/client/X11/xf_input.c
 +
 + if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: force_cancel ctrl=%d contacts=%d quarantined=%d", xfc->ctrlHeld, xfc->active_contacts, xfc->quarantinedCount);
 +
-+	/* GAP-10: snapshot diag contacts, then emit ordered sequence once. */
++	/* GAP-10: snapshot native contacts and emit the canonical diagnostic
++	 * sequence from the adjusted-coordinate diagContacts store. */
 +	if (xfc->touchDiagEnabled)
 +	{
-+		/* Build snapshot of active diagnostic contacts for last-coord cancels. */
 +		int snapNativeCount = 0;
 +		int snapNativeIds[FREERDP_MAX_TOUCH_CONTACTS];
 +		int snapNativeXs[FREERDP_MAX_TOUCH_CONTACTS];
 +		int snapNativeYs[FREERDP_MAX_TOUCH_CONTACTS];
++
 +		for (size_t i = 0; i < FREERDP_MAX_TOUCH_CONTACTS; i++)
 +		{
 +			FreeRDP_TouchContact* c = &cctx->contacts[i];
@@ -1397,22 +1430,15 @@ Index: src/client/X11/xf_input.c
 +				snapNativeCount++;
 +			}
 +		}
-+		/* Emit diagnostic cancel records, summary, then cleanup. */
-+		for (size_t i = 0; i < MAX_CONTACTS; i++)
-+		{
-+			if (xfc->contacts[i].id != 0)
-+			{
-+				WLog_WARN(TAG,
-+				    "touch-diag: event=cancel id=%d x=%d y=%d",
-+				    xfc->contacts[i].id,
-+				    (int)xfc->contacts[i].pos_x,
-+				    (int)xfc->contacts[i].pos_y);
-+			}
-+		}
-+		WLog_WARN(TAG,
-+		    "touch-diag: summary diag_count=%d native_count=%d quarantined=%d",
-+		    xfc->diagContactCount, snapNativeCount,
-+		    xfc->quarantinedCount);
++
++		xf_force_cancel_emit_sequence(
++		    xfc->diagContacts, xfc->diagContactCount, snapNativeCount,
++		    xfc->quarantinedCount, snapNativeIds, snapNativeXs, snapNativeYs,
++		    xf_touch_cancel_emit, xfc);
++
++		for (size_t i = 0; i < FREERDP_MAX_TOUCH_CONTACTS; i++)
++			xfc->diagContacts[i] = (xfDiagContact){ 0 };
++		xfc->diagContactCount = 0;
 +	}
 +
 +	/* Clear all gesture state. */
@@ -1497,37 +1523,31 @@ Index: src/client/X11/xf_input.c
 +			if (supplementalIds[si] != 0)
 +				addSet[addCount++] = supplementalIds[si];
 +		/* Cancel and quarantine native RDPEI contacts. */
++		for (size_t i = 0; i < FREERDP_MAX_TOUCH_CONTACTS; i++)
 +		{
-+			int nativeAddCount = 0;
-+			for (size_t i = 0; i < FREERDP_MAX_TOUCH_CONTACTS; i++)
++			FreeRDP_TouchContact* c = &cctx->contacts[i];
++			if (c->id != 0)
 +			{
-+				FreeRDP_TouchContact* c = &cctx->contacts[i];
-+				if (c->id != 0)
-+				{
-+					int dummy = 0;
-+					if (rdpei)
-+						rdpei->TouchCancel(rdpei, c->id, c->x, c->y, &dummy);
-+					WLog_DBG(TAG, "force_cancel: TouchCancel id=%d x=%d y=%d", c->id, c->x, c->y);
-+
-+   if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: event=cancel id=%d x=%d y=%d", c->id, c->x, c->y); 
-+					nativeAddCount++;
-+					FreeRDP_TouchContact empty = { 0 };
-+					*c = empty;
-+				}
++				int dummy = 0;
++				if (addCount < (int)FREERDP_MAX_TOUCH_CONTACTS)
++					addSet[addCount++] = c->id;
++				if (rdpei)
++					rdpei->TouchCancel(rdpei, c->id, c->x, c->y, &dummy);
++				WLog_DBG(TAG, "force_cancel: TouchCancel id=%d x=%d y=%d", c->id, c->x, c->y);
++				FreeRDP_TouchContact empty = { 0 };
++				*c = empty;
 +			}
 +		}
 +
 +		/* GAP-02: sole runtime writer — delegate to xf_quarantine_update. */
-+		xfc->quarantinedCount = 0;
 +		xf_quarantine_update(xfc->quarantinedFingers,
 +		                     &xfc->quarantinedCount,
 +		                     (int*)&xfc->recoveryGateArmed,
 +		                     addSet, addCount, NULL, 0,
 +		                     FREERDP_MAX_TOUCH_CONTACTS);
- 	}
++	}
 +}
- 
--	return 0;
++
 +/* Public thin wrapper (GAP-10): calls the lifecycle owner once
 + * with no supplemental IDs.  External callers (xf_event.c,
 + * xf_client.c) call this; the third-finger abort calls the
@@ -1538,7 +1558,7 @@ Index: src/client/X11/xf_input.c
  }
  
  static BOOL xf_input_pen_remote(xfContext* xfc, XIDeviceEvent* event, int evtype, int deviceid)
-@@ -862,8 +2035,97 @@ static int xf_input_handle_event_remote(
+@@ -862,8 +2060,98 @@ static int xf_input_handle_event_remote(
  
  	if ((cookie.cc->type == GenericEvent) && (cookie.cc->extension == xfc->XInputOpcode))
  	{
@@ -1588,6 +1608,9 @@ Index: src/client/X11/xf_input.c
 +						                     (int*)&xfc->recoveryGateArmed,
 +						                     NULL, 0, endIds, 1,
 +						                     FREERDP_MAX_TOUCH_CONTACTS);
++						if (xfc->touchDiagEnabled)
++							xf_diag_contact_end(xfc->diagContacts,
++							                     &xfc->diagContactCount, touchId);
 +						if (touchId == xfc->lpFinger)
 +						{
 +							xfc->lpFrozen = FALSE;
@@ -1595,8 +1618,6 @@ Index: src/client/X11/xf_input.c
 +							xfc->lpDeadline = 0;
 +							xfc->lpStartTime = 0;
 +						}
-+					}
-+							xfc->recoveryGateArmed = FALSE;
 +					}
 +					/* On TouchOwnership: accept to unfreeze WM grab */
 +					else if (evtype == XI_TouchOwnership)
@@ -1636,7 +1657,7 @@ Index: src/client/X11/xf_input.c
  			case XI_TouchBegin:
  				xf_input_pens_unhover(xfc);
  				/* fallthrough */
-@@ -876,9 +2138,21 @@ static int xf_input_handle_event_remote(
+@@ -876,9 +2164,21 @@ static int xf_input_handle_event_remote(
  			case XI_Motion:
  			case XI_ButtonRelease:
  			{
@@ -1659,7 +1680,7 @@ Index: src/client/X11/xf_input.c
  
  				if (freerdp_client_is_pen(&xfc->common, deviceid))
  				{
-@@ -889,6 +2163,12 @@ static int xf_input_handle_event_remote(
+@@ -889,6 +2189,12 @@ static int xf_input_handle_event_remote(
  					}
  					break;
  				}
@@ -1672,7 +1693,7 @@ Index: src/client/X11/xf_input.c
  			}
  				/* fallthrough */
  				WINPR_FALLTHROUGH
-@@ -897,7 +2177,6 @@ static int xf_input_handle_event_remote(
+@@ -897,10 +2203,10 @@ static int xf_input_handle_event_remote(
  				xf_input_event(xfc, event, cookie.cc->data, cookie.cc->evtype);
  				break;
  		}
@@ -1680,7 +1701,11 @@ Index: src/client/X11/xf_input.c
  
  	XFreeEventData(xfc->display, cookie.vc);
  	return 0;
-@@ -910,6 +2189,14 @@ int xf_input_init(xfContext* xfc, Window
++	}
+ }
+ 
+ #else
+@@ -910,6 +2216,14 @@ int xf_input_init(xfContext* xfc, Window
  	return 0;
  }
  
@@ -1695,7 +1720,7 @@ Index: src/client/X11/xf_input.c
  #endif
  
  int xf_input_handle_event(xfContext* xfc, const XEvent* event)
-@@ -921,7 +2208,8 @@ int xf_input_handle_event(xfContext* xfc
+@@ -921,7 +2235,8 @@ int xf_input_handle_event(xfContext* xfc
  	settings = xfc->common.context.settings;
  	WINPR_ASSERT(settings);
  
@@ -2241,3 +2266,351 @@ Index: src/libfreerdp/common/settings_str.h
  	{ FreeRDP_VCChunkSize, FREERDP_SETTINGS_TYPE_UINT32, "FreeRDP_VCChunkSize" },
  	{ FreeRDP_VCFlags, FREERDP_SETTINGS_TYPE_UINT32, "FreeRDP_VCFlags" },
  	{ FreeRDP_MonitorLocalShiftX, FREERDP_SETTINGS_TYPE_INT32, "FreeRDP_MonitorLocalShiftX" },
+Index: src/client/X11/test/CMakeLists.txt
+===================================================================
+--- /dev/null
++++ src/client/X11/test/CMakeLists.txt
+@@ -0,0 +1,16 @@
++set(MODULE_NAME "TestXfInputDispatcher")
++
++add_executable(${MODULE_NAME} TestXfInputDispatcher.c)
++target_include_directories(${MODULE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
++target_link_libraries(${MODULE_NAME} PRIVATE xfreerdp-client)
++target_link_options(${MODULE_NAME} PRIVATE
++  "-Wl,--wrap=XGetEventData"
++  "-Wl,--wrap=XFreeEventData"
++)
++
++set_target_properties(${MODULE_NAME} PROPERTIES
++  RUNTIME_OUTPUT_DIRECTORY "${TESTING_OUTPUT_DIRECTORY}"
++)
++
++add_test(NAME ${MODULE_NAME} COMMAND ${TESTING_OUTPUT_DIRECTORY}/${MODULE_NAME})
++set_property(TARGET ${MODULE_NAME} PROPERTY FOLDER "FreeRDP/Client/X11/Test")
+Index: src/client/X11/test/TestXfInputDispatcher.c
+===================================================================
+--- /dev/null
++++ src/client/X11/test/TestXfInputDispatcher.c
+@@ -0,0 +1,310 @@
++#include <X11/Xlib.h>
++#include <X11/extensions/XInput2.h>
++
++#include <freerdp/settings.h>
++#include <winpr/wlog.h>
++
++#include <stdio.h>
++#include <string.h>
++
++#include "../xf_input.h"
++#include "../xfreerdp.h"
++
++static char log_capture[16384];
++
++Bool __wrap_XGetEventData(Display* display, XGenericEventCookie* cookie)
++{
++	(void)display;
++	(void)cookie;
++	return True;
++}
++
++void __wrap_XFreeEventData(Display* display, XGenericEventCookie* cookie)
++{
++	(void)display;
++	(void)cookie;
++}
++
++static BOOL capture_message(const wLogMessage* message)
++{
++	size_t used;
++
++	if (!message || !message->TextString || !strstr(message->TextString, "touch-diag:"))
++		return TRUE;
++
++	used = strlen(log_capture);
++	if (used < sizeof(log_capture) - 1)
++		(void)snprintf(log_capture + used, sizeof(log_capture) - used, "%s\n",
++		               message->TextString);
++	return TRUE;
++}
++
++static BOOL ignore_message(const wLogMessage* message)
++{
++	(void)message;
++	return TRUE;
++}
++
++static void clear_log_capture(void)
++{
++	log_capture[0] = '\0';
++}
++
++static int count_substring(const char* haystack, const char* needle)
++{
++	int count = 0;
++	const char* cursor = haystack;
++	size_t length = strlen(needle);
++
++	while ((cursor = strstr(cursor, needle)) != NULL)
++	{
++		count++;
++		cursor += length;
++	}
++	return count;
++}
++
++static int configure_log_capture(void)
++{
++	wLog* root = WLog_GetRoot();
++	wLog* x11 = WLog_Get("com.freerdp.client.x11");
++	wLogAppender* appender = NULL;
++	wLogCallbacks callbacks = { 0 };
++
++	if (!root || !x11)
++		return 0;
++
++	callbacks.data = ignore_message;
++	callbacks.image = ignore_message;
++	callbacks.message = capture_message;
++	callbacks.package = ignore_message;
++
++	if (!WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK))
++		return 0;
++	appender = WLog_GetLogAppender(root);
++	if (!appender || !WLog_ConfigureAppender(appender, "callbacks", &callbacks))
++		return 0;
++	if (!WLog_SetLogLevel(root, WLOG_TRACE) || !WLog_SetLogLevel(x11, WLOG_TRACE))
++		return 0;
++	return WLog_OpenAppender(root) ? 1 : 0;
++}
++
++static rdpSettings* new_settings(void)
++{
++	rdpSettings* settings = freerdp_settings_new(0);
++
++	if (!settings)
++		return NULL;
++	if (!freerdp_settings_set_bool(settings, FreeRDP_TouchPinchWheelFallback, TRUE) ||
++	    !freerdp_settings_set_bool(settings, FreeRDP_MultiTouchInput, FALSE) ||
++	    !freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, 100) ||
++	    !freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, 100))
++	{
++		freerdp_settings_free(settings);
++		return NULL;
++	}
++	return settings;
++}
++
++static void init_context(xfContext* xfc, rdpSettings* settings)
++{
++	memset(xfc, 0, sizeof(*xfc));
++	xfc->common.context.settings = settings;
++	xfc->XInputOpcode = 77;
++	xfc->cursorHidden = TRUE;
++	xfc->remote_app = FALSE;
++	xfc->offset_x = 10;
++	xfc->offset_y = 20;
++	xfc->scaledWidth = 100;
++	xfc->scaledHeight = 100;
++}
++
++static void make_touch_event(XEvent* event, XIDeviceEvent* device, const xfContext* xfc,
++                             int evtype, int touch_id, int x, int y)
++{
++	memset(event, 0, sizeof(*event));
++	memset(device, 0, sizeof(*device));
++
++	event->xcookie.type = GenericEvent;
++	event->xcookie.extension = xfc->XInputOpcode;
++	event->xcookie.evtype = evtype;
++	event->xcookie.data = device;
++
++	device->type = GenericEvent;
++	device->extension = xfc->XInputOpcode;
++	device->evtype = evtype;
++	device->detail = touch_id;
++	device->event_x = x;
++	device->event_y = y;
++}
++
++static int dispatch_touch(xfContext* xfc, int evtype, int touch_id, int x, int y)
++{
++	XEvent event;
++	XIDeviceEvent device;
++
++	make_touch_event(&event, &device, xfc, evtype, touch_id, x, y);
++	return xf_input_handle_event(xfc, &event);
++}
++
++static int has_quarantine(const xfContext* xfc, int touch_id)
++{
++	for (int i = 0; i < xfc->quarantinedCount; i++)
++	{
++		if (xfc->quarantinedFingers[i] == touch_id)
++			return 1;
++	}
++	return 0;
++}
++
++#define CHECK(condition, message) \
++	do \
++	{ \
++		if (!(condition)) \
++		{ \
++			(void)fprintf(stderr, "FAIL: %s\n", message); \
++			return 1; \
++		} \
++	} while (0)
++
++static int test_quarantine_recovery(void)
++{
++	rdpSettings* settings = new_settings();
++	xfContext xfc;
++
++	CHECK(settings != NULL, "settings allocation");
++	init_context(&xfc, settings);
++
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 11, 20, 30) == 0, "Begin(A)");
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 12, 40, 50) == 0, "Begin(B)");
++	CHECK(xfc.twoFingerPending, "two-finger pending after Begin(B)");
++
++	xf_touch_force_cancel(&xfc);
++	CHECK(xfc.quarantinedCount == 2 && xfc.recoveryGateArmed, "cancel quarantines A and B");
++	CHECK(has_quarantine(&xfc, 11) && has_quarantine(&xfc, 12), "cancel keeps both old IDs");
++
++	CHECK(dispatch_touch(&xfc, XI_TouchUpdate, 11, 25, 35) == 0, "old Update(A) consumed");
++	CHECK(xfc.quarantinedCount == 2, "old Update(A) preserves quarantine");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 11, 25, 35) == 0, "old End(A) consumed");
++	CHECK(xfc.quarantinedCount == 1 && xfc.recoveryGateArmed && has_quarantine(&xfc, 12),
++	      "partial End(A) keeps B and recovery gate armed");
++
++	xf_touch_force_cancel(&xfc);
++	CHECK(xfc.quarantinedCount == 1 && xfc.recoveryGateArmed && has_quarantine(&xfc, 12),
++	      "repeated cancellation preserves B");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 12, 40, 50) == 0, "old End(B) consumed");
++	CHECK(xfc.quarantinedCount == 0 && !xfc.recoveryGateArmed, "final old End(B) reopens input");
++
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 13, 60, 70) == 0, "fresh Begin(C)");
++	CHECK(xfc.lpArmed && xfc.lpFinger == 13, "fresh touch reaches local recognizer");
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++static int test_diagnostic_lifecycle(void)
++{
++	rdpSettings* settings = new_settings();
++	xfContext xfc;
++
++	CHECK(settings != NULL, "settings allocation");
++	init_context(&xfc, settings);
++	xfc.touchDiagEnabled = TRUE;
++	clear_log_capture();
++
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 31, 20, 30) == 0, "diagnostic Begin(A)");
++	CHECK(dispatch_touch(&xfc, XI_TouchUpdate, 31, 25, 35) == 0, "diagnostic Update(A)");
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 32, 40, 50) == 0, "diagnostic Begin(B)");
++	CHECK(xfc.diagContactCount == 2, "diagnostic store tracks both local contacts");
++
++	xf_touch_force_cancel(&xfc);
++	CHECK(xfc.diagContactCount == 0, "cancellation retires diagnostic contacts");
++	CHECK(strstr(log_capture, "touch-diag: event=cancel id=31 x=15 y=15") != NULL,
++	      "cancel uses adjusted final coordinates for A");
++	CHECK(strstr(log_capture, "touch-diag: event=cancel id=32 x=30 y=30") != NULL,
++	      "cancel uses adjusted final coordinates for B");
++	CHECK(strstr(log_capture, "touch-diag: summary diag_count=2 native_count=0") != NULL,
++	      "summary reports local-only cancellation");
++	CHECK(count_substring(log_capture, "touch-diag: summary") == 1,
++	      "one cancellation summary is emitted");
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++static int test_third_finger_compaction(void)
++{
++	rdpSettings* settings = new_settings();
++	xfContext xfc;
++
++	CHECK(settings != NULL, "settings allocation");
++	init_context(&xfc, settings);
++	xfc.threeFingerPending = TRUE;
++	xfc.pinchFingerA = 41;
++	xfc.pinchFingerB = 42;
++	xfc.midFingerC = 0;
++
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 43, 60, 70) == 0, "third-finger abort with sparse supplemental IDs");
++	CHECK(xfc.quarantinedCount == 3 && has_quarantine(&xfc, 41) && has_quarantine(&xfc, 42) &&
++	          has_quarantine(&xfc, 43),
++	      "compacted supplemental IDs retain every nonzero ID");
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++static int test_pending_three_finger_lift(void)
++{
++	rdpSettings* settings = new_settings();
++	xfContext xfc;
++
++	CHECK(settings != NULL, "settings allocation");
++	init_context(&xfc, settings);
++	xfc.threeFingerPending = TRUE;
++	xfc.pinchFingerA = 51;
++	xfc.pinchFingerAx = 100;
++	xfc.pinchFingerAy = 110;
++	xfc.pinchFingerB = 52;
++	xfc.pinchFingerBx = 200;
++	xfc.pinchFingerBy = 210;
++	xfc.midFingerC = 53;
++	xfc.midFingerCx = 300;
++	xfc.midFingerCy = 310;
++	xfc.twoStartMidX = 200;
++	xfc.twoStartMidY = 210;
++	xfc.pinchFirstDist = 140.0;
++	xfc.pinchLastDist = 139.0;
++	xfc.pinchAccum = 4.0;
++	xfc.pinchDir = 1;
++	xfc.pinchMidpointDone = TRUE;
++	xfc.pinchWheelActive = TRUE;
++
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 51, 100, 110) == 0, "pre-claim three-finger lift");
++	CHECK(xfc.quarantinedCount == 2 && has_quarantine(&xfc, 52) && has_quarantine(&xfc, 53),
++	      "pre-claim lift quarantines both remaining IDs");
++	CHECK(!xfc.threeFingerPending, "pre-claim lift clears pending state");
++	CHECK(xfc.pinchFingerA == 0 && xfc.pinchFingerB == 0 && xfc.midFingerC == 0,
++	      "pre-claim lift clears all three-finger IDs");
++	CHECK(xfc.pinchFingerAx == 0 && xfc.pinchFingerAy == 0 && xfc.pinchFingerBx == 0 &&
++	          xfc.pinchFingerBy == 0 && xfc.midFingerCx == 0 && xfc.midFingerCy == 0,
++	      "pre-claim lift clears all three-finger coordinates");
++	CHECK(xfc.twoStartMidX == 0 && xfc.twoStartMidY == 0 && xfc.pinchFirstDist == 0.0 &&
++	          xfc.pinchLastDist == 0.0 && xfc.pinchAccum == 0.0 && xfc.pinchDir == 0 &&
++	          !xfc.pinchMidpointDone && !xfc.pinchWheelActive,
++	      "pre-claim lift clears midpoint and pinch state");
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++int main(void)
++{
++	CHECK(configure_log_capture(), "configure WLog callback appender");
++	CHECK(test_quarantine_recovery() == 0, "quarantine recovery scenario");
++	CHECK(test_diagnostic_lifecycle() == 0, "diagnostic lifecycle scenario");
++	CHECK(test_third_finger_compaction() == 0, "third-finger compaction scenario");
++	CHECK(test_pending_three_finger_lift() == 0, "pending three-finger lift scenario");
++	(void)WLog_CloseAppender(WLog_GetRoot());
++	(void)puts("OK");
++	return 0;
++}
+Index: src/client/X11/CMakeLists.txt
+===================================================================
+--- src.orig/client/X11/CMakeLists.txt
++++ src/client/X11/CMakeLists.txt
+@@ -194,3 +194,7 @@ add_subdirectory(cli)
+ add_subdirectory(man)
+ 
+ set_property(TARGET ${PROJECT_NAME} PROPERTY FOLDER "Client/X11")
++
++if(BUILD_TESTING_INTERNAL OR BUILD_TESTING)
++  add_subdirectory(test)
++endif()
