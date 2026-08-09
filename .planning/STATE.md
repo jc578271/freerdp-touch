@@ -2,17 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in_progress
-stopped_at: Completed 04-05-PLAN.md — all 3 tasks done, /usr/local/bin/menu deployed and verified
-last_updated: "2026-08-09T13:00:00.000Z"
+current_phase: 4
+current_phase_name: diagnostics-packaging-launch-configuration
+status: verifying
+stopped_at: Completed 04-06-PLAN.md
+last_updated: "2026-08-09T14:34:47.758Z"
+last_activity: 2026-08-09
+last_activity_desc: Plan 04-06 completed; GAP-07 remains USER-DEFERRED under D-25.
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 13
   completed_plans: 13
-current_phase_name: diagnostics-packaging-launch-configuration
-last_activity: 2026-08-09
-last_activity_desc: Plan 04-05 executed: gap-closure scripts/docs/deployment complete; /usr/local/bin/menu deployed and verified; 04-06 remaining.
 ---
 
 # State: FreeRDP Touch for OneMix 3
@@ -28,22 +29,25 @@ last_activity_desc: Plan 04-05 executed: gap-closure scripts/docs/deployment com
 
 ## Current Position
 
-- **Phase**: 4 - Diagnostics, Packaging & Launch Configuration
-- **Status**: Plans 04-04 and 04-05 complete. Plan 04-06 remaining. GAP-07 deferred under D-25; `/cert:ignore` remains for v1.
-- **Progress**: 3/4 phases complete; 12/13 plans completed (04-05 done, 04-06 pending).
+Phase: 4 of 4 (Diagnostics, Packaging & Launch Configuration)
+Plan: 6 of 6 in current phase
+Status: Phase complete — ready for verification
+Last activity: 2026-08-09 — Plan 04-06 completed; GAP-07 remains USER-DEFERRED under D-25.
+
+Progress: [██████████] 100%
 
 ```
 [x] Phase 1: Environment Gate & Build Baseline (2/2 plans)
 [x] Phase 2: Native RDPEI Touch Lifecycle (2/2 plans)
 [x] Phase 3: Local-Only Gestures & Session Stability
-[ ] Phase 4: Diagnostics, Packaging & Launch Configuration (5/6 plans complete; 04-06 remaining)
+[~] Phase 4: Diagnostics, Packaging & Launch Configuration (6/6 plans complete; phase verification remains in progress)
 ```
 
 ## Performance Metrics
 
 - **Phases completed**: 3/4
 - **Requirements mapped**: 19/19
-- **Plans completed**: 12/13 (01-01, 01-02, 02-01, 02-02, 03-01, 04-01, 04-02, 04-03, 04-04, 04-05; 03-02 and 03-03 reconciled as superseded by the local-only pivot)
+- **Plans completed**: 13/13 (01-01, 01-02, 02-01, 02-02, 03-01, 04-01, 04-02, 04-03, 04-04, 04-05, 04-06; 03-02 and 03-03 reconciled as superseded by the local-only pivot)
 
 **Per-Plan Metrics:**
 
@@ -54,6 +58,7 @@ last_activity_desc: Plan 04-05 executed: gap-closure scripts/docs/deployment com
 | Phase 04-diagnostics-packaging-launch-configuration P04-03 | 1 | 2 tasks | 2 files |
 | Phase 04 P04 | 623 | 2 tasks | 5 files |
 | Phase 04 P05 | 1371 | 3 tasks | 9 files |
+| Phase 04 P06 | 182 | 4 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -83,10 +88,13 @@ last_activity_desc: Plan 04-05 executed: gap-closure scripts/docs/deployment com
 - [Phase 4 Plan 04]: xf_pinch_emit_steps accumulates fractional deltas in double without truncation; both wheel diagnostics use accum=%.3f with explicit double argument
 - [Phase 4 Plan 04]: Four-package parser fixture extracts all four .debs into one root and proves loader resolution beneath it before running parser cases
 - [Phase 4 Plan 05]: GAP-05 shell closed with canonical calibration validation (digits-only, max-10-digits, no-leading-zero, range-check). GAP-06 closed with EXIT-only cleanup and per-publisher mktemp classifier. GAP-08/GAP-09 closed with subshell checksum and fail-closed exact-four-package install/rollback. WR-02/WR-03 closed with real-wrapper regression and Wayland-negative gate tests. /usr/local/bin/menu deployed byte-for-byte from scripts/menu. GAP-07 remains deferred per D-25.
+- [Phase ?]: Task 4 used the owner-confirmed ten-check physical-device result without repeating package installation, rollback, menu launches, or physical tests.
+- [Phase ?]: GAP-07 remains USER-DEFERRED under D-25; /cert:ignore is expected and server certificate identity remains unverified.
+- [Phase ?]: The v1 diagnostic record remains local-only with native_count=0 on hardware and no required hardware native-cancel record.
 
 ### Todos
 
-- Execute Phase 4 final plan 04-06.
+- Complete the Phase 4 verification/ship audit; keep GAP-07 explicitly USER-DEFERRED under D-25.
 
 ### Blockers
 
@@ -108,12 +116,12 @@ last_activity_desc: Plan 04-05 executed: gap-closure scripts/docs/deployment com
 
 ## Session Continuity
 
-**Last session:** 2026-08-09T13:00:00.000Z
-**Stopped at:** Completed 04-05-PLAN.md — all tasks done, /usr/local/bin/menu deployed and verified
+**Last session:** 2026-08-09T14:34:47.737Z
+**Stopped at:** Completed 04-06-PLAN.md
 **Resume file:** None
 
-- **Last action**: Executed Plan 04-05: closed GAP-05/06/08/09 and WR-02/03 through bounded calibration validation, signal-safe publication, fail-closed docs, and production-path regressions. Deployed /usr/local/bin/menu from scripts/menu with byte-for-byte parity. GAP-07 remains deferred per D-25.
-- **Next action**: Execute Plan 04-06 (final non-certificate rebuild and verification).
+- **Last action**: Completed Plan 04-06: verified the owner-confirmed ten-check record, exact package identity manifests, live PRE/POST snapshots, and D-25 wording without repeating device operations.
+- **Next action**: Complete the Phase 4 verification/ship audit; GAP-07 remains USER-DEFERRED and server certificate identity remains unverified.
 
 ---
 *State initialized: 2026-08-05*

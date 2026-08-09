@@ -142,11 +142,22 @@ Each task was committed atomically:
 
 ## Deviations from Plan
 
-None - continuation resumed after the human verification checkpoint, and the supplied ten-check result was recorded and mechanically validated without duplicating device operations.
+### Auto-fixed Issues
+
+**1. [Rule 3 - Blocking] Repaired legacy STATE.md plan-position fields for GSD handlers**
+- **Found during:** GSD tracking updates after Task 4
+- **Issue:** `state.advance-plan` and `state.update-progress` could not parse the older custom bullet-only Current Position format.
+- **Fix:** Added canonical `Phase`, `Plan`, `Status`, `Last activity`, and `Progress` fields, reran the handlers, and refreshed stale plan/session text while preserving the phase-wide verification status.
+- **Files modified:** `.planning/STATE.md`
+- **Verification:** `state.advance-plan` returned `last_plan` for 6/6; `state.update-progress` returned 100%; `roadmap.update-plan-progress 04` reports 6/6 plans.
+- **Committed in:** final metadata commit.
+
+**Total deviations:** 1 auto-fixed (Rule 3 - Blocking)
+**Impact on plan:** Tracking-only repair; no production code or evidence scope changed.
 
 ## Issues Encountered
 
-None.
+- `phase complete 04` correctly refused to close the phase because the phase-wide verification gate still reports gaps. Plan 04-06 is complete and ROADMAP records 6/6 plans; the phase remains in verification, with GAP-07 explicitly user-deferred under D-25.
 
 ## User Setup Required
 
