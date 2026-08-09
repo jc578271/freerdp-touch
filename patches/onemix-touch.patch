@@ -1,11 +1,251 @@
-From: FreeRDP Touch <freerdp-touch@localhost>
-Date: Sat, 08 Aug 2026 15:21:37 +0700
-Subject: [client,x11,rdpei] OneMix 3 touch gesture patch with diagnostics
-Origin: local, OneMix 3 Debian packaging
-Forwarded: not-needed
-
----
-diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
+Index: src/channels/rdpei/client/rdpei_main.c
+===================================================================
+--- src.orig/channels/rdpei/client/rdpei_main.c
++++ src/channels/rdpei/client/rdpei_main.c
+@@ -95,6 +95,7 @@ typedef struct
+ 	UINT64 lastPollEventTime;
+ 	BOOL running;
+ 	BOOL async;
++	BOOL touchDiagEnabled;
+ } RDPEI_PLUGIN;
+ 
+ /**
+@@ -752,6 +753,7 @@ static UINT rdpei_send_touch_event_pdu(G
+ 
+ 	Stream_SealLength(s);
+ 	status = rdpei_send_pdu(callback, s, EVENTID_TOUCH, Stream_Length(s));
++	if (rdpei->touchDiagEnabled) WLog_Print(rdpei->base.log, WLOG_WARN, "touch-diag: rdpei frame contacts=%u offset=%u size=%lu status=%u", frame->contactCount, frame->frameOffset, (unsigned long)Stream_Length(s), status);
+ 	Stream_Free(s, TRUE);
+ 	return status;
+ }
+@@ -1066,10 +1068,12 @@ static UINT rdpei_touch_process(RdpeiCli
+ 	contactPoint = rdpei_contact(rdpei, externalId, !begin);
+ 	if (contactPoint)
+ 		contactIdlocal = contactPoint->contactId;
+-	LeaveCriticalSection(&rdpei->lock);
+ 
+ 	if (contactIdlocal > UINT32_MAX)
++	{
++		LeaveCriticalSection(&rdpei->lock);
+ 		return ERROR_INVALID_PARAMETER;
++	}
+ 
+ 	if (contactIdlocal >= 0)
+ 	{
+@@ -1124,6 +1128,8 @@ static UINT rdpei_touch_process(RdpeiCli
+ 		error = context->AddContact(context, &contact);
+ 	}
+ 
++	LeaveCriticalSection(&rdpei->lock);
++
+ 	if (contactId)
+ 		*contactId = (INT32)contactIdlocal;
+ 	return error;
+@@ -1490,6 +1496,12 @@ static UINT init_plugin_cb(GENERIC_DYNVC
+ 	rdpei->maxPenContacts = MAX_PEN_CONTACTS;
+ 	rdpei->rdpcontext = rcontext;
+ 
++	/* Diagnostic gate: cached env lookup, default-off.
++	 * Only "1" enables; unset or any other value disables. */
++	/* NOLINTNEXTLINE(concurrency-mt-unsafe) */
++	const char* diagEnv = getenv("FREERDP_TOUCH_DIAG");
++	rdpei->touchDiagEnabled = (diagEnv != NULL && strcmp(diagEnv, "1") == 0);
++
+ 	WINPR_ASSERT(rdpei->base.log);
+ 
+ 	InitializeCriticalSection(&rdpei->lock);
+Index: src/client/X11/test_scroll_classifier.c
+===================================================================
+--- /dev/null
++++ src/client/X11/test_scroll_classifier.c
+@@ -0,0 +1,128 @@
++/* Standalone regression model of the two-finger disambiguation rule in
++ * xf_input_two_finger_resolve.  Mirrors the exact claim order and thresholds
++ * from the source.  If this model drifts from the source the static guard
++ * (grep checks below) catches it.
++ *
++ * Compile: gcc -std=c11 -o test_scroll_classifier test_scroll_classifier.c -lm
++ * Run:     ./test_scroll_classifier */
++
++#include <assert.h>
++#include <math.h>
++#include <stdio.h>
++
++#define PINCH_DEADBAND_PX 8
++#define PINCH_DOMINANCE_RATIO 2.5
++
++typedef enum { PENDING = 0, PINCH = 1, SCROLL = 2 } Claim;
++
++/* Resolve the disambiguation rule.  midpoints are computed with integer
++ * division to match the real code (currentMidX/Y are ints in the source). */
++static Claim resolve(double pinchFirstDist, double twoStartMidX,
++                     double twoStartMidY, double ax, double ay,
++                     double bx, double by, double panDb)
++{
++	double dx = ax - bx;
++	double dy = ay - by;
++	double currentDist = sqrt(dx * dx + dy * dy);
++	int currentMidX = (int)((ax + bx) / 2.0);
++	int currentMidY = (int)((ay + by) / 2.0);
++	int startMidX = (int)twoStartMidX;
++	int startMidY = (int)twoStartMidY;
++	double pinchDelta = fabs(currentDist - pinchFirstDist);
++	double panDelta = hypot((double)(currentMidX - startMidX),
++	                        (double)(currentMidY - startMidY));
++
++	/* Claim PINCH: distance change exceeds deadband AND dominates pan. */
++	if (pinchDelta >= (double)PINCH_DEADBAND_PX &&
++	    pinchDelta > (double)PINCH_DOMINANCE_RATIO * panDelta)
++		return PINCH;
++
++	/* Claim SCROLL: midpoint displacement exceeds pan deadband. */
++	if (panDelta >= (double)panDb)
++		return SCROLL;
++
++	return PENDING;
++}
++
++int main(void)
++{
++	/* --- Case 1: 9px one-finger-first vertical swipe (the bug-gate case)
++	 * A=(100,100), B=(100,300).  Baseline dist=200, mid=(100,200).
++	 * A moves alone to y=109: pinchDelta = |sqrt(0^2+191^2)-200| = 9.
++	 * integer midY = (109+300)/2 = 204, panDelta = hypot(0,4) = 4.
++	 * With 2.0 ratio: 9 > 2.0*4=8 → PINCH (bug).
++	 * With 2.5 ratio: 9 > 2.5*4=10 → FALSE → PENDING (fix). */
++	{
++		Claim c = resolve(200.0, 100.0, 200.0,
++		                  100.0, 109.0, 100.0, 300.0, 8.0);
++		assert(c == PENDING);
++		assert(c != PINCH);
++	}
++
++	/* --- Case 2: Vertical 9px first update, second finger catches up.
++	 * A stays at (100,109), B moves to (100,309).
++	 * pinchDelta = |sqrt(0^2+200^2)-200| = 0, panDelta=9 → SCROLL. */
++	{
++		Claim c = resolve(200.0, 100.0, 200.0,
++		                  100.0, 109.0, 100.0, 309.0, 8.0);
++		assert(c == SCROLL);
++	}
++
++	/* --- Case 3: Horizontal 8px one-finger-first swipe → PENDING.
++	 * A=(100,200), B=(300,200).  A→(108,200): pinchDelta=8, int midX=204, panDelta=4.
++	 * 8 > 2.5*4=10 → FALSE → PENDING. */
++	{
++		Claim c = resolve(200.0, 200.0, 200.0,
++		                  108.0, 200.0, 300.0, 200.0, 8.0);
++		assert(c == PENDING);
++		assert(c != PINCH);
++
++		/* Both catch up: A→(109,200), B→(309,200) → SCROLL. */
++		c = resolve(200.0, 200.0, 200.0,
++		            109.0, 200.0, 309.0, 200.0, 8.0);
++		assert(c == SCROLL);
++	}
++
++	/* --- Case 4: Sequential 8px-per-finger symmetric pinch IN.
++	 * A=(100,100), B=(100,300).  First: only A moves →(100,108).
++	 * pinchDelta=|sqrt(0^2+192^2)-200|=8, int midY=204, panDelta=4.
++	 * 8 > 2.5*4=10 → FALSE → PENDING. */
++	{
++		Claim c = resolve(200.0, 100.0, 200.0,
++		                  100.0, 108.0, 100.0, 300.0, 8.0);
++		assert(c == PENDING);
++
++		/* Second: B also moves →(100,292). Total A=108, B=292.
++		 * dist=|sqrt(0^2+184^2)-200|=16, midY=200, panDelta=0.
++		 * 16 > 2.5*0=0, 16 ≥ 8 → PINCH. */
++		c = resolve(200.0, 100.0, 200.0,
++		            100.0, 108.0, 100.0, 292.0, 8.0);
++		assert(c == PINCH);
++	}
++
++	/* --- Case 5: Single-update symmetric pinch IN (both move together).
++	 * A→(100,120), B→(100,280): pinchDelta=40, mid stays, panDelta=0 → PINCH. */
++	{
++		Claim c = resolve(200.0, 100.0, 200.0,
++		                  100.0, 120.0, 100.0, 280.0, 8.0);
++		assert(c == PINCH);
++	}
++
++	/* --- Case 6: Symmetric pinch OUT.
++	 * A→(100,80), B→(100,320): pinchDelta=40, panDelta=0 → PINCH. */
++	{
++		Claim c = resolve(200.0, 100.0, 200.0,
++		                  100.0, 80.0, 100.0, 320.0, 8.0);
++		assert(c == PINCH);
++	}
++
++	/* --- Case 7: Diagonal scroll — both fingers translate together. */
++	{
++		Claim c = resolve(200.0, 100.0, 200.0,
++		                  108.0, 108.0, 108.0, 308.0, 8.0);
++		assert(c == SCROLL);
++	}
++
++	printf("OK\n");
++	return 0;
++}
+Index: src/client/X11/xf_client.c
+===================================================================
+--- src.orig/client/X11/xf_client.c
++++ src/client/X11/xf_client.c
+@@ -802,6 +802,7 @@ void xf_toggle_fullscreen(xfContext* xfc
+ 	if (xfc->debug)
+ 		xf_ungrab(xfc);
+ 
++	xf_touch_force_cancel(xfc);
+ 	xfc->fullscreen = (xfc->fullscreen) ? FALSE : TRUE;
+ 	xfc->decorations =
+ 	    (xfc->fullscreen) ? FALSE : freerdp_settings_get_bool(settings, FreeRDP_Decorations);
+@@ -1466,6 +1467,10 @@ static void xf_post_disconnect(freerdp*
+ 
+ 	context = instance->context;
+ 	xfc = (xfContext*)context;
++	/* D-06: cancel active contacts before channel teardown.
++	 * cctx->rdpei is still valid at this point -- the channel
++	 * disconnect PubSub callback that sets rdpei=NULL runs later. */
++	xf_touch_force_cancel(xfc);
+ 	PubSub_UnsubscribeChannelConnected(instance->context->pubSub,
+ 	                                   xf_OnChannelConnectedEventHandler);
+ 	PubSub_UnsubscribeChannelDisconnected(instance->context->pubSub,
+Index: src/client/X11/xf_event.c
+===================================================================
+--- src.orig/client/X11/xf_event.c
++++ src/client/X11/xf_event.c
+@@ -709,6 +709,7 @@ static BOOL xf_event_FocusOut(xfContext*
+ 		XUngrabKeyboard(xfc->display, CurrentTime);
+ 
+ 	xf_keyboard_release_all_keypress(xfc);
++	xf_touch_force_cancel(xfc);
+ 	if (app)
+ 		xf_rail_send_activate(xfc, event->window, FALSE);
+ 
+@@ -839,6 +840,8 @@ static BOOL xf_event_ConfigureNotify(xfC
+ 
+ 		if (xfc->window->width != event->width || xfc->window->height != event->height)
+ 		{
++			/* D-12: cancel active contacts before adopting new geometry */
++			xf_touch_force_cancel(xfc);
+ 			xfc->window->width = event->width;
+ 			xfc->window->height = event->height;
+ #ifdef WITH_XRENDER
+@@ -949,7 +952,10 @@ static BOOL xf_event_UnmapNotify(xfConte
+ 	WINPR_ASSERT(event);
+ 
+ 	if (!app)
++	{
++		xf_touch_force_cancel(xfc);
+ 		xf_keyboard_release_all_keypress(xfc);
++	}
+ 
+ 	if (!app)
+ 		return gdi_send_suppress_output(xfc->common.context.gdi, TRUE);
+Index: src/client/X11/xf_input.c
+===================================================================
+--- src.orig/client/X11/xf_input.c
++++ src/client/X11/xf_input.c
 @@ -39,6 +39,8 @@
  #include "xf_utils.h"
  
@@ -46,7 +286,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
  static int xf_input_event(xfContext* xfc, WINPR_ATTR_UNUSED const XEvent* xevent,
                            XIDeviceEvent* event, int evtype);
  
-@@ -99,6 +125,29 @@
+@@ -99,6 +125,29 @@ static BOOL register_input_events(xfCont
  		if (strcmp(dev->name, "Virtual core pointer") == 0)
  			continue;
  
@@ -76,7 +316,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
  		for (int j = 0; j < dev->num_classes; j++)
  		{
  			const XIAnyClassInfo* class = dev->classes[j];
-@@ -106,7 +155,8 @@
+@@ -106,7 +155,8 @@ static BOOL register_input_events(xfCont
  			switch (class->type)
  			{
  				case XITouchClass:
@@ -86,7 +326,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
  					{
  						const XITouchClassInfo* t = (const XITouchClassInfo*)class;
  						if (t->mode == XIDirectTouch)
-@@ -119,12 +169,21 @@
+@@ -119,12 +169,21 @@ static BOOL register_input_events(xfCont
  							XISetMask(masks[nmasks], XI_TouchBegin);
  							XISetMask(masks[nmasks], XI_TouchUpdate);
  							XISetMask(masks[nmasks], XI_TouchEnd);
@@ -108,7 +348,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
  					WLog_DBG(TAG, "%s button device (id: %d, mode: %d)", dev->name, dev->deviceid,
  					         t->num_buttons);
  					XISetMask(masks[nmasks], XI_ButtonPress);
-@@ -241,6 +300,53 @@
+@@ -241,6 +300,53 @@ static BOOL register_device_events(xfCon
  	return TRUE;
  }
  
@@ -162,7 +402,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
  int xf_input_init(xfContext* xfc, Window window)
  {
  	int major = XI_2_Major;
-@@ -256,6 +362,46 @@
+@@ -256,6 +362,47 @@ int xf_input_init(xfContext* xfc, Window
  	xfc->px_vector = 0;
  	xfc->py_vector = 0;
  	xfc->active_contacts = 0;
@@ -177,7 +417,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +	xfc->pinchClaimed = FALSE;
 +	xfc->pinchMidpointDone = FALSE;
 +	xfc->pinchDir = 0;
-+	xfc->pinchAccum = 0;
++	xfc->pinchAccum = 0.0;
 +	xfc->pinchWheelActive = FALSE;
 +	xfc->pinchFirstDist = 0.0;
 +	xfc->pinchLastDist = 0.0;
@@ -205,11 +445,12 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +	/* NOLINTNEXTLINE(concurrency-mt-unsafe) */
 +	const char* diagEnv = getenv("FREERDP_TOUCH_DIAG");
 +	xfc->touchDiagEnabled = (diagEnv != NULL && strcmp(diagEnv, "1") == 0);
++	xfc->diagContactCount = 0;
 +	PubSub_SubscribeTimer(xfc->common.context.pubSub, xf_input_OnTimer);
  
  	if (!XQueryExtension(xfc->display, "XInputExtension", &opcode, &event, &error))
  	{
-@@ -282,6 +428,28 @@
+@@ -282,6 +429,28 @@ int xf_input_init(xfContext* xfc, Window
  			return -1;
  		if (!register_device_events(xfc, window))
  			return -1;
@@ -238,7 +479,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
  	}
  
  	return 0;
-@@ -638,6 +806,778 @@
+@@ -638,6 +807,785 @@ static void xf_input_show_cursor(xfConte
  #endif
  }
  
@@ -249,6 +490,12 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 + * Updates the finger position, computes inter-finger distance, applies
 + * activation deadband, midpoint pointer targeting (D-11), fixed wheel
 + * detents (D-09/10), and reversal hysteresis (D-12). */
++/* Forward declaration for GAP-10 lifecycle owner. */
++/* GAP-10: forward declaration for xf_touch_cancel_lifecycle. */
++static void xf_touch_cancel_lifecycle(xfContext* xfc,
++                                      const int* supplementalIds,
++                                      size_t supplementalCount);
++
 +static void xf_input_pinch_update(xfContext* xfc, int touchId, int x, int y)
 +{
 +	/* Update the position of the finger that reported this event */
@@ -298,7 +545,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +		 * detents with no speed-based acceleration. */
 +		{
 +			double delta = currentDist - xfc->pinchLastDist;
-+			xfc->pinchAccum += (INT32)delta;
++			xfc->pinchAccum += delta;
 +
 +			/* D-12: reversal hysteresis — when direction sign differs
 +			 * from last emitted direction, discard the partial
@@ -311,31 +558,32 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +			if (currentDir != 0 && xfc->pinchDir != 0 &&
 +			    currentDir != xfc->pinchDir)
 +			{
-+				xfc->pinchAccum = 0;
++				xfc->pinchAccum = 0.0;
 +				xfc->pinchDir = 0;
 +			}
 +
-+			/* Emit full detents, keeping sub-step precision in pinchAccum */
-+			while (abs(xfc->pinchAccum) >= PINCH_WHEEL_STEP_PX)
++			/* Emit full detents via shared fractional helper (GAP-04). */
 +			{
-+				if (xfc->pinchAccum > 0)
++				int steps = xf_pinch_emit_steps(&xfc->pinchAccum,
++				                                (double)PINCH_WHEEL_STEP_PX);
++				while (steps > 0)
 +				{
 +					/* Fingers apart → zoom in (Ctrl+wheel-up) */
 +					freerdp_client_send_wheel_event(&xfc->common,
 +					    PTR_FLAGS_WHEEL | 0x78);
-+     if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: synth wheel-up accum=%d", xfc->pinchAccum);
++     if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: synth wheel-up accum=%.3f", (double)xfc->pinchAccum);
 +					xfc->pinchDir = 1;
-+					xfc->pinchAccum -= PINCH_WHEEL_STEP_PX;
++					steps--;
 +				}
-+				else
++				while (steps < 0)
 +				{
 +					/* Fingers together → zoom out (Ctrl+wheel-down) */
 +					freerdp_client_send_wheel_event(&xfc->common,
 +					    PTR_FLAGS_WHEEL | PTR_FLAGS_WHEEL_NEGATIVE |
 +					        (0x100 - 0x78));
-+     if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: synth wheel-down accum=%d", xfc->pinchAccum);
++     if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: synth wheel-down accum=%.3f", (double)xfc->pinchAccum);
 +					xfc->pinchDir = -1;
-+					xfc->pinchAccum += PINCH_WHEEL_STEP_PX;
++					steps++;
 +				}
 +			}
 +		}
@@ -362,7 +610,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +	xfc->pinchActive = FALSE;
 +	xfc->pinchClaimed = FALSE;
 +	xfc->pinchWheelActive = FALSE;
-+	xfc->pinchAccum = 0;
++	xfc->pinchAccum = 0.0;
 +	xfc->pinchDir = 0;
 +	xfc->pinchMidpointDone = FALSE;
 +	xfc->pinchFirstDist = 0.0;
@@ -418,61 +666,55 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +		if (panDb == 0)
 +			panDb = 8;
 +
-+		/* Claim PINCH: distance change exceeds deadband AND
-+		 * dominates pan by more than PINCH_DOMINANCE_RATIO×.
-+		 * A single finger moving alone along the inter-finger axis
-+		 * changes distance up to 2x faster than it moves the
-+		 * midpoint, so the dominance conjunct lets axial two-finger
-+		 * swipes resolve to scroll while pinching with a stationary
-+		 * midpoint (panDelta≈0) still claims within the deadband. */
-+		if (pinchDelta >= (double)PINCH_DEADBAND_PX &&
-+		    pinchDelta > (double)PINCH_DOMINANCE_RATIO * panDelta)
++		/* WR-01: shared classifier — production and tests call the same
++		 * xf_classify_two_finger (GAP-02 closure). */
 +		{
-+			xfc->twoFingerPending = FALSE;
-+			xfc->pinchActive = TRUE;
-+			xfc->pinchLastDist = currentDist;
-+			/* Press Ctrl. */
++			int claim = xf_classify_two_finger(pinchDelta, panDelta,
++			                                  (double)panDb,
++			                                  (double)PINCH_DEADBAND_PX,
++			                                  (double)PINCH_DOMINANCE_RATIO);
++			if (claim == 1) /* PINCH */
 +			{
-+				rdpInput* input = xfc->common.context.input;
-+				if (input)
-+					freerdp_input_send_keyboard_event(input,
-+					    KBD_FLAGS_DOWN, RDP_SCANCODE_LCONTROL);
-+				xfc->ctrlHeld = TRUE;
-+			}
++				xfc->twoFingerPending = FALSE;
++				xfc->pinchActive = TRUE;
++				xfc->pinchLastDist = currentDist;
++				/* Press Ctrl. */
++				{
++					rdpInput* input = xfc->common.context.input;
++					if (input)
++						freerdp_input_send_keyboard_event(input,
++						    KBD_FLAGS_DOWN, RDP_SCANCODE_LCONTROL);
++					xfc->ctrlHeld = TRUE;
++				}
 +   if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: synth ctrl-down");
 +   if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: state pending->pinch contacts=%d", xfc->active_contacts);
-+			WLog_DBG(TAG,
-+			    "pinch: claimed d=%.1f A=%d B=%d", pinchDelta,
-+			    xfc->pinchFingerA, xfc->pinchFingerB);
-+			xf_input_pinch_update(xfc, touchId, x, y);
-+			return 0;
-+		}
-+
-+		/* Claim SCROLL: midpoint displacement exceeds pan deadband. */
-+		if (panDelta >= (double)panDb)
-+		{
-+			xfc->twoFingerPending = FALSE;
-+			xfc->scrollActive = TRUE;
-+			xfc->scrollLastY = currentMidY;
-+			xfc->scrollAccum = 0;
++				WLog_DBG(TAG,
++				    "pinch: claimed d=%.1f A=%d B=%d", pinchDelta,
++				    xfc->pinchFingerA, xfc->pinchFingerB);
++				xf_input_pinch_update(xfc, touchId, x, y);
++				return 0;
++			}
++			if (claim == 2) /* SCROLL */
++			{
++				xfc->twoFingerPending = FALSE;
++				xfc->scrollActive = TRUE;
++				xfc->scrollLastY = currentMidY;
++				xfc->scrollAccum = 0;
 +   if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: state pending->scroll contacts=%d", xfc->active_contacts);
-+			/* Move the hidden remote pointer to the two-finger midpoint
-+			 * before the first wheel detent. RDP wheel events scroll
-+			 * whatever control is under the server-side cursor; without
-+			 * this, scrolling targets the stale pointer location (e.g.
-+			 * a previously-touched list) instead of the list under the
-+			 * fingers. Mirrors the pinch midpoint targeting (D-11). */
-+			freerdp_client_send_button_event(&xfc->common, FALSE,
-+			                                 PTR_FLAGS_MOVE, currentMidX,
-+			                                 currentMidY);
-+			WLog_DBG(TAG,
-+			    "pan: claimed two-finger scroll d=%.1f mid=(%d,%d)",
-+			    panDelta, currentMidX, currentMidY);
-+			return 0;
++				/* Move the hidden remote pointer to the two-finger midpoint
++				 * before the first wheel detent. */
++				freerdp_client_send_button_event(&xfc->common, FALSE,
++				                                 PTR_FLAGS_MOVE, currentMidX,
++				                                 currentMidY);
++				WLog_DBG(TAG,
++				    "pan: claimed two-finger scroll d=%.1f mid=(%d,%d)",
++				    panDelta, currentMidX, currentMidY);
++				return 0;
++			}
 +		}
++	return 0;
 +	}
 +
-+	return 0;
 +}
 +
 +/* Resolve three-finger PENDING disambiguation.  Called from the top of
@@ -578,20 +820,23 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +				}
 +
 +				/* Third (or later) finger aborts. */
-+				const int fingerA = xfc->pinchFingerA;
-+				const int fingerB = xfc->pinchFingerB;
-+				const int savedC = xfc->midFingerC;
-+				xf_touch_force_cancel(xfc);
-+				xfc->quarantinedCount = 0;
-+				const int fingers[4] = { fingerA, fingerB, savedC, touchId };
-+				for (size_t i = 0; i < ARRAYSIZE(fingers); i++)
-+				{
-+					if (fingers[i] != 0)
-+						xfc->quarantinedFingers[xfc->quarantinedCount++] = fingers[i];
-+				}
-+				xfc->recoveryGateArmed = xfc->quarantinedCount > 0;
++					/* Third (or later) finger aborts (GAP-02, GAP-10). */
++					const int fingerA = xfc->pinchFingerA;
++					const int fingerB = xfc->pinchFingerB;
++					const int savedC = xfc->midFingerC;
++					/* Call lifecycle owner once with supplemental IDs.
++					 * Must NOT call public wrapper, duplicate cancellation,
++					 * or mutate quarantine/gate inline. */
++					{
++						const int supp[4] = { fingerA, fingerB, savedC, touchId };
++						size_t suppCount = 0;
++						for (size_t i = 0; i < ARRAYSIZE(supp); i++)
++							if (supp[i] != 0)
++								suppCount++;
++						xf_touch_cancel_lifecycle(xfc, supp, suppCount);
++					}
 +    if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: state quarantine=%d contacts=%d", xfc->quarantinedCount, xfc->active_contacts);
-+				return 0;
++					return 0;
 +			}
 +			case XI_TouchUpdate:
 +				/* Route active pinch to wheel synthesis; pan
@@ -664,7 +909,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +				xfc->pinchActive = FALSE;
 +				xfc->pinchMidpointDone = FALSE;
 +				xfc->pinchWheelActive = FALSE;
-+				xfc->pinchAccum = 0;
++				xfc->pinchAccum = 0.0;
 +				xfc->pinchDir = 0;
 +
 +				WLog_DBG(TAG,
@@ -839,32 +1084,26 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +				    touchId == xfc->pinchFingerB ||
 +				    touchId == xfc->midFingerC)
 +				{
-+					xfc->quarantinedCount = 0;
-+					if (xfc->pinchFingerA != 0 &&
-+					    xfc->pinchFingerA != touchId)
-+						xfc->quarantinedFingers
-+						    [xfc->quarantinedCount++] =
-+						    xfc->pinchFingerA;
-+					if (xfc->pinchFingerB != 0 &&
-+					    xfc->pinchFingerB != touchId)
-+						xfc->quarantinedFingers
-+						    [xfc->quarantinedCount++] =
-+						    xfc->pinchFingerB;
-+					if (xfc->midFingerC != 0 &&
-+					    xfc->midFingerC != touchId)
-+						xfc->quarantinedFingers
-+						    [xfc->quarantinedCount++] =
-+						    xfc->midFingerC;
-+					xfc->threeFingerPending = FALSE;
-+					xfc->midFingerC = 0;
-+					xfc->midFingerCx = 0;
-+					xfc->midFingerCy = 0;
-+					xfc->pinchFingerA = 0;
-+					xfc->pinchFingerB = 0;
-+					xfc->twoStartMidX = 0;
-+					xfc->twoStartMidY = 0;
-+					xfc->recoveryGateArmed =
-+					    xfc->quarantinedCount > 0;
++						/* GAP-02: route through sole runtime quarantine owner. */
++						{
++							int addSet[3];
++							int addCount = 0;
++							if (xfc->pinchFingerA != 0 && xfc->pinchFingerA != touchId)
++								addSet[addCount++] = xfc->pinchFingerA;
++							if (xfc->pinchFingerB != 0 && xfc->pinchFingerB != touchId)
++								addSet[addCount++] = xfc->pinchFingerB;
++							if (xfc->midFingerC != 0 && xfc->midFingerC != touchId)
++								addSet[addCount++] = xfc->midFingerC;
++							xfc->quarantinedCount = 0;
++							xf_quarantine_update(xfc->quarantinedFingers,
++							                     &xfc->quarantinedCount,
++							                     (int*)&xfc->recoveryGateArmed,
++							                     addSet, addCount, NULL, 0,
++							                     FREERDP_MAX_TOUCH_CONTACTS);
++						}
++						WLog_DBG(TAG,
++						    "three-finger: pending lift id=%d",
++						    touchId);
 +					WLog_DBG(TAG,
 +					    "three-finger: pending lift id=%d",
 +					    touchId);
@@ -889,11 +1128,14 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +					xfc->pinchFingerB = 0;
 +					xfc->twoStartMidX = 0;
 +					xfc->twoStartMidY = 0;
-+					if (remainingId != 0)
-+					{
-+						xfc->quarantinedFingers[0] = remainingId;
-+						xfc->quarantinedCount = 1;
-+						xfc->recoveryGateArmed = TRUE;
++						if (remainingId != 0)
++						{
++							xfc->quarantinedCount = 0;
++							xf_quarantine_update(xfc->quarantinedFingers,
++							                     &xfc->quarantinedCount,
++							                     (int*)&xfc->recoveryGateArmed,
++							                     &remainingId, 1, NULL, 0,
++							                     FREERDP_MAX_TOUCH_CONTACTS);
 +					}
 +					WLog_DBG(TAG,
 +					    "scroll: released id=%d", touchId);
@@ -917,12 +1159,15 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +					xfc->pinchFingerB = 0;
 +					xfc->twoStartMidX = 0;
 +					xfc->twoStartMidY = 0;
-+					if (remainingId != 0)
-+					{
-+						xfc->quarantinedFingers[0] = remainingId;
-+						xfc->quarantinedCount = 1;
-+						xfc->recoveryGateArmed = TRUE;
-+					}
++						if (remainingId != 0)
++						{
++							xfc->quarantinedCount = 0;
++							xf_quarantine_update(xfc->quarantinedFingers,
++							                     &xfc->quarantinedCount,
++							                     (int*)&xfc->recoveryGateArmed,
++							                     &remainingId, 1, NULL, 0,
++							                     FREERDP_MAX_TOUCH_CONTACTS);
++						}
 +					WLog_DBG(TAG,
 +					    "two-finger: pending lift id=%d (quarantine=%d)",
 +					    touchId, remainingId);
@@ -946,27 +1191,30 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +					xfc->midActive = FALSE;
 +					xfc->midLastX = 0;
 +					xfc->midLastY = 0;
-+					xfc->quarantinedCount = 0;
-+					if (xfc->pinchFingerA != 0 &&
-+					    xfc->pinchFingerA != touchId)
-+						xfc->quarantinedFingers
-+						    [xfc->quarantinedCount++] =
-+						    xfc->pinchFingerA;
-+					if (xfc->pinchFingerB != 0 &&
-+					    xfc->pinchFingerB != touchId)
-+						xfc->quarantinedFingers
-+						    [xfc->quarantinedCount++] =
-+						    xfc->pinchFingerB;
-+					if (xfc->midFingerC != 0 &&
-+					    xfc->midFingerC != touchId)
-+						xfc->quarantinedFingers
-+						    [xfc->quarantinedCount++] =
-+						    xfc->midFingerC;
-+					xfc->pinchFingerA = 0;
-+					xfc->pinchFingerB = 0;
-+					xfc->midFingerC = 0;
-+					xfc->midFingerCx = 0;
-+					xfc->midFingerCy = 0;
++						/* GAP-02: route through sole runtime quarantine owner. */
++						{
++							int addSet[3];
++							int addCount = 0;
++							if (xfc->pinchFingerA != 0 && xfc->pinchFingerA != touchId)
++								addSet[addCount++] = xfc->pinchFingerA;
++							if (xfc->pinchFingerB != 0 && xfc->pinchFingerB != touchId)
++								addSet[addCount++] = xfc->pinchFingerB;
++							if (xfc->midFingerC != 0 && xfc->midFingerC != touchId)
++								addSet[addCount++] = xfc->midFingerC;
++							xfc->quarantinedCount = 0;
++							xf_quarantine_update(xfc->quarantinedFingers,
++							                     &xfc->quarantinedCount,
++							                     (int*)&xfc->recoveryGateArmed,
++							                     addSet, addCount, NULL, 0,
++							                     FREERDP_MAX_TOUCH_CONTACTS);
++						}
++						xfc->pinchFingerA = 0;
++						xfc->pinchFingerB = 0;
++						xfc->midFingerC = 0;
++						xfc->midFingerCx = 0;
++						xfc->midFingerCy = 0;
++						xfc->twoStartMidX = 0;
++						xfc->twoStartMidY = 0;
 +					xfc->twoStartMidX = 0;
 +					xfc->twoStartMidY = 0;
 +					xfc->recoveryGateArmed =
@@ -1017,7 +1265,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
  static int xf_input_touch_remote(xfContext* xfc, XIDeviceEvent* event, int evtype)
  {
  	int x = 0;
-@@ -645,31 +1585,198 @@
+@@ -645,31 +1593,256 @@ static int xf_input_touch_remote(xfConte
  	int touchId = 0;
  	RdpeiClientContext* rdpei = xfc->common.rdpei;
  
@@ -1030,35 +1278,78 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
  	x = (int)event->event_x;
  	y = (int)event->event_y;
 +
-+	/* Content-bounds gate: reject letterbox touches before coordinate
-+	 * transform. Guarded by WITH_XRENDER. */
++		/* Content-bounds gate: only reject Begin outside content;
++		 * Update and End always reach cleanup (GAP-03, BL-03). */
 +#ifdef WITH_XRENDER
-+	{
-+		const int left = xfc->offset_x;
-+		const int top = xfc->offset_y;
-+		const int right = xfc->offset_x + xfc->scaledWidth;
-+		const int bottom = xfc->offset_y + xfc->scaledHeight;
++		{
++			const int left = xfc->offset_x;
++			const int top = xfc->offset_y;
++			const int right = xfc->offset_x + xfc->scaledWidth;
++			const int bottom = xfc->offset_y + xfc->scaledHeight;
 +
-+		if (x < left || x >= right || y < top || y >= bottom)
-+			return 0;
-+	}
++			if (!xf_bounds_admit(evtype == XI_TouchBegin, x, y,
++			                     left, top, right, bottom))
++				return 0;
++		}
 +#endif
++
++		/* GAP-10: gated diagnostic lifecycle store (observational only).
++		 * Duplicate Begin refreshes existing slot without double-counting;
++		 * Update/End refresh or retire; DIAG-01 idempotency holds. */
++		if (xfc->touchDiagEnabled)
++		{
++			switch (evtype)
++			{
++				case XI_TouchBegin:
++					xf_diag_contact_begin(xfc->diagContacts,
++					    &xfc->diagContactCount,
++					    FREERDP_MAX_TOUCH_CONTACTS,
++					    touchId, x, y);
++					break;
++				case XI_TouchUpdate:
++					xf_diag_contact_update(xfc->diagContacts,
++					    xfc->diagContactCount,
++					    touchId, x, y);
++					break;
++				case XI_TouchEnd:
++					xf_diag_contact_end(xfc->diagContacts,
++					    &xfc->diagContactCount,
++					    touchId);
++					break;
++				default:
++					break;
++			}
++		}
 +
  	xf_event_adjust_coordinates(xfc, &x, &y);
  
 -	switch (evtype)
+-	{
+-		case XI_TouchBegin:
+-			freerdp_client_handle_touch(&xfc->common, FREERDP_TOUCH_DOWN, touchId, 0, x, y);
+-			break;
+-		case XI_TouchUpdate:
+-			freerdp_client_handle_touch(&xfc->common, FREERDP_TOUCH_MOTION, touchId, 0, x, y);
+-			break;
+-		case XI_TouchEnd:
+-			freerdp_client_handle_touch(&xfc->common, FREERDP_TOUCH_UP, touchId, 0, x, y);
+-			break;
+-		default:
+-			break;
 +	/* All touch is consumed locally by the fallback gesture recognizer.
 +	 * No native RDPEI touch contacts are forwarded (per user decision). */
 +	return xf_input_touch_fallback(xfc, evtype, x, y, touchId);
 +}
 +
-+/* Forced contact cancellation. Clears all gesture state, releases Ctrl and
-+ * any held mouse button, cancels native RDPEI contacts, and quarantines all
-+ * physical fingers (native contacts + fallback-mode pinch/drag fingers) so
-+ * their remaining events don't produce spurious gestures after lifecycle
-+ * abort (FocusOut, ConfigureNotify, UnmapNotify, toggle_fullscreen,
-+ * post_disconnect, third-finger pinch abort). */
-+void xf_touch_force_cancel(xfContext* xfc)
++/* Lifecycle cancellation owner (GAP-02, GAP-10).
++ * Called by xf_touch_force_cancel (public wrapper, no supplementals) and
++ * the third-finger abort (with supplementals).  Snapshots active diagnostic
++ * contacts, calls xf_force_cancel_emit_sequence ONCE, clears gesture state,
++ * delegates all quarantine/gate writes to xf_quarantine_update, and cancels
++ * native RDPEI contacts. */
++static void xf_touch_cancel_lifecycle(xfContext* xfc,
++                                      const int* supplementalIds,
++                                      size_t supplementalCount)
 +{
 +	rdpClientContext* cctx = &xfc->common;
 +	RdpeiClientContext* rdpei = cctx->rdpei;
@@ -1087,28 +1378,43 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +
 + if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: force_cancel ctrl=%d contacts=%d quarantined=%d", xfc->ctrlHeld, xfc->active_contacts, xfc->quarantinedCount);
 +
-+	/* Per-contact cancel evidence for active local physical touches
-+	 * (the canonical local-only path; no native RDPEI contacts exist). */
-+	for (size_t i = 0; i < MAX_CONTACTS; i++)
- 	{
--		case XI_TouchBegin:
--			freerdp_client_handle_touch(&xfc->common, FREERDP_TOUCH_DOWN, touchId, 0, x, y);
--			break;
--		case XI_TouchUpdate:
--			freerdp_client_handle_touch(&xfc->common, FREERDP_TOUCH_MOTION, touchId, 0, x, y);
--			break;
--		case XI_TouchEnd:
--			freerdp_client_handle_touch(&xfc->common, FREERDP_TOUCH_UP, touchId, 0, x, y);
--			break;
--		default:
--			break;
-+		if (xfc->contacts[i].id != 0)
++	/* GAP-10: snapshot diag contacts, then emit ordered sequence once. */
++	if (xfc->touchDiagEnabled)
++	{
++		/* Build snapshot of active diagnostic contacts for last-coord cancels. */
++		int snapNativeCount = 0;
++		int snapNativeIds[FREERDP_MAX_TOUCH_CONTACTS];
++		int snapNativeXs[FREERDP_MAX_TOUCH_CONTACTS];
++		int snapNativeYs[FREERDP_MAX_TOUCH_CONTACTS];
++		for (size_t i = 0; i < FREERDP_MAX_TOUCH_CONTACTS; i++)
 +		{
-+			if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: event=cancel id=%d x=%d y=%d", xfc->contacts[i].id, (int)xfc->contacts[i].pos_x, (int)xfc->contacts[i].pos_y);
++			FreeRDP_TouchContact* c = &cctx->contacts[i];
++			if (c->id != 0 && snapNativeCount < (int)FREERDP_MAX_TOUCH_CONTACTS)
++			{
++				snapNativeIds[snapNativeCount] = c->id;
++				snapNativeXs[snapNativeCount] = c->x;
++				snapNativeYs[snapNativeCount] = c->y;
++				snapNativeCount++;
++			}
 +		}
- 	}
- 
--	return 0;
++		/* Emit diagnostic cancel records, summary, then cleanup. */
++		for (size_t i = 0; i < MAX_CONTACTS; i++)
++		{
++			if (xfc->contacts[i].id != 0)
++			{
++				WLog_WARN(TAG,
++				    "touch-diag: event=cancel id=%d x=%d y=%d",
++				    xfc->contacts[i].id,
++				    (int)xfc->contacts[i].pos_x,
++				    (int)xfc->contacts[i].pos_y);
++			}
++		}
++		WLog_WARN(TAG,
++		    "touch-diag: summary diag_count=%d native_count=%d quarantined=%d",
++		    xfc->diagContactCount, snapNativeCount,
++		    xfc->quarantinedCount);
++	}
++
 +	/* Clear all gesture state. */
 +
 +	/* Release held middle button (pan). */
@@ -1133,7 +1439,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +	xfc->lpStartTime = 0;
 +	xfc->pinchActive = FALSE;
 +	xfc->pinchClaimed = FALSE;
-+	xfc->pinchAccum = 0;
++	xfc->pinchAccum = 0.0;
 +	xfc->pinchDir = 0;
 +	xfc->pinchMidpointDone = FALSE;
 +	xfc->pinchWheelActive = FALSE;
@@ -1169,69 +1475,70 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +		xfc->ctrlHeld = FALSE;
 +	}
 +
-+	xfc->quarantinedCount = 0;
-+
-+	/* Quarantine fallback-mode physical fingers so their remaining
-+	 * events don't produce spurious tap/drag after lifecycle abort. */
-+	if (hadPinch || hadPending || hadMid || hadScroll || hadThree)
++	/* Build the full add-set from saved fallback fingers + supplementals.
++	 * GAP-02: xf_quarantine_update is the sole runtime quarantine writer. */
 +	{
-+		if (savedPinchA != 0)
-+			xfc->quarantinedFingers[xfc->quarantinedCount++] = savedPinchA;
-+		if (savedPinchB != 0)
-+			xfc->quarantinedFingers[xfc->quarantinedCount++] = savedPinchB;
-+		if (savedMidFingerC != 0)
++		int addSet[FREERDP_MAX_TOUCH_CONTACTS];
++		int addCount = 0;
++		/* Fallback-mode physical fingers. */
++		if (hadPinch || hadPending || hadMid || hadScroll || hadThree)
 +		{
-+			BOOL dupC = FALSE;
-+			for (int i = 0; i < xfc->quarantinedCount; i++)
-+				if (xfc->quarantinedFingers[i] == savedMidFingerC)
-+				{
-+					dupC = TRUE;
-+					break;
-+				}
-+			if (!dupC)
-+				xfc->quarantinedFingers[xfc->quarantinedCount++] =
-+				    savedMidFingerC;
++			if (savedPinchA != 0)
++				addSet[addCount++] = savedPinchA;
++			if (savedPinchB != 0)
++				addSet[addCount++] = savedPinchB;
++			if (savedMidFingerC != 0)
++				addSet[addCount++] = savedMidFingerC;
 +		}
-+	}
-+	if (hadFallback && savedFallback != 0)
-+	{
-+		BOOL dup = FALSE;
-+		for (int i = 0; i < xfc->quarantinedCount; i++)
-+			if (xfc->quarantinedFingers[i] == savedFallback)
-+			{
-+				dup = TRUE;
-+				break;
-+			}
-+		if (!dup && xfc->quarantinedCount < (int)FREERDP_MAX_TOUCH_CONTACTS)
-+			xfc->quarantinedFingers[xfc->quarantinedCount++] = savedFallback;
-+	}
-+
-+	/* Cancel and quarantine native RDPEI contacts. */
-+	for (size_t i = 0; i < FREERDP_MAX_TOUCH_CONTACTS; i++)
-+	{
-+		FreeRDP_TouchContact* c = &cctx->contacts[i];
-+		if (c->id != 0)
++		if (hadFallback && savedFallback != 0)
++			addSet[addCount++] = savedFallback;
++		/* Supplemental (third-finger abort) IDs. */
++		for (size_t si = 0; si < supplementalCount && addCount < (int)FREERDP_MAX_TOUCH_CONTACTS; si++)
++			if (supplementalIds[si] != 0)
++				addSet[addCount++] = supplementalIds[si];
++		/* Cancel and quarantine native RDPEI contacts. */
 +		{
-+			int dummy = 0;
-+			if (rdpei)
-+				rdpei->TouchCancel(rdpei, c->id, c->x, c->y, &dummy);
-+			WLog_DBG(TAG, "force_cancel: TouchCancel id=%d x=%d y=%d", c->id, c->x, c->y);
++			int nativeAddCount = 0;
++			for (size_t i = 0; i < FREERDP_MAX_TOUCH_CONTACTS; i++)
++			{
++				FreeRDP_TouchContact* c = &cctx->contacts[i];
++				if (c->id != 0)
++				{
++					int dummy = 0;
++					if (rdpei)
++						rdpei->TouchCancel(rdpei, c->id, c->x, c->y, &dummy);
++					WLog_DBG(TAG, "force_cancel: TouchCancel id=%d x=%d y=%d", c->id, c->x, c->y);
 +
 +   if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: event=cancel id=%d x=%d y=%d", c->id, c->x, c->y); 
-+			if (xfc->quarantinedCount < (int)FREERDP_MAX_TOUCH_CONTACTS)
-+				xfc->quarantinedFingers[xfc->quarantinedCount++] = c->id;
-+
-+			FreeRDP_TouchContact empty = { 0 };
-+			*c = empty;
++					nativeAddCount++;
++					FreeRDP_TouchContact empty = { 0 };
++					*c = empty;
++				}
++			}
 +		}
-+	}
 +
-+	if (xfc->quarantinedCount > 0)
-+		xfc->recoveryGateArmed = TRUE;
++		/* GAP-02: sole runtime writer — delegate to xf_quarantine_update. */
++		xfc->quarantinedCount = 0;
++		xf_quarantine_update(xfc->quarantinedFingers,
++		                     &xfc->quarantinedCount,
++		                     (int*)&xfc->recoveryGateArmed,
++		                     addSet, addCount, NULL, 0,
++		                     FREERDP_MAX_TOUCH_CONTACTS);
+ 	}
++}
+ 
+-	return 0;
++/* Public thin wrapper (GAP-10): calls the lifecycle owner once
++ * with no supplemental IDs.  External callers (xf_event.c,
++ * xf_client.c) call this; the third-finger abort calls the
++ * lifecycle owner directly with supplemental IDs. */
++void xf_touch_force_cancel(xfContext* xfc)
++{
++	xf_touch_cancel_lifecycle(xfc, NULL, 0);
  }
  
  static BOOL xf_input_pen_remote(xfContext* xfc, XIDeviceEvent* event, int evtype, int deviceid)
-@@ -862,8 +1969,80 @@
+@@ -862,8 +2035,97 @@ static int xf_input_handle_event_remote(
  
  	if ((cookie.cc->type == GenericEvent) && (cookie.cc->extension == xfc->XInputOpcode))
  	{
@@ -1246,8 +1553,18 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +			if (evtype == XI_TouchBegin || evtype == XI_TouchUpdate ||
 +			    evtype == XI_TouchEnd || evtype == XI_TouchOwnership)
 +			{
-+				XIDeviceEvent* dev = (XIDeviceEvent*)cookie.cc->data;
-+				const int touchId = dev->detail;
++					int touchId;
++					if (evtype == XI_TouchOwnership)
++					{
++						const XITouchOwnershipEvent* oe =
++						    (const XITouchOwnershipEvent*)cookie.cc->data;
++						touchId = oe->touchid;
++					}
++					else
++					{
++						XIDeviceEvent* dev = (XIDeviceEvent*)cookie.cc->data;
++						touchId = dev->detail;
++					}
 +				int qidx;
 +				BOOL quarantined = FALSE;
 +
@@ -1262,12 +1579,15 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +
 +				if (quarantined)
 +				{
-+					/* On TouchEnd: remove from quarantined set */
++					/* On TouchEnd: remove from quarantined set (GAP-02). */
 +					if (evtype == XI_TouchEnd)
 +					{
-+						for (int sj = qidx + 1; sj < xfc->quarantinedCount; sj++)
-+							xfc->quarantinedFingers[sj - 1] = xfc->quarantinedFingers[sj];
-+						xfc->quarantinedCount--;
++						int endIds[1] = { touchId };
++						xf_quarantine_update(xfc->quarantinedFingers,
++						                     &xfc->quarantinedCount,
++						                     (int*)&xfc->recoveryGateArmed,
++						                     NULL, 0, endIds, 1,
++						                     FREERDP_MAX_TOUCH_CONTACTS);
 +						if (touchId == xfc->lpFinger)
 +						{
 +							xfc->lpFrozen = FALSE;
@@ -1275,14 +1595,16 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
 +							xfc->lpDeadline = 0;
 +							xfc->lpStartTime = 0;
 +						}
-+						if (xfc->quarantinedCount == 0)
++					}
 +							xfc->recoveryGateArmed = FALSE;
 +					}
 +					/* On TouchOwnership: accept to unfreeze WM grab */
 +					else if (evtype == XI_TouchOwnership)
 +					{
-+						XIAllowTouchEvents(xfc->display, dev->deviceid,
-+						                   touchId, xfc->window->handle,
++						const XITouchOwnershipEvent* oe =
++						    (const XITouchOwnershipEvent*)cookie.cc->data;
++						XIAllowTouchEvents(xfc->display, oe->deviceid,
++						                   oe->touchid, xfc->window->handle,
 +						                   XIAcceptTouch);
 +					}
 +					/* All quarantined events are consumed without forwarding */
@@ -1303,16 +1625,18 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
  		{
 +			case XI_TouchOwnership:
 +			{
-+				XIDeviceEvent* deviceEvent = (XIDeviceEvent*)cookie.cc->data;
-+				XIAllowTouchEvents(xfc->display, deviceEvent->deviceid, deviceEvent->detail,
++				const XITouchOwnershipEvent* oe =
++				    (const XITouchOwnershipEvent*)cookie.cc->data;
++				XIAllowTouchEvents(xfc->display, oe->deviceid, oe->touchid,
 +				                   xfc->window->handle, XIAcceptTouch);
 +			}
-+				xf_input_touch_remote(xfc, cookie.cc->data, cookie.cc->evtype);
++				/* Ownership events are token-grant only --
++				 * NEVER forwarded to touch processing. (GAP-01) */
 +				break;
  			case XI_TouchBegin:
  				xf_input_pens_unhover(xfc);
  				/* fallthrough */
-@@ -876,9 +2055,21 @@
+@@ -876,9 +2138,21 @@ static int xf_input_handle_event_remote(
  			case XI_Motion:
  			case XI_ButtonRelease:
  			{
@@ -1335,7 +1659,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
  
  				if (freerdp_client_is_pen(&xfc->common, deviceid))
  				{
-@@ -889,6 +2080,12 @@
+@@ -889,6 +2163,12 @@ static int xf_input_handle_event_remote(
  					}
  					break;
  				}
@@ -1348,7 +1672,15 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
  			}
  				/* fallthrough */
  				WINPR_FALLTHROUGH
-@@ -910,6 +2107,14 @@
+@@ -897,7 +2177,6 @@ static int xf_input_handle_event_remote(
+ 				xf_input_event(xfc, event, cookie.cc->data, cookie.cc->evtype);
+ 				break;
+ 		}
+-	}
+ 
+ 	XFreeEventData(xfc->display, cookie.vc);
+ 	return 0;
+@@ -910,6 +2189,14 @@ int xf_input_init(xfContext* xfc, Window
  	return 0;
  }
  
@@ -1363,7 +1695,7 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
  #endif
  
  int xf_input_handle_event(xfContext* xfc, const XEvent* event)
-@@ -921,7 +2126,8 @@
+@@ -921,7 +2208,8 @@ int xf_input_handle_event(xfContext* xfc
  	settings = xfc->common.context.settings;
  	WINPR_ASSERT(settings);
  
@@ -1373,8 +1705,307 @@ diff --git a/client/X11/xf_input.c b/client/X11/xf_input.c
  	{
  		return xf_input_handle_event_remote(xfc, event);
  	}
-diff --git a/client/X11/xfreerdp.h b/client/X11/xfreerdp.h
-@@ -310,6 +310,44 @@
+Index: src/client/X11/xf_input.h
+===================================================================
+--- src.orig/client/X11/xf_input.h
++++ src/client/X11/xf_input.h
+@@ -30,4 +30,6 @@
+ int xf_input_init(xfContext* xfc, Window window);
+ int xf_input_handle_event(xfContext* xfc, const XEvent* event);
+ 
++void xf_touch_force_cancel(xfContext* xfc);
++
+ #endif /* FREERDP_CLIENT_X11_INPUT_H */
+Index: src/client/X11/xf_touch_internal.h
+===================================================================
+--- /dev/null
++++ src/client/X11/xf_touch_internal.h
+@@ -0,0 +1,264 @@
++/*
++ * xf_touch_internal.h — Shared pure helpers for the X11 touch gesture layer.
++ *
++ * Both production xf_input.c and independent regression tests include this
++ * header.  No X11 or FreeRDP dependencies — only <math.h> and <stddef.h>.
++ */
++
++#ifndef XF_TOUCH_INTERNAL_H
++#define XF_TOUCH_INTERNAL_H
++
++#include <math.h>
++#include <stddef.h>
++
++/* ── GAP-03: bounds admission ────────────────────────────────────── */
++
++/* Returns 1 if the event should be admitted, 0 if it should be dropped.
++ * Only XI_TouchBegin outside the content rect is rejected.
++ * XI_TouchUpdate and XI_TouchEnd always reach cleanup (GAP-03, BL-03). */
++static inline int xf_bounds_admit(int is_begin, int x, int y, int left,
++                                  int top, int right, int bottom)
++{
++	if (!is_begin)
++		return 1;
++	if (x < left || x >= right || y < top || y >= bottom)
++		return 0;
++	return 1;
++}
++
++/* ── GAP-02/10: single runtime quarantine + gate owner ────────────── */
++
++/* Add a set of finger IDs to the quarantine array (dedup, bounds-check
++ * per maxContacts).  Consume End removals (one matched ID per endId).
++ * Every operation derives recoveryGateArmed from the final count.
++ * xf_quarantine_update is the only runtime writer of
++ * quarantinedFingers / quarantinedCount / recoveryGateArmed after
++ * xf_input_init. */
++static inline int xf_quarantine_update(int *fingers, int *count, int *gate,
++                                       const int *addIds, int addCount,
++                                       const int *endIds, int endCount,
++                                       int maxContacts)
++{
++	int i, j, ai, ei;
++
++	/* Consume End removals first — match one ID per endId. */
++	for (ei = 0; ei < endCount; ei++)
++	{
++		int eid = endIds[ei];
++		if (eid == 0)
++			continue;
++		for (i = 0; i < *count; i++)
++		{
++			if (fingers[i] == eid)
++			{
++				for (j = i; j < *count - 1; j++)
++					fingers[j] = fingers[j + 1];
++				(*count)--;
++				break;
++			}
++		}
++	}
++
++	/* Add set with dedup + bounds-check. */
++	for (ai = 0; ai < addCount; ai++)
++	{
++		int id = addIds[ai];
++		int dup;
++
++		if (id == 0)
++			continue;
++		dup = 0;
++		for (i = 0; i < *count; i++)
++		{
++			if (fingers[i] == id)
++			{
++				dup = 1;
++				break;
++			}
++		}
++		if (!dup && *count < maxContacts)
++			fingers[(*count)++] = id;
++	}
++
++	*gate = (*count > 0);
++	return *count;
++}
++
++/* Convenience: single-ID quarantine add (GAP-02). */
++static inline int xf_quarantine_add(int *fingers, int count, int fingerId, int maxContacts)
++{
++	int gate;
++	return xf_quarantine_update(fingers, &count, &gate, &fingerId, 1, NULL, 0, maxContacts);
++}
++
++/* Convenience: gate derive from count (GAP-02). */
++static inline int xf_gate_derive(int count)
++{
++	return count > 0;
++}
++
++/* ── WR-01: two-finger disambiguation classifier ─────────────────── */
++
++/* Returns 0=PENDING, 1=PINCH, 2=SCROLL.  Production and tests call the
++ * same function — if this drifts from xf_input_two_finger_resolve the
++ * regression catches it. */
++static inline int xf_classify_two_finger(double pinchDelta, double panDelta,
++                                         double panDb, double deadbandPx,
++                                         double dominanceRatio)
++{
++	if (pinchDelta >= deadbandPx && pinchDelta > dominanceRatio * panDelta)
++		return 1; /* PINCH */
++	if (panDelta >= panDb)
++		return 2; /* SCROLL */
++	return 0; /* PENDING */
++}
++
++/* ── GAP-04: fractional pinch accumulator ────────────────────────── */
++
++/* Accumulate delta (caller adds delta first), then emit signed wheel
++ * steps from *accum in full-step increments of step.
++ * Returns the signed integer count of wheel steps emitted.
++ * Uses fabs to avoid int truncation of the double accumulator. */
++static inline int xf_pinch_emit_steps(double *accum, double step)
++{
++	int emitted = 0;
++
++	while (fabs(*accum) >= step)
++	{
++		if (*accum > 0)
++		{
++			emitted++;
++			*accum -= step;
++		}
++		else
++		{
++			emitted--;
++			*accum += step;
++		}
++	}
++	return emitted;
++}
++
++/* ── GAP-10: diagnostic lifecycle store ──────────────────────────── */
++
++typedef struct
++{
++	int touchId;
++	int x;
++	int y;
++	int active; /* nonzero if a finger is currently tracked */
++} xfDiagContact;
++
++/* Insert or refresh on duplicate Begin — does NOT increment count. */
++static inline void xf_diag_contact_begin(xfDiagContact *diags, int *count,
++                                         int max, int touchId, int x,
++                                         int y)
++{
++	int i;
++	for (i = 0; i < *count; i++)
++	{
++		if (diags[i].touchId == touchId)
++		{
++			diags[i].x = x;
++			diags[i].y = y;
++			return;
++		}
++	}
++	if (*count >= max)
++		return;
++	diags[*count].touchId = touchId;
++	diags[*count].x = x;
++	diags[*count].y = y;
++	diags[*count].active = 1;
++	(*count)++;
++}
++
++/* Refresh last coordinates for an active diag contact. */
++static inline void xf_diag_contact_update(const xfDiagContact *diags,
++                                          int count, int touchId, int x,
++                                          int y)
++{
++	int i;
++	for (i = 0; i < count; i++)
++	{
++		if (diags[i].touchId == touchId && diags[i].active)
++		{
++			/* Cast away const — struct lifetime is owned by xfContext. */
++			((xfDiagContact *)diags)[i].x = x;
++			((xfDiagContact *)diags)[i].y = y;
++			return;
++		}
++	}
++}
++
++/* Retire a diag contact (compact).  Decrements count. */
++static inline void xf_diag_contact_end(xfDiagContact *diags, int *count,
++                                       int touchId)
++{
++	int i, j;
++	for (i = 0; i < *count; i++)
++	{
++		if (diags[i].touchId == touchId)
++		{
++			for (j = i; j < *count - 1; j++)
++				diags[j] = diags[j + 1];
++			(*count)--;
++			return;
++		}
++	}
++}
++
++/* ── GAP-10: ordered force-cancel emission ───────────────────────── */
++
++typedef enum
++{
++	XF_FC_PHASE_DIAG_CANCEL = 0,
++	XF_FC_PHASE_SUMMARY,
++	XF_FC_PHASE_NATIVE_CANCEL,
++	XF_FC_PHASE_GESTURE_CLEAR
++} xfFcPhase;
++
++typedef void (*xfFcEmitCb)(xfFcPhase phase, int touchId, int x, int y,
++                           int diag_count, int native_count,
++                           int quarantined, void *ctx);
++
++/* Pure ordering helper — owns no xfContext storage.  Snapshots active
++ * diagnostic contacts, emits DIAG_CANCEL at last coords, emits one
++ * SUMMARY with exact counts, emits native cancellations, then emits
++ * GESTURE_CLEAR.  Returns the diagnostic snapshot count.
++ * Called exactly once by xf_touch_cancel_lifecycle (GAP-10). */
++static inline int xf_force_cancel_emit_sequence(
++    const xfDiagContact *diags, int diagCount, int nativeCount,
++    int quarantinedCount, const int *nativeIds, const int *nativeXs,
++    const int *nativeYs, xfFcEmitCb emit, void *ctx)
++{
++	int i;
++	int diagsSnapshot = 0;
++
++	/* Phase 1: DIAG_CANCEL for each active slot at its last coordinates. */
++	for (i = 0; i < diagCount; i++)
++	{
++		if (diags[i].active)
++		{
++			emit(XF_FC_PHASE_DIAG_CANCEL, diags[i].touchId,
++			     diags[i].x, diags[i].y, 0, 0, 0, ctx);
++			diagsSnapshot++;
++		}
++	}
++
++	/* Phase 2: SUMMARY — exact counts. */
++	emit(XF_FC_PHASE_SUMMARY, 0, 0, 0, diagsSnapshot, nativeCount,
++	     quarantinedCount, ctx);
++
++	/* Phase 3: NATIVE_CANCEL — only for synthetic native contacts. */
++	for (i = 0; i < nativeCount; i++)
++		emit(XF_FC_PHASE_NATIVE_CANCEL, nativeIds[i], nativeXs[i],
++		     nativeYs[i], 0, 0, 0, ctx);
++
++	/* Phase 4: GESTURE_CLEAR. */
++	emit(XF_FC_PHASE_GESTURE_CLEAR, 0, 0, 0, 0, 0, 0, ctx);
++
++	return diagsSnapshot;
++}
++
++#endif /* XF_TOUCH_INTERNAL_H */
+Index: src/client/X11/xfreerdp.h
+===================================================================
+--- src.orig/client/X11/xfreerdp.h
++++ src/client/X11/xfreerdp.h
+@@ -124,6 +124,7 @@ typedef struct
+ } button_map;
+ 
+ #if defined(WITH_XI)
++	#include "xf_touch_internal.h"
+ #define MAX_CONTACTS 20
+ 
+ typedef struct touch_contact
+@@ -301,6 +302,7 @@ struct xf_context
+ 	BOOL ungrabKeyboardWithRightCtrl;
+ 
+ #if defined(WITH_XI)
++	#include "xf_touch_internal.h"
+ 	touchContact contacts[MAX_CONTACTS];
+ 	int active_contacts;
+ 	int lastEvType;
+@@ -310,6 +312,46 @@ struct xf_context
  	double z_vector;
  	double px_vector;
  	double py_vector;
@@ -1384,6 +2015,8 @@ diff --git a/client/X11/xfreerdp.h b/client/X11/xfreerdp.h
 +	BOOL recoveryGateArmed;
 +	int quarantinedFingers[FREERDP_MAX_TOUCH_CONTACTS];
 +	int quarantinedCount;
++	xfDiagContact diagContacts[FREERDP_MAX_TOUCH_CONTACTS];
++	int diagContactCount;
 +	/* Phase 3 gesture state */
 +	BOOL lpArmed;
 +	INT32 lpDownX, lpDownY;
@@ -1396,7 +2029,7 @@ diff --git a/client/X11/xfreerdp.h b/client/X11/xfreerdp.h
 +	BOOL pinchClaimed;
 +	double pinchFirstDist;
 +	double pinchLastDist;
-+	INT32 pinchAccum;
++	double pinchAccum;
 +	int pinchDir;
 +	BOOL pinchMidpointDone;
 +	int pinchFingerA, pinchFingerB;
@@ -1419,147 +2052,73 @@ diff --git a/client/X11/xfreerdp.h b/client/X11/xfreerdp.h
  #endif
  	BOOL xi_rawevent;
  	BOOL xi_event;
-diff --git a/channels/rdpei/client/rdpei_main.c b/channels/rdpei/client/rdpei_main.c
-@@ -95,6 +95,7 @@
- 	UINT64 lastPollEventTime;
- 	BOOL running;
- 	BOOL async;
-+	BOOL touchDiagEnabled;
- } RDPEI_PLUGIN;
- 
- /**
-@@ -752,6 +753,7 @@
- 
- 	Stream_SealLength(s);
- 	status = rdpei_send_pdu(callback, s, EVENTID_TOUCH, Stream_Length(s));
-+	if (rdpei->touchDiagEnabled) WLog_Print(rdpei->base.log, WLOG_WARN, "touch-diag: rdpei frame contacts=%u offset=%u size=%lu status=%u", frame->contactCount, frame->frameOffset, (unsigned long)Stream_Length(s), status);
- 	Stream_Free(s, TRUE);
- 	return status;
- }
-@@ -1066,10 +1068,12 @@
- 	contactPoint = rdpei_contact(rdpei, externalId, !begin);
- 	if (contactPoint)
- 		contactIdlocal = contactPoint->contactId;
--	LeaveCriticalSection(&rdpei->lock);
- 
- 	if (contactIdlocal > UINT32_MAX)
-+	{
-+		LeaveCriticalSection(&rdpei->lock);
- 		return ERROR_INVALID_PARAMETER;
-+	}
- 
- 	if (contactIdlocal >= 0)
- 	{
-@@ -1124,6 +1128,8 @@
- 		error = context->AddContact(context, &contact);
- 	}
- 
-+	LeaveCriticalSection(&rdpei->lock);
-+
- 	if (contactId)
- 		*contactId = (INT32)contactIdlocal;
- 	return error;
-@@ -1490,6 +1496,12 @@
- 	rdpei->maxPenContacts = MAX_PEN_CONTACTS;
- 	rdpei->rdpcontext = rcontext;
- 
-+	/* Diagnostic gate: cached env lookup, default-off.
-+	 * Only "1" enables; unset or any other value disables. */
-+	/* NOLINTNEXTLINE(concurrency-mt-unsafe) */
-+	const char* diagEnv = getenv("FREERDP_TOUCH_DIAG");
-+	rdpei->touchDiagEnabled = (diagEnv != NULL && strcmp(diagEnv, "1") == 0);
-+
- 	WINPR_ASSERT(rdpei->base.log);
- 
- 	InitializeCriticalSection(&rdpei->lock);
-diff --git a/client/X11/xf_input.h b/client/X11/xf_input.h
-@@ -30,4 +30,6 @@
- int xf_input_init(xfContext* xfc, Window window);
- int xf_input_handle_event(xfContext* xfc, const XEvent* event);
- 
-+void xf_touch_force_cancel(xfContext* xfc);
-+
- #endif /* FREERDP_CLIENT_X11_INPUT_H */
-diff --git a/client/X11/xf_event.c b/client/X11/xf_event.c
-@@ -709,6 +709,7 @@
- 		XUngrabKeyboard(xfc->display, CurrentTime);
- 
- 	xf_keyboard_release_all_keypress(xfc);
-+	xf_touch_force_cancel(xfc);
- 	if (app)
- 		xf_rail_send_activate(xfc, event->window, FALSE);
- 
-@@ -839,6 +840,8 @@
- 
- 		if (xfc->window->width != event->width || xfc->window->height != event->height)
- 		{
-+			/* D-12: cancel active contacts before adopting new geometry */
-+			xf_touch_force_cancel(xfc);
- 			xfc->window->width = event->width;
- 			xfc->window->height = event->height;
- #ifdef WITH_XRENDER
-@@ -949,7 +952,10 @@
- 	WINPR_ASSERT(event);
- 
- 	if (!app)
-+	{
-+		xf_touch_force_cancel(xfc);
- 		xf_keyboard_release_all_keypress(xfc);
-+	}
- 
- 	if (!app)
- 		return gdi_send_suppress_output(xfc->common.context.gdi, TRUE);
-diff --git a/client/X11/xf_client.c b/client/X11/xf_client.c
-@@ -802,6 +802,7 @@
- 	if (xfc->debug)
- 		xf_ungrab(xfc);
- 
-+	xf_touch_force_cancel(xfc);
- 	xfc->fullscreen = (xfc->fullscreen) ? FALSE : TRUE;
- 	xfc->decorations =
- 	    (xfc->fullscreen) ? FALSE : freerdp_settings_get_bool(settings, FreeRDP_Decorations);
-@@ -1466,6 +1467,10 @@
- 
- 	context = instance->context;
- 	xfc = (xfContext*)context;
-+	/* D-06: cancel active contacts before channel teardown.
-+	 * cctx->rdpei is still valid at this point -- the channel
-+	 * disconnect PubSub callback that sets rdpei=NULL runs later. */
-+	xf_touch_force_cancel(xfc);
- 	PubSub_UnsubscribeChannelConnected(instance->context->pubSub,
- 	                                   xf_OnChannelConnectedEventHandler);
- 	PubSub_UnsubscribeChannelDisconnected(instance->context->pubSub,
-diff --git a/client/common/cmdline.c b/client/common/cmdline.c
-@@ -1171,6 +1171,27 @@
+Index: src/client/common/cmdline.c
+===================================================================
+--- src.orig/client/common/cmdline.c
++++ src/client/common/cmdline.c
+@@ -1171,6 +1171,57 @@ static int freerdp_client_command_line_p
  		if (!freerdp_settings_set_bool(settings, FreeRDP_MultiTouchGestures, enable))
  			return fail_at(arg, COMMAND_LINE_ERROR);
  	}
 +	CommandLineSwitchCase(arg, "touch-long-press")
 +	{
++		unsigned long v;
++		char* endPtr = NULL;
 +		if (!arg->Value)
 +			return fail_at(arg, COMMAND_LINE_ERROR_MISSING_VALUE);
-+		if (!freerdp_settings_set_uint32(settings, FreeRDP_TouchLongPressDurationMs,
-+		                                 (UINT32)atoi(arg->Value)))
++		if (arg->Value[0] == '\0')
++			return fail_at(arg, COMMAND_LINE_ERROR);
++		if (arg->Value[0] == '+' || (arg->Value[0] == '0' && arg->Value[1] != '\0'))
++			return fail_at(arg, COMMAND_LINE_ERROR);
++		errno = 0;
++		v = strtoul(arg->Value, &endPtr, 10);
++		if ((v == 0 || v == ULONG_MAX) && (errno != 0))
++			return fail_at(arg, COMMAND_LINE_ERROR);
++		if (endPtr == arg->Value || *endPtr != '\0')
++			return fail_at(arg, COMMAND_LINE_ERROR);
++		if (v < 500 || v > 700)
++			return fail_at(arg, COMMAND_LINE_ERROR);
++		if (!freerdp_settings_set_uint32(settings,
++		                                 FreeRDP_TouchLongPressDurationMs,
++		                                 (UINT32)v))
 +			return fail_at(arg, COMMAND_LINE_ERROR);
 +	}
 +	CommandLineSwitchCase(arg, "touch-slop")
 +	{
++		unsigned long v;
++		char* endPtr = NULL;
 +		if (!arg->Value)
 +			return fail_at(arg, COMMAND_LINE_ERROR_MISSING_VALUE);
-+		if (!freerdp_settings_set_uint32(settings, FreeRDP_TouchLongPressSlopPx,
-+		                                 (UINT32)atoi(arg->Value)))
++		if (arg->Value[0] == '\0')
 +			return fail_at(arg, COMMAND_LINE_ERROR);
-+	}
-+	CommandLineSwitchCase(arg, "touch-pinch-wheel-fallback")
-+	{
-+		if (!freerdp_settings_set_bool(settings, FreeRDP_TouchPinchWheelFallback, enable))
++		if (arg->Value[0] == '+' || (arg->Value[0] == '0' && arg->Value[1] != '\0'))
 +			return fail_at(arg, COMMAND_LINE_ERROR);
-+	}
++		errno = 0;
++		v = strtoul(arg->Value, &endPtr, 10);
++		if ((v == 0 || v == ULONG_MAX) && (errno != 0))
++			return fail_at(arg, COMMAND_LINE_ERROR);
++		if (endPtr == arg->Value || *endPtr != '\0')
++			return fail_at(arg, COMMAND_LINE_ERROR);
++		if (v < 4 || v > 16)
++			return fail_at(arg, COMMAND_LINE_ERROR);
++		if (!freerdp_settings_set_uint32(settings,
++		                                 FreeRDP_TouchLongPressSlopPx,
++		                                 (UINT32)v))
++			return fail_at(arg, COMMAND_LINE_ERROR);
++		}
++		CommandLineSwitchCase(arg, "touch-pinch-wheel-fallback")
++		{
++			if (!freerdp_settings_set_bool(settings, FreeRDP_TouchPinchWheelFallback, enable))
++				return fail_at(arg, COMMAND_LINE_ERROR);
++		}
  	CommandLineSwitchCase(arg, "echo")
  	{
  		if (!freerdp_settings_set_bool(settings, FreeRDP_SupportEchoChannel, enable))
-diff --git a/client/common/cmdline.h b/client/common/cmdline.h
-@@ -494,6 +494,12 @@
+Index: src/client/common/cmdline.h
+===================================================================
+--- src.orig/client/common/cmdline.h
++++ src/client/common/cmdline.h
+@@ -494,6 +494,12 @@ static const COMMAND_LINE_ARGUMENT_A glo
  #endif
  	{ "toggle-fullscreen", COMMAND_LINE_VALUE_BOOL, NULL, BoolValueTrue, NULL, -1, NULL,
  	  "Alt+Ctrl+Enter to toggle fullscreen" },
@@ -1572,8 +2131,26 @@ diff --git a/client/common/cmdline.h b/client/common/cmdline.h
  	{ "tune", COMMAND_LINE_VALUE_REQUIRED, "<setting:value>,<setting:value>", "", NULL, -1, NULL,
  	  "[experimental] directly manipulate freerdp settings, use with extreme caution!" },
  #if defined(WITH_FREERDP_DEPRECATED_COMMANDLINE)
-diff --git a/include/freerdp/settings_types_private.h b/include/freerdp/settings_types_private.h
-@@ -612,8 +612,11 @@
+Index: src/debian/changelog
+===================================================================
+--- src.orig/debian/changelog
++++ src/debian/changelog
+@@ -1,3 +1,10 @@
++freerdp3 (3.15.0+dfsg-2.1+deb13u3+onemix1) trixie; urgency=medium
++
++  * Local OneMix 3 touch gesture patch with diagnostics, quarantine
++    lifecycle ownership, checked parser input, and double accumulator.
++
++ -- FreeRDP Touch <freerdp-touch@localhost>  Sat, 09 Aug 2026 17:30:00 +0700
++
+ freerdp3 (3.15.0+dfsg-2.1+deb13u3) trixie; urgency=medium
+ 
+   * security fix from 3.25.0:
+Index: src/include/freerdp/settings_types_private.h
+===================================================================
+--- src.orig/include/freerdp/settings_types_private.h
++++ src/include/freerdp/settings_types_private.h
+@@ -612,8 +612,11 @@ struct rdp_settings
  	SETTINGS_DEPRECATED(ALIGN64 BOOL SuspendInput);          /* 2636 */
  	SETTINGS_DEPRECATED(ALIGN64 char* KeyboardPipeName);     /* 2637 */
  	SETTINGS_DEPRECATED(ALIGN64 BOOL HasRelativeMouseEvent); /* 2638 */
@@ -1587,8 +2164,11 @@ diff --git a/include/freerdp/settings_types_private.h b/include/freerdp/settings
  
  	/* Brush Capabilities */
  	SETTINGS_DEPRECATED(ALIGN64 UINT32 BrushSupportLevel); /* 2688 */
-diff --git a/libfreerdp/common/settings_getters.c b/libfreerdp/common/settings_getters.c
-@@ -382,6 +382,9 @@
+Index: src/libfreerdp/common/settings_getters.c
+===================================================================
+--- src.orig/libfreerdp/common/settings_getters.c
++++ src/libfreerdp/common/settings_getters.c
+@@ -382,6 +382,9 @@ BOOL freerdp_settings_get_bool(WINPR_ATT
  		case FreeRDP_MultiTouchInput:
  			return settings->MultiTouchInput;
  
@@ -1598,7 +2178,7 @@ diff --git a/libfreerdp/common/settings_getters.c b/libfreerdp/common/settings_g
  		case FreeRDP_NSCodec:
  			return settings->NSCodec;
  
-@@ -1097,6 +1100,10 @@
+@@ -1097,6 +1100,10 @@ BOOL freerdp_settings_set_bool(WINPR_ATT
  			settings->MultiTouchInput = cnv.c;
  			break;
  
@@ -1609,7 +2189,7 @@ diff --git a/libfreerdp/common/settings_getters.c b/libfreerdp/common/settings_g
  		case FreeRDP_NSCodec:
  			settings->NSCodec = cnv.c;
  			break;
-@@ -1996,6 +2003,12 @@
+@@ -1996,6 +2003,12 @@ UINT32 freerdp_settings_get_uint32(WINPR
  		case FreeRDP_TlsSecLevel:
  			return settings->TlsSecLevel;
  
@@ -1622,7 +2202,7 @@ diff --git a/libfreerdp/common/settings_getters.c b/libfreerdp/common/settings_g
  		case FreeRDP_VCChunkSize:
  			return settings->VCChunkSize;
  
-@@ -2525,6 +2538,14 @@
+@@ -2525,6 +2538,14 @@ BOOL freerdp_settings_set_uint32(WINPR_A
  			settings->TlsSecLevel = cnv.c;
  			break;
  
@@ -1637,8 +2217,11 @@ diff --git a/libfreerdp/common/settings_getters.c b/libfreerdp/common/settings_g
  		case FreeRDP_VCChunkSize:
  			settings->VCChunkSize = cnv.c;
  			break;
-diff --git a/libfreerdp/common/settings_str.h b/libfreerdp/common/settings_str.h
-@@ -254,6 +254,8 @@
+Index: src/libfreerdp/common/settings_str.h
+===================================================================
+--- src.orig/libfreerdp/common/settings_str.h
++++ src/libfreerdp/common/settings_str.h
+@@ -254,6 +254,8 @@ static const struct settings_str_entry s
  	{ FreeRDP_TcpKeepAlive, FREERDP_SETTINGS_TYPE_BOOL, "FreeRDP_TcpKeepAlive" },
  	{ FreeRDP_TlsSecurity, FREERDP_SETTINGS_TYPE_BOOL, "FreeRDP_TlsSecurity" },
  	{ FreeRDP_ToggleFullscreen, FREERDP_SETTINGS_TYPE_BOOL, "FreeRDP_ToggleFullscreen" },
@@ -1647,7 +2230,7 @@ diff --git a/libfreerdp/common/settings_str.h b/libfreerdp/common/settings_str.h
  	{ FreeRDP_TransportDump, FREERDP_SETTINGS_TYPE_BOOL, "FreeRDP_TransportDump" },
  	{ FreeRDP_TransportDumpReplay, FREERDP_SETTINGS_TYPE_BOOL, "FreeRDP_TransportDumpReplay" },
  	{ FreeRDP_TransportDumpReplayNodelay, FREERDP_SETTINGS_TYPE_BOOL,
-@@ -444,6 +446,10 @@
+@@ -444,6 +446,10 @@ static const struct settings_str_entry s
  	{ FreeRDP_TcpKeepAliveRetries, FREERDP_SETTINGS_TYPE_UINT32, "FreeRDP_TcpKeepAliveRetries" },
  	{ FreeRDP_ThreadingFlags, FREERDP_SETTINGS_TYPE_UINT32, "FreeRDP_ThreadingFlags" },
  	{ FreeRDP_TlsSecLevel, FREERDP_SETTINGS_TYPE_UINT32, "FreeRDP_TlsSecLevel" },
@@ -1658,147 +2241,3 @@ diff --git a/libfreerdp/common/settings_str.h b/libfreerdp/common/settings_str.h
  	{ FreeRDP_VCChunkSize, FREERDP_SETTINGS_TYPE_UINT32, "FreeRDP_VCChunkSize" },
  	{ FreeRDP_VCFlags, FREERDP_SETTINGS_TYPE_UINT32, "FreeRDP_VCFlags" },
  	{ FreeRDP_MonitorLocalShiftX, FREERDP_SETTINGS_TYPE_INT32, "FreeRDP_MonitorLocalShiftX" },
-diff --git a/client/X11/test_scroll_classifier.c b/client/X11/test_scroll_classifier.c
-new file mode 100644
---- /dev/null
-+++ b/client/X11/test_scroll_classifier.c
-@@ -0,0 +1,128 @@
-+/* Standalone regression model of the two-finger disambiguation rule in
-+ * xf_input_two_finger_resolve.  Mirrors the exact claim order and thresholds
-+ * from the source.  If this model drifts from the source the static guard
-+ * (grep checks below) catches it.
-+ *
-+ * Compile: gcc -std=c11 -o test_scroll_classifier test_scroll_classifier.c -lm
-+ * Run:     ./test_scroll_classifier */
-+
-+#include <assert.h>
-+#include <math.h>
-+#include <stdio.h>
-+
-+#define PINCH_DEADBAND_PX 8
-+#define PINCH_DOMINANCE_RATIO 2.5
-+
-+typedef enum { PENDING = 0, PINCH = 1, SCROLL = 2 } Claim;
-+
-+/* Resolve the disambiguation rule.  midpoints are computed with integer
-+ * division to match the real code (currentMidX/Y are ints in the source). */
-+static Claim resolve(double pinchFirstDist, double twoStartMidX,
-+                     double twoStartMidY, double ax, double ay,
-+                     double bx, double by, double panDb)
-+{
-+	double dx = ax - bx;
-+	double dy = ay - by;
-+	double currentDist = sqrt(dx * dx + dy * dy);
-+	int currentMidX = (int)((ax + bx) / 2.0);
-+	int currentMidY = (int)((ay + by) / 2.0);
-+	int startMidX = (int)twoStartMidX;
-+	int startMidY = (int)twoStartMidY;
-+	double pinchDelta = fabs(currentDist - pinchFirstDist);
-+	double panDelta = hypot((double)(currentMidX - startMidX),
-+	                        (double)(currentMidY - startMidY));
-+
-+	/* Claim PINCH: distance change exceeds deadband AND dominates pan. */
-+	if (pinchDelta >= (double)PINCH_DEADBAND_PX &&
-+	    pinchDelta > (double)PINCH_DOMINANCE_RATIO * panDelta)
-+		return PINCH;
-+
-+	/* Claim SCROLL: midpoint displacement exceeds pan deadband. */
-+	if (panDelta >= (double)panDb)
-+		return SCROLL;
-+
-+	return PENDING;
-+}
-+
-+int main(void)
-+{
-+	/* --- Case 1: 9px one-finger-first vertical swipe (the bug-gate case)
-+	 * A=(100,100), B=(100,300).  Baseline dist=200, mid=(100,200).
-+	 * A moves alone to y=109: pinchDelta = |sqrt(0^2+191^2)-200| = 9.
-+	 * integer midY = (109+300)/2 = 204, panDelta = hypot(0,4) = 4.
-+	 * With 2.0 ratio: 9 > 2.0*4=8 → PINCH (bug).
-+	 * With 2.5 ratio: 9 > 2.5*4=10 → FALSE → PENDING (fix). */
-+	{
-+		Claim c = resolve(200.0, 100.0, 200.0,
-+		                  100.0, 109.0, 100.0, 300.0, 8.0);
-+		assert(c == PENDING);
-+		assert(c != PINCH);
-+	}
-+
-+	/* --- Case 2: Vertical 9px first update, second finger catches up.
-+	 * A stays at (100,109), B moves to (100,309).
-+	 * pinchDelta = |sqrt(0^2+200^2)-200| = 0, panDelta=9 → SCROLL. */
-+	{
-+		Claim c = resolve(200.0, 100.0, 200.0,
-+		                  100.0, 109.0, 100.0, 309.0, 8.0);
-+		assert(c == SCROLL);
-+	}
-+
-+	/* --- Case 3: Horizontal 8px one-finger-first swipe → PENDING.
-+	 * A=(100,200), B=(300,200).  A→(108,200): pinchDelta=8, int midX=204, panDelta=4.
-+	 * 8 > 2.5*4=10 → FALSE → PENDING. */
-+	{
-+		Claim c = resolve(200.0, 200.0, 200.0,
-+		                  108.0, 200.0, 300.0, 200.0, 8.0);
-+		assert(c == PENDING);
-+		assert(c != PINCH);
-+
-+		/* Both catch up: A→(109,200), B→(309,200) → SCROLL. */
-+		c = resolve(200.0, 200.0, 200.0,
-+		            109.0, 200.0, 309.0, 200.0, 8.0);
-+		assert(c == SCROLL);
-+	}
-+
-+	/* --- Case 4: Sequential 8px-per-finger symmetric pinch IN.
-+	 * A=(100,100), B=(100,300).  First: only A moves →(100,108).
-+	 * pinchDelta=|sqrt(0^2+192^2)-200|=8, int midY=204, panDelta=4.
-+	 * 8 > 2.5*4=10 → FALSE → PENDING. */
-+	{
-+		Claim c = resolve(200.0, 100.0, 200.0,
-+		                  100.0, 108.0, 100.0, 300.0, 8.0);
-+		assert(c == PENDING);
-+
-+		/* Second: B also moves →(100,292). Total A=108, B=292.
-+		 * dist=|sqrt(0^2+184^2)-200|=16, midY=200, panDelta=0.
-+		 * 16 > 2.5*0=0, 16 ≥ 8 → PINCH. */
-+		c = resolve(200.0, 100.0, 200.0,
-+		            100.0, 108.0, 100.0, 292.0, 8.0);
-+		assert(c == PINCH);
-+	}
-+
-+	/* --- Case 5: Single-update symmetric pinch IN (both move together).
-+	 * A→(100,120), B→(100,280): pinchDelta=40, mid stays, panDelta=0 → PINCH. */
-+	{
-+		Claim c = resolve(200.0, 100.0, 200.0,
-+		                  100.0, 120.0, 100.0, 280.0, 8.0);
-+		assert(c == PINCH);
-+	}
-+
-+	/* --- Case 6: Symmetric pinch OUT.
-+	 * A→(100,80), B→(100,320): pinchDelta=40, panDelta=0 → PINCH. */
-+	{
-+		Claim c = resolve(200.0, 100.0, 200.0,
-+		                  100.0, 80.0, 100.0, 320.0, 8.0);
-+		assert(c == PINCH);
-+	}
-+
-+	/* --- Case 7: Diagonal scroll — both fingers translate together. */
-+	{
-+		Claim c = resolve(200.0, 100.0, 200.0,
-+		                  108.0, 108.0, 108.0, 308.0, 8.0);
-+		assert(c == SCROLL);
-+	}
-+
-+	printf("OK\n");
-+	return 0;
-+}
-diff --git a/debian/changelog b/debian/changelog
---- a/debian/changelog
-+++ b/debian/changelog
-@@ -1,3 +1,9 @@
-+freerdp3 (3.15.0+dfsg-2.1+deb13u3+onemix1) trixie; urgency=medium
-+
-+  * Local OneMix 3 touch gesture patch.
-+
-+ -- FreeRDP Touch <freerdp-touch@localhost>  Sat, 08 Aug 2026 15:21:37 +0700
-+
- freerdp3 (3.15.0+dfsg-2.1+deb13u3) trixie; urgency=medium
