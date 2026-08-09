@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Phase 4 gap-closure plans ready for execution with user override
-last_updated: "2026-08-09T07:18:02.115Z"
+stopped_at: Completed 04-04 gap-closure plan
+last_updated: "2026-08-09T11:03:42.522Z"
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 13
-  completed_plans: 10
+  completed_plans: 11
 current_phase_name: diagnostics-packaging-launch-configuration
 last_activity: 2026-08-09
-last_activity_desc: Phase 4 gap-closure plans ready; final checker overridden by user and GAP-07 deferred under D-25.
+last_activity_desc: Plan 04-04 executed; six X11/parser gaps closed, patch re-crystallized with shared xf_touch_internal.h. Plans 04-05 and 04-06 pending.
 ---
 
 # State: FreeRDP Touch for OneMix 3
@@ -29,8 +29,8 @@ last_activity_desc: Phase 4 gap-closure plans ready; final checker overridden by
 ## Current Position
 
 - **Phase**: 4 - Diagnostics, Packaging & Launch Configuration
-- **Status**: Phase 4 gap closure ready to execute. The owner overrode the final planning-checker pass; GAP-07 is deferred under D-25 and `/cert:ignore` remains for v1.
-- **Progress**: 3/4 phases complete; 10/13 plans completed, with Phase 4 plans 04-04 through 04-06 pending.
+- **Status**: Plan 04-04 complete (six X11/parser gaps closed, patch re-crystallized). Plans 04-05 and 04-06 pending. GAP-07 deferred under D-25; `/cert:ignore` remains for v1.
+- **Progress**: 3/4 phases complete; 11/13 plans completed (04-04 done, 04-05 and 04-06 pending).
 
 ```
 [x] Phase 1: Environment Gate & Build Baseline (2/2 plans)
@@ -43,7 +43,7 @@ last_activity_desc: Phase 4 gap-closure plans ready; final checker overridden by
 
 - **Phases completed**: 3/4
 - **Requirements mapped**: 19/19
-- **Plans completed**: 10/13 (01-01, 01-02, 02-01, 02-02, 03-01, 04-01, 04-02, 04-03; 03-02 and 03-03 reconciled as superseded by the local-only pivot)
+- **Plans completed**: 11/13 (01-01, 01-02, 02-01, 02-02, 03-01, 04-01, 04-02, 04-03, 04-04; 03-02 and 03-03 reconciled as superseded by the local-only pivot)
 
 **Per-Plan Metrics:**
 
@@ -52,6 +52,7 @@ last_activity_desc: Phase 4 gap-closure plans ready; final checker overridden by
 | Phase 04 P01 | 52 | 3 tasks | 3 files |
 | Phase 04-diagnostics-packaging-launch-configuration P04-02 | 5 | 2 tasks | 2 files |
 | Phase 04-diagnostics-packaging-launch-configuration P04-03 | 1 | 2 tasks | 2 files |
+| Phase 04 P04 | 623 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -76,10 +77,14 @@ last_activity_desc: Phase 4 gap-closure plans ready; final checker overridden by
 - [Phase ?]: Atomic publication with flock -n and publication-aware trap (readlink -f comparison, no fragile published flag)
 - [Phase 4 Plan 03]: Verification record uses deterministic 10x5 state-machine grammar with inline Python/stdlib parser — raw byte inspection before decode, no framework dependency
 - [Phase 4 Plan 03]: Stock rollback launch documentation uses menu --mouse-only because plain menu composes patched touch options that stock FreeRDP rejects
+- [Phase 4 Plan 04]: Shared xf_touch_internal.h is the authoritative implementation seam — includes only <math.h> and <stddef.h>, no X11 or FreeRDP headers
+- [Phase 4 Plan 04]: xf_quarantine_update is the sole runtime writer of quarantine storage after xf_input_init; every gesture cleanup and force-cancel path delegates through it
+- [Phase 4 Plan 04]: xf_pinch_emit_steps accumulates fractional deltas in double without truncation; both wheel diagnostics use accum=%.3f with explicit double argument
+- [Phase 4 Plan 04]: Four-package parser fixture extracts all four .debs into one root and proves loader resolution beneath it before running parser cases
 
 ### Todos
 
-- Execute Phase 4 gap-closure plans 04-04, 04-05, and 04-06.
+- Execute Phase 4 gap-closure plans 04-05 and 04-06.
 
 ### Blockers
 
@@ -102,11 +107,11 @@ last_activity_desc: Phase 4 gap-closure plans ready; final checker overridden by
 ## Session Continuity
 
 **Last session:** 2026-08-09
-**Stopped at:** Phase 4 gap-closure plans ready for execution with user override
+**Stopped at:** Completed 04-04-PLAN.md
 **Resume file:** None
 
-- **Last action**: Replanned Phase 4 gap closure as plans 04-04 through 04-06, deferred GAP-07 under D-25, and accepted the final checker override.
-- **Next action**: Execute Phase 4 gap closure, starting with Wave 1 plans 04-04 and 04-05.
+- **Last action**: Executed Plan 04-04: closed six X11/parser/diagnostic gaps, created shared xf_touch_internal.h, built 4 regression suites, re-crystallized quilt patch.
+- **Next action**: Execute Plans 04-05 (package scripts) and 04-06 (launch docs).
 
 ---
 *State initialized: 2026-08-05*

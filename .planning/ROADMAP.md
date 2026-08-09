@@ -93,7 +93,7 @@
   3. The user can launch the patched client with a documented preset that keeps native multitouch disabled, enables the local-only gesture layer, exposes long-press/pinch calibration, and provides an explicit mouse-only escape hatch.
   4. The user can enable diagnostic logging that records touch begin/update/end/cancel events, gesture decisions, and RDPEI frame submission, while normal launches keep the logging disabled.
 
-**Plans**: 6 plans (3 executed, 3 gap closure)
+**Plans**: 4/6 plans executed
 
 **Wave 1**
 
@@ -106,7 +106,7 @@
 
 **Gap Closure** *(Wave 1 parallel, then Wave 2)*
 
-- [ ] 04-04-PLAN.md — X11 lifecycle, parser, and diagnostic defect closure: one-owner recovery, cached/idempotent diagnostics, local-only cancellation truth, exact four-package loader-isolated parser fixture, and gated RDPEI frame-record preservation (DIAG-01, CONF-01) — Wave 1, depends_on []
+- [x] 04-04-PLAN.md — X11 lifecycle, parser, and diagnostic defect closure: one-owner recovery, cached/idempotent diagnostics, local-only cancellation truth, exact four-package loader-isolated parser fixture, and gated RDPEI frame-record preservation (DIAG-01, CONF-01) — Wave 1, depends_on []
 - [ ] 04-05-PLAN.md — Release script, wrapper/menu, docs, and deployment closure: deterministic repeated calibration validation, signal-safe publication fixture, repeatable exact four-package install/rollback docs, fail-closed incomplete identities, and deployed-menu parity (CONF-01, PACK-01, PACK-02) — Wave 1, depends_on []
 - [ ] 04-06-PLAN.md — Final non-certificate rebuild and verification: two separately runnable clean builds with durable identity manifests, all automated regressions, separate process-aware live PRE/POST interruption invocations, repeated install/rollback, local-only native_count=0 diagnostics, native-device checks, and deployed-menu parity (DIAG-01, PACK-01, PACK-02, CONF-01) — Wave 2, depends_on [04-04, 04-05]
 
@@ -119,7 +119,7 @@
 | 1. Environment Gate & Build Baseline | 2/2 | Complete    | 2026-08-06 |
 | 2. Native RDPEI Touch Lifecycle | 2/2 | Complete    | 2026-08-06 |
 | 3. Local-Only Gestures & Session Stability | 3/3 | Complete | 2026-08-08 |
-| 4. Diagnostics, Packaging & Launch Configuration | 3/6 | Gaps found — 3-plan closure ready; GAP-07 owner-deferred | 2026-08-08 |
+| 4. Diagnostics, Packaging & Launch Configuration | 4/6 | In Progress|  |
 
 ## Ordering Rationale
 
