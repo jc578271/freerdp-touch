@@ -24,21 +24,48 @@ create_shims() {
 
   mkdir -p "$fixture/bin"
 
-  # apt-cache showsrc: output proper deb-src format
+  # apt-cache source lookup: fail loudly if the old repository path returns
   cat > "$fixture/bin/apt-cache" <<'S'
 #!/bin/bash
-case "$1" in
-  showsrc) echo "Version: 3.15.0+dfsg-2.1+deb13u3" ;;
+set -eu
+touch "${FIXTURE_APT_CACHE_SENTINEL:?}"
+printf 'FAIL: obsolete apt-cache source lookup reached\n' >&2
+exit 91
+S
+
+  # perl Dpkg::Control shim: record the exact field requests and return DSC metadata
+  cat > "$fixture/bin/perl" <<'S'
+#!/bin/bash
+set -eu
+[ "$1" = "-MDpkg::Control" ]
+case "$2" in
+  *Dpkg::Control*CTRL_DSC*allow_pgp*) ;;
+  *) printf 'FAIL: unexpected Perl control parser expression\n' >&2; exit 1 ;;
+esac
+printf '%s|%s\n' "$4" "$3" >> "${FIXTURE_PERL_LOG:?}"
+case "$4" in
+  Source) printf 'freerdp3' ;;
+  Version) printf '3.15.0+dfsg-2.1+deb13u3' ;;
+  Build-Depends) printf 'debhelper-compat (= 13)' ;;
+  *) exit 1 ;;
 esac
 S
 
-  # dpkg-source -x: create minimal extracted tree
+  # dpkg-source -x: create minimal extracted tree and record the DSC handoff
   cat > "$fixture/bin/dpkg-source" <<'S'
 #!/bin/bash
 set -eu
+dsc=""
 workdir=""
-while [ $# -gt 0 ]; do case "$1" in -x) shift; shift; workdir="$1";; *) shift;; esac; done
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -x) shift; dsc="$1"; shift; workdir="$1" ;;
+    *) shift ;;
+  esac
+done
+[ -n "$dsc" ] || exit 1
 [ -n "$workdir" ] || exit 1
+printf '%s\n' "$dsc" > "${FIXTURE_DSC_HANDOFF:?}"
 mkdir -p "$workdir/debian/patches" "$workdir/client/X11"
 touch "$workdir/debian/patches/series"
 echo "3.15.0+dfsg-2.1+deb13u3+onemix1" > "$workdir/debian/changelog"
@@ -58,8 +85,11 @@ echo "3.15.0+dfsg-2.1+deb13u3+onemix1"
 S
 
   # dpkg-buildpackage: create the four expected .deb files in parent dir
+  # or leave a marker so the smoke case proves this boundary was not crossed.
   cat > "$fixture/bin/dpkg-buildpackage" <<'S'
 #!/bin/bash
+set -eu
+[ -z "${FIXTURE_BUILD_MARKER:-}" ] || touch "$FIXTURE_BUILD_MARKER"
 ver="3.15.0+dfsg-2.1+deb13u3+onemix1"
 arch="amd64"
 parent="$(dirname "$PWD")"
@@ -226,15 +256,22 @@ run_term_case() {
   local sleep_at_marker="$5"   # "yes" = sleep at pre-swap, "no" = touch only
 
   local case_dir="$td/$case_name"
-  mkdir -p "$case_dir/scripts" "$case_dir/build" "$case_dir/patches"
+  mkdir -p "$case_dir/scripts" "$case_dir/src" "$case_dir/patches"
   local marker_dir="$case_dir/markers"
   local counter_file="$case_dir/cleanup_count"
   mkdir -p "$marker_dir"
 
   create_shims "$case_dir"
 
-  # Dummy input files
-  touch "$case_dir/build/freerdp3_3.15.0+dfsg-2.1+deb13u3.dsc"
+  # Dummy local source package inputs
+  printf '%s\n' \
+    'Format: 3.0 (quilt)' \
+    'Source: freerdp3' \
+    'Version: 3.15.0+dfsg-2.1+deb13u3' \
+    'Build-Depends: debhelper-compat (= 13)' \
+    > "$case_dir/src/freerdp3_3.15.0+dfsg-2.1+deb13u3.dsc"
+  touch "$case_dir/src/freerdp3_3.15.0+dfsg.orig.tar.xz"
+  touch "$case_dir/src/freerdp3_3.15.0+dfsg-2.1+deb13u3.debian.tar.xz"
   touch "$case_dir/patches/onemix-touch.patch"
 
   # Set up prior dist if needed
@@ -262,6 +299,9 @@ run_term_case() {
   PATH="$case_dir/bin:$PATH" \
     FIXTURE_MARKER_DIR="$marker_dir" \
     FIXTURE_CLEANUP_COUNT_FILE="$counter_file" \
+    FIXTURE_APT_CACHE_SENTINEL="$case_dir/apt-cache-used" \
+    FIXTURE_PERL_LOG="$case_dir/perl-requests.log" \
+    FIXTURE_DSC_HANDOFF="$case_dir/dsc-handoff" \
     CC_OUTPUT_LOG="$CC_OUTPUT_LOG" \
     bash "$case_dir/scripts/build-release.sh" &
   local pid=$!
@@ -345,6 +385,81 @@ run_term_case() {
 run_term_case "pre-swap-prior" "pre_swap" "yes" "prior" "yes"
 run_term_case "post-swap-prior" "post_swap" "yes" "new" "no"
 run_term_case "pre-swap-noprior" "pre_swap" "no" "none" "yes"
+
+# =======================================================================
+# Verify local DSC parsing and pre-build smoke termination
+# =======================================================================
+run_smoke_case() {
+  local case_dir="$td/smoke"
+  mkdir -p "$case_dir/scripts" "$case_dir/src" "$case_dir/patches"
+  create_shims "$case_dir"
+
+  printf '%s\n' \
+    'Format: 3.0 (quilt)' \
+    'Source: freerdp3' \
+    'Version: 3.15.0+dfsg-2.1+deb13u3' \
+    'Build-Depends: debhelper-compat (= 13)' \
+    > "$case_dir/src/freerdp3_3.15.0+dfsg-2.1+deb13u3.dsc"
+  touch "$case_dir/src/freerdp3_3.15.0+dfsg.orig.tar.xz"
+  touch "$case_dir/src/freerdp3_3.15.0+dfsg-2.1+deb13u3.debian.tar.xz"
+  touch "$case_dir/patches/onemix-touch.patch"
+  cp "$release_src" "$case_dir/scripts/build-release.sh"
+  chmod 700 "$case_dir/scripts/build-release.sh"
+
+  local output="$case_dir/smoke-output.log"
+  set +e
+  PATH="$case_dir/bin:$PATH" \
+    BUILD_RELEASE_SMOKE=1 \
+    FIXTURE_APT_CACHE_SENTINEL="$case_dir/apt-cache-used" \
+    FIXTURE_PERL_LOG="$case_dir/perl-requests.log" \
+    FIXTURE_DSC_HANDOFF="$case_dir/dsc-handoff" \
+    FIXTURE_BUILD_MARKER="$case_dir/build-invoked" \
+    CC_OUTPUT_LOG="$CC_OUTPUT_LOG" \
+    bash "$case_dir/scripts/build-release.sh" >"$output" 2>&1
+  local exit_code=$?
+  set -e
+  if [ "$exit_code" -ne 0 ]; then
+    printf 'FAIL: smoke exited %d\n' "$exit_code" >&2
+    exit 1
+  fi
+
+  local dsc="$case_dir/src/freerdp3_3.15.0+dfsg-2.1+deb13u3.dsc"
+  [ -f "$case_dir/perl-requests.log" ] || { printf 'FAIL: Perl request log missing\n' >&2; exit 1; }
+  [ "$(wc -l < "$case_dir/perl-requests.log")" -eq 3 ] || {
+    printf 'FAIL: expected three Dpkg::Control field requests\n' >&2
+    exit 1
+  }
+  for field in Source Version Build-Depends; do
+    grep -Fqx "$field|$dsc" "$case_dir/perl-requests.log" || {
+      printf 'FAIL: missing Dpkg::Control request for %s\n' "$field" >&2
+      exit 1
+    }
+  done
+  [ "$(<"$case_dir/dsc-handoff")" = "$dsc" ] || {
+    printf 'FAIL: dpkg-source received the wrong DSC\n' >&2
+    exit 1
+  }
+  [ ! -e "$case_dir/apt-cache-used" ] || {
+    printf 'FAIL: obsolete apt-cache source lookup was reached\n' >&2
+    exit 1
+  }
+  [ ! -e "$case_dir/build-invoked" ] || {
+    printf 'FAIL: package build invoked during smoke\n' >&2
+    exit 1
+  }
+  [ ! -e "$case_dir/dist" ] || {
+    printf 'FAIL: smoke created dist\n' >&2
+    exit 1
+  }
+  if compgen -G "$case_dir/.dist-bundle-*" >/dev/null; then
+    printf 'FAIL: smoke created a dist bundle\n' >&2
+    exit 1
+  fi
+
+  printf 'OK: local DSC parsing and pre-build smoke\n'
+}
+
+run_smoke_case
 
 # =======================================================================
 # Verify CC targets: nonempty and unique
