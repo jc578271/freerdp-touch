@@ -1,299 +1,392 @@
 ---
 phase: 04-diagnostics-packaging-launch-configuration
-verified: 2026-08-09T15:30:00Z
+verified: 2026-08-10T00:06:54Z
 status: gaps_found
-score: 0/4
-behavior_unverified: 1
+score: 0/4 roadmap must-haves verified
+behavior_unverified: 2
 overrides_applied: 0
 re_verification:
   previous_status: gaps_found
-  previous_score: 24/30
+  previous_score: 0/4
   gaps_closed:
-    - "XI_TouchOwnership now uses XITouchOwnershipEvent and is not forwarded to xf_input_touch_remote."
-    - "The content-bounds helper admits Update and End events for cleanup."
-    - "The live parser rejects malformed, noncanonical, out-of-range, and overflowing calibration options."
-    - "The wrapper rejects overlong and leading-zero calibration values before shell arithmetic."
-    - "README checksum verification now uses a subshell and rollback rejects failed or incomplete dpkg-query output."
+    - "The real XI2 dispatcher now preserves quarantine through stale Update, partial End, repeated cancellation, final End, and fresh Begin."
+    - "Local-only cancellation diagnostics now use adjusted diagContacts, emit one native_count=0 summary, and retire the store."
+    - "Third-finger supplemental IDs and pending-three-finger cleanup are covered by the production dispatcher regression."
+    - "The refreshed quilt patch applies in a new Debian extraction and passes the focused dispatcher CTest and ownership checker."
   gaps_remaining:
-    - "Cancellation quarantine and three-finger recovery invariants are still false in the production dispatcher."
-    - "Canonical local-only cancellation diagnostics do not emit or retire the diagnostic contacts they track."
-    - "Release assembly can publish an unvalidated package selected from shared /tmp."
-    - "The documented bare menu command is neither installed by the Debian package nor relocatable."
+    - "Release publication does not bind the Stage 8 validation result to the Stage 9 payload copied into dist."
+    - "The packaged install does not provide, document deployment of, or relocate the documented menu launcher."
+    - "Tracked diagnostic artifacts and the menu retain connection/session material; password argv transport remains unresolved."
   regressions:
-    - "The claimed production call to xf_force_cancel_emit_sequence is absent; only the helper test calls it."
-    - "The signal fixture passes despite its sha256sum -c shim emitting an error and not modelling checksum verification."
-    - "The wrapper idempotency assertions normalize the statuses they purport to compare."
+    - "The current dist bundle predates the Plan 04-07 patch repair, so it cannot be evidence that the repaired dispatcher ships."
+    - "The signal fixture still does not isolate its classifier output under fixture TMPDIR and its sha256sum shim does not faithfully implement -c."
+    - "The committed wrapper idempotency fixture masks statuses, although an independent verifier check confirmed the wrapper itself is deterministic."
 gaps:
-  - truth: "A reproducible release publishes only the four package files validated from the fresh pinned patch build."
+  - truth: "A reproducible release publishes only the exact four package files validated from the fresh pinned patch build."
     status: failed
-    reason: "build-release.sh uses mktemp -u under shared /tmp and re-globs package paths after validation, allowing an unvalidated same-version package to be copied and checksummed."
+    reason: "The release script reserves an unowned path with mktemp -u, validates package paths in Stage 8, then discards them and re-globs the same filenames in Stage 9. An independent scratch probe mutated the exact freerdp3-x11 pathname after validation; the script completed and published the mutated bytes with a new checksum."
     artifacts:
       - path: "scripts/build-release.sh"
-        issue: "Lines 82-84 create an unowned extraction path; lines 213-215 discard the Stage 8 path and select a fresh glob result."
+        issue: "Stage 3 uses mktemp -u at lines 82-84; Stage 9 reselects files with ls/head at lines 213-215 instead of copying retained Stage 8 inputs."
+      - path: "dist"
+        issue: "The current valid-looking four-package bundle was built before Plan 04-07 and is not a bundle of the current repaired patch."
+      - path: "tests/build_release_signal_check.sh"
+        issue: "The signal fixture does not set or enforce fixture-local TMPDIR for the classifier and its sha256sum shim accepts -c incorrectly."
     missing:
-      - "Create an owned mktemp -d build root and extract below it."
-      - "Retain the exact Stage 8 validated package paths in an array and copy only those paths."
-      - "Add an adversarial regression proving a same-version file cannot replace a validated package."
-  - truth: "Cancellation and touch-count interruptions leave the local recognizer clean and block new input until every cancelled finger lifts."
+      - "Create an owned private build root with mktemp -d and extract beneath it."
+      - "Retain validated package paths in an array, copy only those paths, then validate the copied bundle metadata and checksums before publication."
+      - "Add an adversarial regression that replaces a validated pathname between validation and bundle assembly and requires publication to fail."
+      - "Rebuild dist only after the corrected publication path is in place."
+  - truth: "A user following documented package installation can invoke the documented local-only launch preset."
     status: failed
-    reason: "Production code directly resets quarantine state, unconditionally disarms recovery on any quarantined event, omits a third arriving finger in a common supplemental array layout, and leaves threeFingerPending state stale after a pre-claim lift."
-    artifacts:
-      - path: "build/freerdp3-3.15.0+dfsg/client/X11/xf_input.c"
-        issue: "Runtime writes at 949-951, 1421, 1457, 1488, 1528, 1830, and 2092 violate the claimed sole-owner invariant."
-    missing:
-      - "Route every runtime quarantine mutation through xf_quarantine_update without blind count resets."
-      - "Remove the unconditional recoveryGateArmed = FALSE assignment."
-      - "Pass all compacted supplemental IDs and clear every three-finger-pending field on a pre-claim lift."
-      - "Add a dispatcher-level regression covering Update, first End, repeated cancel, final End, and a fresh Begin."
-  - truth: "Diagnostic mode records accurate local-only Begin/Update/End/Cancel lifecycle evidence and cleans diagnostic state after cancellation."
-    status: failed
-    reason: "Ingress populates diagContacts, but cancellation logs xfc->contacts and cctx->contacts, neither of which is populated by the canonical fallback dispatcher. diagContacts is never cleared when recovery intercepts End. The declared ordering helper is not called by production."
-    artifacts:
-      - path: "build/freerdp3-3.15.0+dfsg/client/X11/xf_input.c"
-        issue: "The lifecycle manually emits cancellation records from the wrong stores at 1710-1724 and never calls xf_force_cancel_emit_sequence."
-      - path: "build/freerdp3-3.15.0+dfsg/client/X11/xf_touch_internal.h"
-        issue: "xf_force_cancel_emit_sequence is defined and tested but orphaned from production."
-    missing:
-      - "Snapshot, emit, and retire diagContacts in the actual lifecycle owner."
-      - "Wire xf_force_cancel_emit_sequence exactly once or remove it and test the actual equivalent implementation."
-      - "Exercise the real event dispatcher rather than only pure helper models."
-  - truth: "A user following the documented package installation can invoke the documented local-only launch preset."
-    status: failed
-    reason: "README instructs the user to run bare menu, but the four Debian packages contain neither menu nor launch-touch.sh; scripts/menu hard-codes the current checkout path."
+    reason: "The four Debian packages install only xfreerdp3 and libraries; none installs menu, launch-touch.sh, or check-x11-session.sh. README documents bare menu without a provisioning step, while scripts/menu hard-codes the owner checkout path for launch-touch.sh."
     artifacts:
       - path: "README.md"
-        issue: "Launch instructions contain bare menu and no launcher installation or repository-relative invocation."
+        issue: "Documents menu but does not document installation/deployment of the launcher or a relocatable repository-relative invocation."
       - path: "scripts/menu"
-        issue: "The generated xinitrc execs /home/hoang/freerdp-touch/scripts/launch-touch.sh."
+        issue: "Generated xinitrc invokes a fixed owner-specific checkout path."
+      - path: "dist/freerdp3-x11_*.deb"
+        issue: "Package-content inspection found /usr/bin/xfreerdp3 only; no launch scripts are shipped by any package in the closure."
     missing:
-      - "Package/install an explicit launcher, or document ./scripts/menu and resolve the wrapper relative to the menu script."
-      - "Fail before launch if xrandr or xinput setup fails, then add a regression for that path."
-  - truth: "Release artifacts and diagnostics do not disclose sensitive connection or session metadata."
+      - "Either package the launcher/gate/menu artifacts or document an explicit supported deployment step."
+      - "Resolve the wrapper relative to an installed launcher location or supported checkout, not a fixed owner path."
+      - "Add a package-only or clean-checkout launch regression."
+  - truth: "Release and launch artifacts do not retain private connection/session material."
     status: failed
-    reason: "Both tracked rdp-debug log files contain private-address and account/domain-labelled metadata; .gitignore does not ignore the tracked filename pattern."
+    reason: "Both tracked rdp-debug log artifacts contain valid IP literals including a private address, and .gitignore does not protect the rdp-debug*.log pattern. scripts/menu also contains hard-coded endpoint and account arguments."
     artifacts:
       - path: "rdp-debug-gestures.log"
-        issue: "Tracked generated diagnostic output contains sensitive metadata."
+        issue: "Tracked generated diagnostic artifact contains connection metadata."
       - path: "rdp-debug-native.log"
-        issue: "Tracked generated diagnostic output contains sensitive metadata."
+        issue: "Tracked generated diagnostic artifact contains connection metadata."
       - path: ".gitignore"
-        issue: "Only rdp-debug.log is ignored; the tracked variants remain unprotected."
+        issue: "Does not ignore rdp-debug*.log."
+      - path: "scripts/menu"
+        issue: "Stores fixed connection endpoint/account arguments in a committed launcher."
     missing:
-      - "Remove generated logs from the repository, follow the repository publication policy for reachable history, and retain only redacted fixtures if evidence is needed."
-      - "Ignore the broad rdp-debug*.log pattern."
-  - truth: "The menu-to-client credential handoff does not expose the supplied secret through process arguments."
-    status: failed
-    reason: "menu constructs /p:<value>, serializes it into xinitrc, and the wrapper forwards it unchanged to xfreerdp3. D-23 requires this opaque handoff but does not explicitly accept argv disclosure."
+      - "Remove or redact generated diagnostic artifacts according to the repository publication policy and ignore the broad diagnostic-log pattern."
+      - "Remove owner-specific connection arguments from the committed launcher and use a supported user-supplied configuration boundary."
+  - truth: "The menu-to-client password handoff has an explicitly accepted protection model."
+    status: partial
+    reason: "The menu reads the password, serializes a /p: argument into a private temporary xinitrc, and the wrapper forwards it to xfreerdp3. Private file modes reduce file exposure but do not establish protection from process-argument observation. This is not covered by the user's D-25 certificate exception."
     artifacts:
       - path: "scripts/menu"
-        issue: "Lines 43-56 construct and serialize the /p: argument."
+        issue: "Constructs and serializes the password argv token into the generated xinitrc."
       - path: "scripts/launch-touch.sh"
-        issue: "Lines 106 and 110 forward every opaque argument to the client."
+        issue: "Forwards opaque connection arguments to the client as intended."
     missing:
-      - "Replace /p: argv transport with a supported protected credential mechanism, or obtain an explicit owner exception separate from D-25."
-      - "Add a regression that verifies the client process argument vector never contains the supplied secret."
+      - "Choose a supported protected credential mechanism, or record a separate explicit owner acceptance for this argv transport risk."
 deferred:
   - truth: "GAP-07 certificate hardening"
-    addressed_in: "Future owner-requested requirement or phase; no later roadmap phase is currently scheduled."
-    evidence: "GAP-07 remains USER-DEFERRED, /cert:ignore is expected for v1, and server certificate identity must not be claimed as verified."
+    addressed_in: "Future owner-requested requirement or phase"
+    evidence: "GAP-07 is USER-DEFERRED under D-25. /cert:ignore remains expected with accepted HIGH server-impersonation/MITM risk; certificate identity is not verified."
 behavior_unverified_items:
   - truth: "The user can install the patched four-package closure and restore the stock closure using the documented commands."
-    test: "After the build-publication and launcher gaps are fixed, perform the exact four-package patched install twice and the exact four-package stock rollback twice on the native-X11 device."
-    expected: "Each transaction succeeds, all four identities match its intended version, and the stock mouse-only launch works after rollback."
-    why_human: "The repository regression mocks apt and the durable record is a prior assertion; this verification did not mutate the installed system to repeat package transactions."
+    test: "After release publication and launcher gaps are repaired, run the exact patched four-package install twice and the exact stock rollback twice on the native-X11 device."
+    expected: "Each transaction succeeds; all four identities match the intended version after each transaction; a stock mouse-only launch works after rollback."
+    why_human: "Repository regressions mock apt and this verification intentionally did not mutate the installed package state."
+  - truth: "Exact-1 diagnostics record the complete runtime XInput2/RDPEI lifecycle while normal hardware launches remain quiet."
+    test: "On native X11, run a diagnostic menu session, exercise touch lifecycle and an interruption, then run a normal session with diagnostics unset."
+    expected: "The private diagnostic log has ingress, gesture, synthesis, cancellation, and applicable RDPEI frame records; normal mode creates no diagnostic log or touch-diag output."
+    why_human: "Focused CTests exercise the actual dispatcher with synthetic cookies, but no test in this verification drives a physical XI2 device and live RDPEI session through the exact environment gate."
 ---
 
 # Phase 04: Diagnostics, Packaging & Launch Configuration Verification Report
 
-**Phase Goal:** The verified patch ships as an installable Debian package with env-var-gated diagnostics and a documented launch preset that a user can install, roll back, and operate.  
-**Verified:** 2026-08-09T15:30:00Z  
+**Phase Goal:** The verified patch ships as an installable Debian package with env-var-gated diagnostics and a documented launch preset that a user can install, roll back, and operate.
+
+**Verified:** 2026-08-10T00:06:54Z  
 **Status:** gaps_found  
-**Re-verification:** Yes — after claimed gap closure
+**Re-verification:** Yes — prior gaps were rechecked against source, fresh quilt extraction, focused tests, package contents, and independent scratch probes.
 
 ## Verdict
 
-The phase goal is **not achieved**. The repository contains a real four-package bundle, a quilt patch that applies cleanly to fresh source, a functional parser fixture, and a substantially implemented wrapper. Those facts do not make the release shippable:
+The phase goal is **not achieved**.
 
-1. the release pipeline can publish a package that was not the package it validated;
-2. the shipped X11 event dispatcher still breaks cancellation/recovery and three-finger lifecycle invariants;
-3. local-only cancellation diagnostics are wired to the wrong contact stores and leak diagnostic state;
-4. a newly installed user cannot reproduce the README's bare `menu` launch path; and
-5. tracked diagnostic artifacts and the `/p:` handoff create unaccepted confidentiality exposure.
+Plan 04-07 repaired the previously broken dispatcher and canonical diagnostic lifecycle in the current source and quilt patch. That repair is substantive: it passed both the focused production-dispatcher CTest and a second, independently performed fresh Debian-source/quilt/CMake/CTest/checker run.
 
-The locked D-25 certificate exception is preserved below and is **not** counted as a failed requirement.
+However, the phase still cannot ship:
+
+1. `scripts/build-release.sh` can publish bytes that were not the Stage 8 validated package bytes. A verifier scratch probe demonstrated that exact failure path.
+2. The current `dist` bundle predates the Plan 04-07 repair; it cannot demonstrate that the repaired dispatcher is in the shipped package.
+3. The four-package closure does not install the documented `menu` launcher or its wrapper/gate dependencies, and the launcher uses a fixed owner checkout path not documented for users.
+4. Tracked diagnostic logs and the committed menu retain connection/session material. The password `/p:` argv design also requires a separate owner decision; D-25 accepts only the certificate exception.
+
+The valid checksums, correct package names, passing parser fixture, and passing synthetic dispatcher tests are real evidence, but they do not reverse these delivery failures.
 
 ## Goal Achievement
 
 ### Roadmap Success Criteria
 
-| # | Observable truth | Status | Evidence |
+| # | Roadmap contract | Status | Evidence |
 |---|---|---|---|
-| 1 | The developer can reproducibly build an installable pinned Debian package using the documented quilt patch. | ✗ FAILED | A fresh extraction accepted the patch and the current bundle has four valid packages, but `scripts/build-release.sh` builds in shared `/tmp` using `mktemp -u` and reselects package globs after Stage 8 validation. The published payload is not reliably the validated fresh-build payload. |
-| 2 | The user can install the patch and restore stock Debian packages with documented, verified commands. | ⚠ PRESENT_BEHAVIOR_UNVERIFIED | README uses an explicit four-package closure; its focused regression passes, current `dpkg-query` confirms all four stock packages, and the structured prior record exists. The regression mocks apt, and no fresh state-changing install/rollback was performed in this verification. |
-| 3 | The user can launch a documented local-only preset with calibration and mouse-only fallback. | ✗ FAILED | `launch-touch.sh` composes the correct flags and its fixture passes, but README documents bare `menu`; the Debian packages do not install a launcher and `scripts/menu` hard-codes the current checkout location. |
-| 4 | Exact-1 diagnostics record touch lifecycle, gesture decisions, and RDPEI frames while normal launches are quiet. | ✗ FAILED | Exact-1 cached X11/RDPEI gates and record sites exist, but local fallback cancellation emits from inactive `xfc->contacts`/`cctx->contacts`, never clears `diagContacts`, and never calls the declared production ordering helper. |
+| 1 | Reproducibly build an installable pinned Debian `.deb` using the documented quilt patch. | FAILED | Fresh quilt application and focused build/test work, but the publisher reserves an unowned `/tmp` path and reselects package paths after validation. The independent mutation probe published altered post-validation bytes successfully. |
+| 2 | Install patched packages and restore stock Debian packages using documented, verified commands. | PRESENT_BEHAVIOR_UNVERIFIED | README has explicit four-package commands and its mock regression passes. No fresh state-changing install/rollback was performed, and safe package provenance is currently failed. |
+| 3 | Launch a documented local-only preset with calibration and a mouse-only escape hatch. | FAILED | Wrapper behavior is implemented and independently exercised, but the package installs no launcher and README's bare `menu` path is neither provisioned nor relocatable. |
+| 4 | Enable opt-in lifecycle/gesture/RDPEI diagnostics while normal launches remain quiet. | PRESENT_BEHAVIOR_UNVERIFIED | Exact cached gates, diagnostic source paths, production dispatcher CTest, and fresh quilt proof pass. Physical XI2/RDPEI runtime behavior and normal quiet mode were not independently exercised. The current bundle also predates the repair. |
 
-**Score:** 0/4 roadmap truths verified (1 present, behavior-unverified).
+**Score:** 0/4 roadmap truths verified (2 present but behavior-unverified).
 
-### Plan Frontmatter Must-Have Accounting
+## Re-verification Results
 
-All 64 declared plan truths were audited in addition to the four roadmap criteria. The goal score above deliberately uses the roadmap contract; a count of small green implementation subclaims must not obscure a failed release outcome.
+### Closed Prior Gaps
 
-| Plan | Declared truths | Verified | Failed | Present, behavior-unverified | Backstop / human-needed |
+| Prior concern | Result | Independent evidence |
+|---|---|---|
+| Quarantine recovery through actual XI2 dispatcher | VERIFIED | `TestXfInputDispatcher` passed the Begin(A), Begin(B), cancel, stale Update, partial End, repeat cancel, final End, fresh Begin sequence. |
+| Local-only cancellation diagnostic source and retirement | VERIFIED | CTest captured adjusted-coordinate cancel records, one `native_count=0` summary, and diagnostic-store retirement through the production lifecycle owner. |
+| Third-finger supplemental ID compaction and pre-claim cleanup | VERIFIED | Dispatcher CTest and `check_third_finger_owner.py` passed. |
+| Shipping quilt synchronization | VERIFIED | A new `dpkg-source` extraction accepted the patch through the full quilt stack; source/CMake/test artifacts matched; focused target build, CTest, and checker passed. |
+
+### Remaining Release-Delivery Failures
+
+The source of truth for a release is the validated payload, not the filename or a later checksum. The current release path has this invalid data flow:
+
+```text
+Stage 8: select pathname -> validate metadata
+Stage 9: discard pathname -> re-glob pathname -> copy -> checksum copied bytes -> publish
+```
+
+The script uses `mktemp -u` for the extraction name and later re-globs `DEB_FILE` with `ls ... | head -1`. In an isolated verifier fixture, the exact expected package filename was mutated after Stage 8 validation and before Stage 9. The unmodified publication logic returned success, generated checksums for the changed file, and published it. This disproves the claimed validated-fresh-output guarantee.
+
+The current `dist` symlink is structurally valid: it is relative, resolves inside the repository, contains exactly four expected `amd64` `+onemix1` files, and `sha256sum -c` succeeds. Its bundle timestamp is earlier than the Plan 04-07 commits and patch modification, so it is not evidence for the repaired dispatcher shipping.
+
+## Plan Frontmatter Must-Have Accounting
+
+All 68 truth-level PLAN declarations were checked. `BACKSTOP / HUMAN` means the PLAN explicitly marked the assertion as non-inferable or it requires a live user/device observation; it is not counted as verified.
+
+| Plan | Declared | Verified | Failed | Present, behavior-unverified | Backstop / human |
 |---|---:|---:|---:|---:|---:|
-| 04-01 | 9 | 2 | 4 | 2 | 1 |
-| 04-02 | 11 | 10 | 0 | 0 | 1 |
-| 04-03 | 10 | 5 | 1 | 3 | 1 |
-| 04-04 | 12 | 5 | 7 | 0 | 0 |
-| 04-05 | 12 | 9 | 2 | 1 | 0 |
-| 04-06 | 10 | 4 | 3 | 3 | 0 |
-| **Total** | **64** | **35** | **17** | **9** | **3** |
+| 04-01 | 9 | 2 | 2 | 4 | 1 |
+| 04-02 | 11 | 9 | 0 | 1 | 1 |
+| 04-03 | 10 | 7 | 0 | 2 | 1 |
+| 04-04 | 12 | 11 | 0 | 1 | 0 |
+| 04-05 | 12 | 9 | 1 | 2 | 0 |
+| 04-06 | 10 | 2 | 3 | 5 | 0 |
+| 04-07 | 4 | 4 | 0 | 0 | 0 |
+| **Total** | **68** | **44** | **6** | **15** | **3** |
 
-Non-green plan truths resolve as follows:
+### 04-01 Must-Haves
 
-- **04-01:** diagnostics cancellation contract, clean-build provenance, publication safety, and local fallback cancellation records fail; disabled-path equivalence and two-build behavior remain unexercised; the diagnostic-content backstop needs human review.
-- **04-03:** the documented launch flow fails because `menu` is not provisioned; on-device install, quiet-mode, and menu-only assertions are prior-record behavior rather than fresh executable evidence; the installed-version backstop needs human review.
-- **04-04:** the sole-owner quarantine truth and all production cancellation/ordering/dispatcher regressions fail. The ownership cast, bounds helper, double accumulator, and live parser fixture are verified.
-- **04-05:** the signal fixture is incomplete because its `sha256sum -c` shim errors yet returns success, and the README regression intentionally accepts mismatched package names. The idempotency assertion masks return codes, so that behavioral claim is unverified.
-- **04-06:** release identity/provenance, aggregate regression coverage, and local-only diagnostic cancellation assertions fail; two-build, live-interruption, and live install/rollback assertions are present but not independently rerunnable behavioral proof.
-
-## Required Artifacts
-
-| Artifact | Expected | Status | Details |
+| # | Assertion, abridged only for table width | Status | Evidence |
 |---|---|---|---|
-| `patches/onemix-touch.patch` | Complete quilt patch for pinned source | ✓ VERIFIED | Applied with `quilt push -a` to a fresh `dpkg-source` extraction. Patched X11, header, parser, and RDPEI files match the current build tree. The build-tree changelog intentionally remains stock; the fresh patched changelog contains `+onemix1`. |
-| `dist` relative symlink | Exact four-package runtime bundle plus checksums | ⚠ HOLLOW | It is relative, points inside the repository, contains exactly four amd64 `+onemix1` packages, and every SHA256SUMS entry passes. Its provenance is unsafe because the producer can reselect an unvalidated `/tmp` package after validation. |
-| `scripts/build-release.sh` | Fresh extraction, patch application, validated atomic publication | ✗ FAILED | Substantive 286-line pipeline with lock/traps/atomic symlink swap, but unsafe workspace ownership and post-validation globbing break release integrity. |
-| `scripts/launch-touch.sh` | Local-only preset, calibration, mouse-only, exact-1 diagnostic log | ✓ VERIFIED | Source and copied-wrapper regression prove flags, range validation, direct normal exec, private diagnostic log setup, and client-status propagation. |
-| `scripts/menu` and `/usr/local/bin/menu` | Canonical menu delegation | ⚠ PARTIAL | Deployed file is byte-identical and mode 0755. It delegates via a fixed `/home/hoang/freerdp-touch/...` path and is not installed/documented as part of package setup. |
-| `xf_touch_internal.h` | Production-shared cancellation helpers | ⚠ ORPHANED IN PART | Helpers are substantive and the helper regression passes, but `xf_force_cancel_emit_sequence` has no production call site despite its comment and plan claim. |
-| `README.md` | Install, rollback, and launch operations guide | ⚠ PARTIAL | Explicit checksum/install/rollback/rebase documentation is substantive. The documented launch command lacks a provisioned, relocatable launcher. |
-| Phase regressions | Evidence for real release behavior | ⚠ PARTIAL | Parser, session-gate, ownership, and wrapper paths run. Helper/model tests and fixtures do not exercise the broken dispatcher paths; two tests mask or ignore relevant failures. |
+| 1 | Exact-1 core diagnostic records; other values quiet | PRESENT_BEHAVIOR_UNVERIFIED | Cached exact predicate and record sites are present; physical XI2/RDPEI session was not run. |
+| 2 | Disabled diagnostic gate changes no gesture behavior | PRESENT_BEHAVIOR_UNVERIFIED | Gate is conditional, but disabled-path equivalence is a runtime invariant with no focused transition test. |
+| 3 | Fresh patch builds a four-package `+onemix1` closure | FAILED | Fresh patch compiles/CTest passes, but safe package publication and a current package rebuild are absent. |
+| 4 | `dist` is relative and has exactly four packages plus checksums | VERIFIED | Independently checked current link, closure, metadata, and checksum file. |
+| 5 | Two clean builds have identical normalized closure | PRESENT_BEHAVIOR_UNVERIFIED | Historical manifests match but are not independent execution evidence; the producer is unsafe. |
+| 6 | Lock/trap/atomic publisher cannot corrupt prior valid output | FAILED | Atomic pointer swap exists, but `mktemp -u` and post-validation re-globbing invalidate the full guarantee. |
+| 7 | No APT hold/pin blocks security updates | VERIFIED | No project hold/pin implementation was found; README explicitly documents no hold/pin. |
+| 8 | Cached RDPEI gate and conditional cancellation/frame diagnostics | PRESENT_BEHAVIOR_UNVERIFIED | Source has cached exact gate and one frame record; live RDPEI frame submission was not exercised. |
+| 9 | Diagnostic record contents never contain command/credential material | BACKSTOP / HUMAN | Source format strings are compact touch fields, but tracked generated diagnostic artifacts retain connection metadata. |
 
-## Key Link Verification
+### 04-02 Must-Haves
 
-| From | To | Via | Status | Details |
-|---|---|---|---|---|
-| `scripts/build-release.sh` | `patches/onemix-touch.patch` | Fresh extraction copies patch, appends `series`, and runs quilt | ✓ WIRED | Independently applied to fresh source. |
-| Fresh patched source | four-package `dist` bundle | `dpkg-buildpackage` output -> Stage 8 validation -> Stage 9 copy | ✗ NOT SAFE | Stage 9 starts a new `ls ... | head -1` selection instead of retaining the Stage 8 `DEB_FILE`. |
-| `xf_touch_internal.h` | `xf_input.c` | Shared classifier/bounds/pinch/quarantine helpers | ⚠ PARTIAL | Several helpers are called, but the declared `xf_force_cancel_emit_sequence` link is absent; GSD's pattern-only key-link result was a false positive from a comment/definition. |
-| `xf_input_touch_remote` | local fallback recognizer | adjusted XI touch -> `xf_input_touch_fallback` | ✓ WIRED | The canonical `+touch-pinch-wheel-fallback` path selects `xf_input_handle_event_remote` and returns to the fallback recognizer; no `freerdp_client_handle_touch` call remains there. |
-| `diagContacts` ingress | cancellation diagnostics | lifecycle snapshot/cancel/retire | ✗ DISCONNECTED | Ingress updates `diagContacts`, while cancellation reads `xfc->contacts` and native `cctx->contacts`; recovery-intercepted End never retires diagnostic contacts. |
-| `scripts/menu` | `scripts/launch-touch.sh` | generated xinitrc `exec` | ⚠ PARTIAL | Works only at the fixed owner checkout path; package/docs do not establish that path for an installed user. |
-| wrapper | `/usr/bin/xfreerdp3` | Bash argument arrays and direct exec/tee | ✓ WIRED | Fixture invokes the copied wrapper with the actual command construction. |
+| # | Assertion, abridged | Status | Evidence |
+|---|---|---|---|
+| 1 | Wrapper composes local fallback flags and omits `+multitouch` | VERIFIED | Source plus independent wrapper invocation check. |
+| 2 | Defaults are 600 ms and 8 px without prompt | VERIFIED | Source and copied-wrapper fixture. |
+| 3 | Calibration accepts bounded canonical decimal input and rejects invalid values before client invocation | VERIFIED | Independent wrapper check covered normal, leading-zero rejection, range behavior, and no-client rejection. |
+| 4 | `--mouse-only` removes touch options and bypasses calibration validation | VERIFIED | Independently invoked with invalid calibration; client received only forwarded connection argument. |
+| 5 | Exact-1 wrapper diagnostics create private timestamped log and preserve client status | VERIFIED | Independent wrapper check verified 0700 directory, 0600 file, filename pattern, tee content, and exit 42 propagation. |
+| 6 | Non-1 wrapper diagnostics use direct client with no log | VERIFIED | Independent `0` and `false` checks preserved client statuses and created no state directory. |
+| 7 | Wrapper does not echo/eval/log forwarded opaque args | VERIFIED | Static scan and mocked forwarding path show arrays/direct exec/tee only; no echo, eval, or WLOG setting. |
+| 8 | Menu xinitrc handoff preserves prompt, rotation/startx flow, and private cleanup | PRESENT_BEHAVIOR_UNVERIFIED | Source and direct-xinitrc fixture pass; real TTY/startx/rotation interaction was not exercised. |
+| 9 | Menu accepts only `--mouse-only` and forwards it correctly | VERIFIED | Source parser and menu fixture cover the supported mode. |
+| 10 | Exact diagnostic environment propagates through xinitrc | VERIFIED | `menu_diagnostic_env_check.sh` passed normal, diagnostic, and mouse-only cases. |
+| 11 | No extra classifier tuning knobs exposed | BACKSTOP / HUMAN | No extra wrapper flags found; PLAN marks this non-inferable. |
 
-## Data-Flow Trace (Level 4)
+### 04-03 Must-Haves
 
-| Artifact | Data variable / input | Source | Produces real data | Status |
-|---|---|---|---|---|
-| Release assembly | `DEB_FILE` | `/tmp` package glob after build | No trustworthy retained validation identity | ✗ UNSAFE FLOW |
-| Diagnostics | `diagContacts` | real TouchBegin/Update/End ingress | Yes at ingress, but cancellation consumes different stores | ✗ HOLLOW AT CANCEL |
-| Wrapper | calibration environment and forwarded args | shell environment / menu xinitrc | Real arrays reach `xfreerdp3` | ✓ FLOWING |
-| Menu | wrapper path | fixed literal path | Only works for this checkout, not documented installation | ⚠ STATIC / NONRELOCATABLE |
+| # | Assertion, abridged | Status | Evidence |
+|---|---|---|---|
+| 1 | README documents explicit four-package install with `--allow-downgrades` | VERIFIED | Current marked install block and README regression. |
+| 2 | README documents four-package rollback and stock assertion | VERIFIED | Current marked rollback block and README regression branches. |
+| 3 | README documents fail-closed security-update rebase without hold/pin | VERIFIED | Source documentation checked. |
+| 4 | README documents normal/diagnostic/calibration/mouse-only modes | VERIFIED | Source documentation checked. |
+| 5 | README examples are sanitized | VERIFIED | No password argument or valid IP literal found in README examples. |
+| 6 | Device install, gestures, diagnostics, mouse-only, and rollback succeeded | PRESENT_BEHAVIOR_UNVERIFIED | Structured record exists but is prior narration; no device/package-state mutation was repeated. |
+| 7 | 04-03 verification record has deterministic ten-section grammar | VERIFIED | Independently checked ten headings, ten `Actual: PASS` fields, UTF-8/CR/escape surface, and forbidden-token surface. |
+| 8 | Normal launch is quiet and adds no diagnostic log | PRESENT_BEHAVIOR_UNVERIFIED | Prior record claims it; no independent normal device session ran. |
+| 9 | Documentation limits device checks to the three menu invocations | VERIFIED | README documents the locked normal, diagnostic, and mouse-only menu paths. |
+| 10 | Installed patched and stock versions were actually observed | BACKSTOP / HUMAN | Requires a fresh device transaction. |
+
+### 04-04 Must-Haves
+
+| # | Assertion, abridged | Status | Evidence |
+|---|---|---|---|
+| 1 | Ownership events use `XITouchOwnershipEvent` and never enter touch coordinate processing | VERIFIED | Source wiring plus ownership-layout regression passed. |
+| 2 | `xf_quarantine_update` is the production runtime owner | VERIFIED | Source checker and actual dispatcher CTest passed. |
+| 3 | Bounds gate rejects only Begin and lets Update/End clean up | VERIFIED | Shared-helper regression and direct source wiring passed. |
+| 4 | Fractional double pinch accumulation and safe diagnostic formats | VERIFIED | 46-assert helper regression, pinch reversal check, and source checker passed. |
+| 5 | Parser uses checked canonical `strtoul` validation | VERIFIED | Isolated four-package live parser fixture passed accepted, malformed, range, leading-zero, and overflow cases. |
+| 6 | Parser fixture loads all project libraries from its extracted four-package root | VERIFIED | `gap05_parser_check.sh` passed loader-origin checks and cases. |
+| 7 | Cached gate and duplicate Begin diagnostic-store idempotency | PRESENT_BEHAVIOR_UNVERIFIED | Shared helper and source structure support it, but the exact public-dispatcher duplicate-Begin transition lacks a focused test. |
+| 8 | Single-threaded cancellation ordering is deterministic | VERIFIED | Production lifecycle CTest covers local records; production-shared helper covers synthetic native ordering. |
+| 9 | Lifecycle calls ordered cancellation helper once and reports `native_count=0` locally | VERIFIED | Source checker plus CTest captured local-only summary. |
+| 10 | Thin force-cancel wrapper and third-finger owner path | VERIFIED | Checker and dispatcher CTest passed. |
+| 11 | Repeat cancel, End drain, fresh Begin lifecycle regression | VERIFIED | `TestXfInputDispatcher` passed. |
+| 12 | Listed production-path regressions compile/pass | VERIFIED | Focused helper, ownership, parser, source checker, pinch, and static RDPEI checks were independently run. |
+
+### 04-05 Must-Haves
+
+| # | Assertion, abridged | Status | Evidence |
+|---|---|---|---|
+| 1 | Shell validation rejects overlong/noncanonical values | VERIFIED | Independent wrapper behavior probe passed. |
+| 2 | EXIT-only cleanup and signal preservation protect publication | PRESENT_BEHAVIOR_UNVERIFIED | Source and scratch signal cases support the trap behavior, but fixture checksum fidelity is defective and no corrected real publisher run was made. |
+| 3 | Per-publisher classifier output uses `mktemp` and cleanup state | VERIFIED | Source creates/removes unique classifier output; fixture observed distinct dynamic targets. |
+| 4 | Signal fixture has complete fixture-local shims and faithful publication proof | FAILED | Fixture does not set/enforce fixture-local TMPDIR for classifier output; its `sha256sum` shim mishandles `-c` yet exits success. |
+| 5 | Tracked/deployed menu parity and startx status propagation | VERIFIED | `/usr/local/bin/menu` is mode 0755 and byte-identical; source has status handling and one expected `/cert:ignore`. |
+| 6 | Wrapper/menu production-path fixture covers listed mocked cases | VERIFIED | Fixture passed normal, diagnostics, mouse-only, calibration, opaque args, client failure, and startx status paths. |
+| 7 | Wrapper validation is deterministic across fresh processes | VERIFIED | Committed fixture masks statuses, but an independent verifier probe correctly preserved and compared repeated valid/invalid statuses and output. |
+| 8 | X11 gate rejects both Wayland indicators | VERIFIED | Focused gate regression passed. |
+| 9 | README checksum uses a subshell | VERIFIED | README regression passed cwd-preservation check. |
+| 10 | Rollback requires four query results before stock result | VERIFIED | Source and README regression cover query failure/incomplete results. |
+| 11 | Exact install/rollback blocks are idempotent and reject every mismatch | PRESENT_BEHAVIOR_UNVERIFIED | Mocked repeat runs pass, but the committed regression intentionally accepts a mismatched-name fixture and no real apt transaction was repeated. |
+| 12 | D-25 certificate exception remains deferred rather than passed | VERIFIED | README and phase materials state the deferral correctly. |
+
+### 04-06 Must-Haves
+
+| # | Assertion, abridged | Status | Evidence |
+|---|---|---|---|
+| 1 | Every release run safely publishes exact pinned validated closure | FAILED | Release provenance flaw is directly demonstrated; current bundle is older than Plan 04-07. |
+| 2 | Two independent releases have durable matching manifests | PRESENT_BEHAVIOR_UNVERIFIED | Files match structurally, but historical manifests are not independent execution proof and producer safety is false. |
+| 3 | Final parser fixture uses exact isolated four-package bundle | VERIFIED | Independently passed against current bundle. |
+| 4 | Scratch signal fixture faithfully proves dynamic output/checksum/publication behavior | FAILED | Missing fixture TMPDIR isolation and invalid `sha256sum -c` shim invalidate the complete assertion. |
+| 5 | Live PRE/POST process-group interruption cases are proven | PRESENT_BEHAVIOR_UNVERIFIED | Durable prior snapshots exist; the multi-minute stateful live publisher process was not rerun. |
+| 6 | Every non-certificate automated regression passes with complete evidence | FAILED | The release fixture defects remain and package provenance is false; aggregate green narration is not accepted. |
+| 7 | Native device diagnostics prove local-only last-coordinate cancellation and quiet behavior | PRESENT_BEHAVIOR_UNVERIFIED | Requires a physical X11 touch/RDP session; prior record is not fresh evidence. |
+| 8 | Final exact patched install and stock rollback run twice | PRESENT_BEHAVIOR_UNVERIFIED | README mock regression passes; no system package state was changed. |
+| 9 | Deployed menu parity and ten-section device record are valid | PRESENT_BEHAVIOR_UNVERIFIED | Parity and record grammar are verified, but operational PASS claims require device confirmation. |
+| 10 | GAP-07 is reported user-deferred, not certificate-passed | VERIFIED | Correctly stated in README, plans, and this report. |
+
+### 04-07 Must-Haves
+
+| # | Assertion, abridged | Status | Evidence |
+|---|---|---|---|
+| 1 | Old Update/non-final End stay quarantined; final End admits fresh touch | VERIFIED | Focused public-dispatcher CTest passed. |
+| 2 | Adjusted `diagContacts` cancellation records, one local summary, store retirement | VERIFIED | Captured production WLog assertions passed. |
+| 3 | Third-finger supplemental IDs and pre-claim field cleanup | VERIFIED | Dispatcher CTest and scoped ownership checker passed. |
+| 4 | Fresh quilt source applies and passes real dispatcher test/checker | VERIFIED | Independently repeated fresh extraction, quilt push, artifact comparison, CMake target build, CTest, and checker. |
+
+## Required Artifacts and Key Links
+
+| Artifact/link | Status | Evidence |
+|---|---|---|
+| `patches/onemix-touch.patch` -> fresh Debian source | VERIFIED | Full quilt-stack application, source/CMake/test comparison, target build, CTest, and checker passed in a newly created workspace. |
+| Fresh patched source -> current distributable package | FAILED | No post-04-07 full package publication exists; current `dist` predates the repair. |
+| `scripts/build-release.sh` Stage 8 -> Stage 9 -> `dist` | FAILED | Validation identity is discarded and re-globbed; independent mutation probe demonstrated publication of altered bytes. |
+| Current `dist` -> four-package metadata/checksums | VERIFIED AS STRUCTURE ONLY | Relative symlink, four expected names, `amd64`, expected version, and all checksums passed. This is not provenance evidence. |
+| `xf_input_handle_event` -> XI2 dispatcher -> quarantine/diagnostic lifecycle | VERIFIED IN SOURCE/PATCH | Public-dispatcher CTest and source checker exercise actual production wiring. |
+| `scripts/launch-touch.sh` -> installed `xfreerdp3` | VERIFIED | Direct copied-wrapper behavior probe preserved args/statuses and validated diagnostic filesystem behavior. |
+| `menu` -> wrapper -> installed client | FAILED AS INSTALLABLE USER FLOW | xinitrc link is fixed to an owner checkout and none of the Debian packages installs the required scripts. |
+| README -> package install/rollback | PARTIAL | Explicit four-package command blocks are substantive and mocked; live package transaction remains unverified. |
+
+### Data-Flow Trace
+
+| Dynamic artifact | Input/source | Trace result |
+|---|---|---|
+| Release bundle | Build output in parent of unowned `/tmp` work path | UNSAFE: Stage 9 performs a second selection after Stage 8 validation. |
+| Current package contents | Old `dist` bundle | STALE: bundle timestamps precede the Plan 04-07 source/patch commits. |
+| Local diagnostics | Exact cached environment gate -> adjusted coordinates -> `diagContacts` -> lifecycle callback -> WLog | FLOWING IN SOURCE: production dispatcher CTest and fresh-patch CTest passed; live hardware/RDPEI flow remains unexercised. |
+| Wrapper diagnostics | Exact wrapper environment gate -> private state directory/log -> tee -> `PIPESTATUS[0]` | FLOWING: independent mock-client test verified modes, permissions, content, and status propagation. |
+| Menu launch | README bare command -> externally copied `/usr/local/bin/menu` -> fixed checkout wrapper | HOLLOW FOR PACKAGE-ONLY USER: launcher assets are absent from package and deployment is undocumented. |
 
 ## Behavioral Spot-Checks
 
-| Behavior | Command | Result | Status |
-|---|---|---|---|
-| Fresh patch applies and source wiring is present | fresh `dpkg-source` + `quilt push -a` + `cmp` | Patch applied; five production files match current patched tree | ✓ PASS |
-| Current bundle integrity | resolved `dist` `sha256sum -c`, `dpkg-deb -f` | Four expected amd64 `+onemix1` packages all pass | ✓ PASS |
-| Live parser behavior | `bash tests/gap05_parser_check.sh "$(readlink -f dist)"` | All canonical/reject/overflow cases passed using extracted project libraries | ✓ PASS |
-| Native-X11 negative gate | `bash tests/check_x11_session_check.sh` | Native scope and Wayland-negative cases passed | ✓ PASS |
-| Menu diagnostic propagation | `bash tests/menu_diagnostic_env_check.sh` | Passed | ✓ PASS |
-| Wrapper/menu fixture | `bash tests/wrapper_production_check.sh` | Passed, but idempotency statuses are forced to zero at lines 268-300 | ⚠ PARTIAL EVIDENCE |
-| README command blocks | `bash tests/readme_doc_regression.sh` | Passed, but intentionally accepts a mismatched package-name fixture | ⚠ PARTIAL EVIDENCE |
-| Signal publication fixture | `bash tests/build_release_signal_check.sh` | Passed, but fixture output includes `basename: invalid option -- 'c'`; its checksum-check shim does not model `sha256sum -c` | ⚠ PARTIAL EVIDENCE |
-| Shared helper model | compiled `tests/xf_touch_internal_check.c` | 46 helper assertions passed | ⚠ HELPER-ONLY |
-| Ownership layout | compiled `tests/gap01_ownership_layout.c` | Passed | ✓ PASS |
-| Pinch reversal model | compiled `tests/pinch_reversal_check.c` | Passed, but is an integer mirrored model rather than current double production accumulator | ⚠ MODEL-ONLY |
-| Ownership source checker | `python3 tests/check_third_finger_owner.py` | Passed, but its own Check 4 explicitly defers full runtime-writer proof | ⚠ PARTIAL EVIDENCE |
-
-No full release build was rerun: it would be a multi-minute, stateful operation and would not establish safe publication while the source-level selection flaw is observable. The fresh quilt application and current-bundle/parser checks supplied the necessary independent evidence without treating SUMMARY claims as proof.
+| Behavior | Independent command/check | Result |
+|---|---|---|
+| Production XI2 dispatcher regression | Focused `ctest -R '^TestXfInputDispatcher$'` | PASS (1/1). |
+| X11 ownership/lifecycle source invariant | `python3 tests/check_third_finger_owner.py .../xf_input.c` | PASS. |
+| Fresh quilt synchronization | New `dpkg-source`, full `quilt push -a`, artifact compare, CMake target build, CTest, checker | PASS. |
+| Shared X11 helpers, ownership layout, classifier, pinch reversal | Focused compile/run probes | PASS. |
+| Isolated package loader/parser behavior | `bash tests/gap05_parser_check.sh "$(readlink -f dist)"` | PASS; project SONAMEs resolved under extraction root. |
+| Wrapper normal/non-1/diagnostic/mouse-only behavior | Independent copied-wrapper mock probe | PASS; normal statuses 37/38, diagnostic status 42, correct permissions and no non-1 log. |
+| Wrapper fresh-process idempotency | Independent copied-wrapper probe without status masking | PASS; repeated valid status 23/output match and repeated invalid status 1/error match. |
+| Menu diagnostic propagation | `bash tests/menu_diagnostic_env_check.sh` | PASS. |
+| README command blocks | `bash tests/readme_doc_regression.sh` | PASS with test-quality warning below. |
+| Signal fixture | `bash tests/build_release_signal_check.sh` | PASS with test-quality failure below; it is not complete evidence for release integrity. |
+| Current bundle metadata/checksums | `dpkg-deb -f` and `sha256sum -c` on resolved `dist` | PASS structurally. |
+| Stage 8-to-Stage 9 binding | Independent isolated mutation probe | FAIL: altered post-validation bytes were published successfully. |
+| Package launcher delivery | `dpkg-deb -c` across all four packages | FAIL: no menu, wrapper, or X11 gate script is installed. |
 
 ## Requirements Coverage
 
 | Requirement | Source plans | Status | Evidence |
 |---|---|---|---|
-| `DIAG-01` | 04-01, 04-04, 04-06 | ✗ BLOCKED | Exact-1 caching and many records exist, but canonical fallback cancellation emits no correct per-contact cancels, retains diagnostic contacts, and does not use the claimed ordering helper. |
-| `PACK-01` | 04-01, 04-05, 04-06 | ✗ BLOCKED | Patch application, current bundle structure, and manifests exist, but shared `/tmp` plus post-validation re-globbing permits publication of an unvalidated package. |
-| `PACK-02` | 04-03, 04-05, 04-06 | ? NEEDS HUMAN | Explicit four-package documentation is sound for real `dpkg-query`, the current system is stock on all four packages, and a sanitized prior record exists. Actual patched-install/stock-rollback state transitions were not repeated here. |
-| `CONF-01` | 04-02, 04-03, 04-04, 04-05, 04-06 | ✗ BLOCKED | Wrapper mechanics are implemented, but the documented preset is not provisioned/relocatable and the packaged local gesture lifecycle remains broken under interruption. |
+| `DIAG-01` | 04-01, 04-04, 04-06, 04-07 | NEEDS HUMAN | Core source, production dispatcher test, and fresh quilt proof are now substantive. A current package rebuild and native-X11/RDPEI behavior check are still required. |
+| `PACK-01` | 04-01, 04-05, 04-06 | BLOCKED | Unsafe release provenance is demonstrated; current bundle is stale relative to the repaired patch. |
+| `PACK-02` | 04-03, 04-05, 04-06 | BLOCKED | Documentation is substantially improved, but safe package provenance is blocked and live patched-install/stock-rollback transactions are not independently verified. |
+| `CONF-01` | 04-02, 04-03, 04-04, 04-05, 04-06, 04-07 | BLOCKED | Wrapper/preset mechanics are present, but a package-only user cannot obtain the documented launcher and its fixed location is not portable. |
 
-All Phase 04 IDs are claimed by at least one PLAN frontmatter. There are no orphaned Phase 04 requirement IDs. The `[x]` markers in `REQUIREMENTS.md` and plan/SUMMARY completion claims were not used as verification evidence.
+All four Phase 04 requirement IDs are claimed by PLAN frontmatter. No requirement is orphaned.
 
-## Advisory Review Adjudication
+## Prohibitions and Security Scope
 
-| Finding | Adjudication | Impact |
+| Prohibition / decision | Status | Evidence |
 |---|---|---|
-| CR-01 `/p:` process-argument exposure | Confirmed handoff: `menu` constructs `/p:<value>` and wrapper forwards it. Long-lived `/proc` visibility was not independently timed, but protected argv transport is absent. | BLOCKER unless the owner explicitly accepts it separately from D-25. |
-| CR-02 tracked diagnostic logs | Materially confirmed: both files are tracked and contain private-address plus account/domain-labelled metadata; broad ignore coverage is absent. The review's specific auto-reconnect-verifier detail was not independently corroborated. | BLOCKER privacy/artifact hygiene defect. |
-| CR-03 shared `/tmp` package substitution | Confirmed. | BLOCKER for `PACK-01`. |
-| CR-04 recovery gate prematurely disarmed | Confirmed at `xf_input.c:2092`, plus blind resets elsewhere. | BLOCKER for local lifecycle correctness. |
-| CR-05 third arriving finger omitted | Confirmed: `{ A, B, 0, C }` with `suppCount == 3` passes only the first three array elements. | BLOCKER for local lifecycle correctness. |
-| CR-06 stale three-finger pending state | Confirmed: pre-claim End returns after quarantine without clearing pending IDs/state. | BLOCKER for local lifecycle correctness. |
-| WR-01 wrong diagnostic store / leak | Confirmed and elevated in effect because it directly blocks `DIAG-01`. | BLOCKER requirement impact. |
-| WR-02 rotation/calibration failures still launch | Confirmed: generated xinitrc lacks `set -e` or setup-command status checks. | WARNING; add fail-closed handling before final UAT. |
-| WR-03 wrapper idempotency test masks statuses | Confirmed at lines 268-300. | WARNING; behavior is not proven by this test. |
-| WR-04 launcher not installed or relocatable | Confirmed by package-content inspection, README, and fixed path source. | BLOCKER for documented operation / `CONF-01`. |
-| IN-01 `new.md` contradicts shipped local-only design | Confirmed. | INFO; archive/delete/label it, but it is not itself a phase-goal blocker. |
+| Do not reintroduce `+multitouch` or native forwarding in the launch preset | VERIFIED | Wrapper/menu use local fallback; no `+multitouch` activation found. |
+| Enable wrapper/core diagnostics only for exact `FREERDP_TOUCH_DIAG=1` | VERIFIED IN SOURCE/WRAPPER | X11 and RDPEI cache exact `"1"`; direct wrapper behavior tested `0`, `false`, and `1`. Physical core behavior remains in human verification. |
+| Do not hold/pin the local package over Debian updates | VERIFIED | No hold/pin behavior found; README documents no hold/pin. |
+| Do not use broad package install globs | VERIFIED | README resolves four named closure identities and fails closed on zero/multiple shell matches. |
+| Do not retain/log credentials or opaque connection arguments in launch artifacts | FAILED | Tracked diagnostic logs retain connection metadata; committed menu stores hard-coded connection args. Password argv transport also lacks a separate acceptance decision. |
+| Do not expose classifier constants as user controls | BACKSTOP / HUMAN | No added controls found, but this PLAN item is explicitly non-inferable. |
+| D-25 certificate exception | USER-DEFERRED | GAP-07 certificate hardening is explicitly USER-DEFERRED under D-25. `/cert:ignore` remains with accepted HIGH MITM/server-impersonation risk. Certificate identity protection is not claimed. |
 
-## Prohibitions and Accepted Exception
+## Anti-Patterns and Test-Evidence Limits
 
-| Check | Status | Evidence |
-|---|---|---|
-| Do not reintroduce `+multitouch` or native RDPEI forwarding in the release preset | ✓ VERIFIED | Wrapper contains only `+touch-pinch-wheel-fallback`; canonical remote dispatcher returns to the local fallback recognizer. |
-| Enable diagnostics only for exact `FREERDP_TOUCH_DIAG=1` | ✓ VERIFIED | X11, RDPEI, wrapper, and menu propagation all use an exact `"1"` predicate; focused environment regression passes. |
-| Do not hold/pin over future Debian security updates | ✓ VERIFIED | No project hold/pin implementation; `apt-mark showhold` and relevant system preferences show no FreeRDP hold/pin. |
-| Do not disclose credentials or connection material through release artifacts/diagnostics | ✗ FAILED | Tracked logs disclose sensitive metadata; `/p:` is forwarded as an argv token. |
-| Do not document a broad package glob | ✓ VERIFIED | README uses four named package patterns and rejects zero/multiple matches for install. |
-| Do not expose additional classifier tuning knobs | ? BACKSTOP / HUMAN | No extra wrapper knobs were found, but the PLAN explicitly classifies this non-inferable prohibition as a backstop. |
+| File | Finding | Severity | Impact |
+|---|---|---|---|
+| `scripts/build-release.sh` | `mktemp -u` plus post-validation `ls ... | head -1` selection | BLOCKER | Validated-build provenance is false. |
+| `tests/build_release_signal_check.sh` | Does not constrain classifier output to fixture `TMPDIR`; mocked `sha256sum` mishandles `-c` and still returns success | BLOCKER for its declared fixture truth | It cannot certify the complete release path claimed by Plans 04-05/04-06. |
+| `tests/wrapper_production_check.sh` | Idempotency portions use `|| rc=0` / `|| true`, masking actual statuses | WARNING | The committed test does not prove its stated status comparison, though independent verifier coverage passed. |
+| `tests/readme_doc_regression.sh` | Mismatched package-name fixture is intentionally accepted | WARNING | The regression does not prove every stated mismatch rejection. |
+| `scripts/menu` | Hard-coded connection args and fixed checkout path | BLOCKER | Privacy issue and nonportable deployment path. |
+| `rdp-debug-gestures.log`, `rdp-debug-native.log` | Tracked diagnostic output includes private connection metadata | BLOCKER | Violates artifact hygiene and can disclose session information. |
+| `xf_input.c` | Existing upstream `XXX` comment outside patch additions | INFO | No Phase 04 patch addition introduced a `TBD`, `FIXME`, or `XXX` marker; this inherited context is not counted as new phase debt. |
 
-**Locked D-25 exception:** “GAP-07 remains USER-DEFERRED, /cert:ignore is expected for v1, and server certificate identity must not be claimed as verified.” This accepted certificate-identity exception is not listed as a newly failed requirement and does not excuse any other gap above.
+## Escalation Gate: Password Argument Transport
 
-## Anti-Patterns Found
+A separate developer decision is required. The code intentionally reads the password interactively and handles it in a private temporary xinitrc, but it serializes `/p:<value>` and passes it through the wrapper to the client. Private file permissions are not proof that process arguments are protected. This exposure is distinct from the accepted certificate exception and must not be silently treated as D-25 acceptance.
 
-| File | Line(s) | Pattern | Severity | Impact |
-|---|---:|---|---|---|
-| `scripts/build-release.sh` | 82, 213-215 | `mktemp -u` and post-validation glob selection | BLOCKER | Unsafe publication provenance. |
-| `xf_input.c` | 949-951, 1421, 1457, 1488, 1528, 1830, 2092 | Direct quarantine/gate writers outside claimed owner | BLOCKER | Recovery gate can admit/lose contacts incorrectly. |
-| `xf_input.c` | 1710-1724 | Cancellation reads inactive stores rather than `diagContacts` | BLOCKER | Missing/stale local cancellation diagnostics. |
-| `xf_touch_internal.h` | 229 | Comment claims helper is called exactly once; it has no production call | BLOCKER | Tested helper is orphaned. |
-| `tests/wrapper_production_check.sh` | 268-300 | `|| rc=0` / `|| true` force observed statuses to zero | WARNING | Idempotency outcome is untested. |
-| `tests/readme_doc_regression.sh` | 192-202 | Mismatched package-name fixture is explicitly accepted | WARNING | Does not prove the stronger stated mismatch rejection. |
-| `tests/build_release_signal_check.sh` | 87-92 | `sha256sum` shim treats `-c` as a filename and still succeeds | WARNING | Fixture reaches signal markers without exercising checksum validation. |
-| `xf_input.c` | 2161 | `XXX` comment | INFO | Pre-existing upstream context: it is not added by `onemix-touch.patch`, so it is not counted as Phase 04 unresolved debt. |
+Choose one of the following before declaring the launch flow security-complete:
 
-## Human Verification After Gap Repair
+1. Replace argv password transport with a supported protected mechanism; or
+2. Explicitly accept the scoped argv exposure in a decision separate from D-25, including its platform assumptions.
 
-### 1. Exact four-package install and rollback
+## Human Verification Required After Gap Repair
 
-**Test:** From a native-X11/TTY environment, checksum the repaired bundle, install the exact patched four-package closure twice, then restore the exact stock closure twice.
+### 1. Exact Four-Package Install and Rollback
 
-**Expected:** Every transaction succeeds; all four identities match the expected version after each step; stock mouse-only launch reaches the desktop after rollback.
+**Test:** On the native-X11 device, checksum the newly rebuilt bundle, install the exact patched closure twice, then restore the exact stock closure twice.
 
-**Why human:** This changes package state and requires the physical target; repository tests use mocks.
+**Expected:** Each transaction succeeds; all four package identities match the expected local or stock versions; the stock mouse-only launch works after rollback.
 
-### 2. Cancellation and recovery lifecycle
+**Why human:** This verification does not mutate system package state.
 
-**Test:** Start a two- and three-finger gesture, induce focus/fullscreen/disconnect cancellation, send an Update and one old-finger End, then lift all old fingers and perform a fresh tap.
+### 2. Diagnostic and Interruption Flow on Physical XI2/RDPEI
 
-**Expected:** New touches stay blocked until the final old End; no button/Ctrl remains held; all original IDs are quarantined; after the final End the next fresh gesture works normally.
+**Test:** Run `FREERDP_TOUCH_DIAG=1 menu` after launcher deployment is repaired. Trigger touch Begin/Update/End, a local gesture decision, and interruption during an active gesture. Then run normal `menu` with diagnostics unset.
 
-**Why human:** The actual XI2 dispatcher and physical contact ordering require the native X11 touchscreen.
+**Expected:** Diagnostic mode records adjusted-coordinate local cancellation, one matching `native_count=0` summary, synthesis/gesture events, and applicable RDPEI frame records. Normal mode creates no diagnostic file or `touch-diag:` output.
 
-### 3. Local-only diagnostic cancellation trace
+**Why human:** Synthetic dispatcher CTests do not replace the physical XI2/RDP session.
 
-**Test:** Run `FREERDP_TOUCH_DIAG=1 menu`, trigger cancellation during an active local gesture, then inspect the private log without copying sensitive content.
+### 3. Package-Only or Clean-Checkout Launch
 
-**Expected:** One last-coordinate cancel per active fallback finger, an exact summary with `native_count=0`, diagnostic-store cleanup, and no new `touch-diag:` output or log file in a normal launch.
+**Test:** Follow README from a package-only installation or a documented fresh checkout location, then invoke the documented menu path.
 
-**Why human:** The present source demonstrably fails this path; after repair it needs live XInput2 evidence.
+**Expected:** The launcher/gate/wrapper resolve without owner-specific paths; normal, diagnostic, and mouse-only modes start as documented.
+
+**Why human:** Current package contents conclusively fail this; a repaired deployment design needs user-flow confirmation.
 
 ## Gaps Summary
 
-There are no later roadmap phases that explicitly schedule these defects, so none is deferred by Step 9b. Repair the unsafe release boundary first, then repair the real dispatcher and diagnostic lifecycle, provision a relocatable launcher, remove confidential generated artifacts, and resolve the password transport. Rebuild from the repaired patch before repeating native-device install/rollback and gesture UAT.
+There are no later milestone phases to which these failures can be deferred. The next repair must first make release publication bind validated source output to published package bytes, then rebuild the current patch. It must also provide a real documented launcher deployment and remove private connection/session material from tracked artifacts and the launcher. Only then should native-X11 package install/rollback and diagnostic UAT be repeated.
+
+The D-25 certificate exception remains unchanged and is not a remediation target for this phase report.
 
 ---
 
-_Verified: 2026-08-09T15:30:00Z_  
+_Verified: 2026-08-10T00:06:54Z_  
 _Verifier: Claude (gsd-verifier)_
