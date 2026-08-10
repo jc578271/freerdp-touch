@@ -6,9 +6,9 @@ current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
 stopped_at: Completed quick task 260810-e0n
-last_updated: "2026-08-10T03:47:05.334Z"
+last_updated: "2026-08-10T03:58:12.248Z"
 last_activity: 2026-08-10
-last_activity_desc: Quick task 260810-e0n completed; pinned Debian source inputs are tracked under src/, build-release uses the local signed DSC with a pre-build smoke path, and sensitive diagnostic logs are ignored and untracked.
+last_activity_desc: Fresh clones now carry the exact pinned Debian source package under `src/`; the release script validates that local DSC and supports a non-publishing pre-build smoke check; diagnostic logs are no longer tracked.
 progress:
   total_phases: 4
   completed_phases: 4
@@ -118,6 +118,7 @@ Progress: [██████████] 100%
 | 4 | Update /usr/local/bin/menu so FreeRDP option 3 uses the canonical patched launch parameters | 2026-08-08 | 67ac6d5 | — |
 | 260810-d0h | Record the owner waiver for remaining Phase 04 blockers and optional custom scripts | 2026-08-10 | 22ac689 | [260810-d0h-record-owner-decision-that-only-freerdp-](./quick/260810-d0h-record-owner-decision-that-only-freerdp-/) |
 | 260810-e0n | Track pinned Debian source inputs, use the local DSC for release builds, and ignore sensitive diagnostic logs | 2026-08-10 | d043fe5 | [260810-e0n-create-src-containing-the-three-pinned-d](./quick/260810-e0n-create-src-containing-the-three-pinned-d/) |
+| 7 | Tạo INSTALLATION.md với quy trình fresh clone, build, kiểm tra và cài bốn package FreeRDP Touch | 2026-08-10 | be77978 | — |
 
 ### Research Flags (carried from research summary)
 
