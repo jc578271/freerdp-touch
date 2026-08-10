@@ -2342,7 +2342,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 ===================================================================
 --- /dev/null
 +++ freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
-@@ -0,0 +1,375 @@
+@@ -0,0 +1,492 @@
 +#include <X11/Xlib.h>
 +#include <X11/extensions/XInput2.h>
 +
@@ -2560,8 +2560,8 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 +	          mouse_events.y[1] == 10,
 +	      "first tap uses adjusted coordinates");
 +
-+	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 62, 24, 33) == 0, "second Begin");
-+	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 62, 24, 33) == 0, "second End");
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 62, 30, 30) == 0, "second Begin");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 62, 30, 30) == 0, "second End");
 +	CHECK(mouse_events.count == 4, "two taps emit two complete click pairs");
 +	for (size_t i = 0; i < mouse_events.count; i++)
 +	{
@@ -2569,9 +2569,123 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 +		          ((i % 2 == 0) ? (PTR_FLAGS_DOWN | PTR_FLAGS_BUTTON1) : PTR_FLAGS_BUTTON1),
 +		      "tap pair flags are ordered down/up");
 +		CHECK(mouse_events.x[i] == 10 && mouse_events.y[i] == 10,
-+		      "nearby second tap reuses the first adjusted coordinate");
++		      "10px nearby second tap reuses the first adjusted coordinate");
 +	}
 +
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 63, 40, 30) == 0, "old-anchor third Begin");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 63, 40, 30) == 0, "old-anchor third End");
++	CHECK(mouse_events.count == 6, "third tap creates a fresh anchor");
++	xfc.tapPairTime -= 550;
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 64, 50, 30) == 0, "old-anchor fourth Begin");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 64, 50, 30) == 0, "old-anchor fourth End");
++	CHECK(mouse_events.count == 8, "old anchor still emits a complete click");
++	CHECK(mouse_events.x[6] == 40 && mouse_events.y[6] == 10 && mouse_events.x[7] == 40 &&
++	          mouse_events.y[7] == 10,
++	      "550ms-old tap anchor is too old to reuse");
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++static int test_zero_calibration_one_finger_slop(void)
++{
++	rdpSettings* settings = new_settings();
++	rdpInput input = { 0 };
++	xfContext xfc;
++
++	CHECK(settings != NULL, "one-finger settings allocation");
++	CHECK(freerdp_settings_get_uint32(settings, FreeRDP_TouchLongPressDurationMs) == 0,
++	      "one-finger duration starts unset");
++	CHECK(freerdp_settings_get_uint32(settings, FreeRDP_TouchLongPressSlopPx) == 0,
++	      "one-finger slop starts unset");
++	init_context(&xfc, settings);
++	input.context = &xfc.common.context;
++	input.MouseEvent = capture_mouse_event;
++	xfc.common.context.input = &input;
++	mouse_events = (mouse_capture){ 0 };
++
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 71, 20, 30) == 0, "one-finger Begin");
++	CHECK(xfc.lpDeadline - xfc.lpStartTime == 500, "zero duration fallback arms for 500ms");
++	CHECK(dispatch_touch(&xfc, XI_TouchUpdate, 71, 30, 30) == 0,
++	      "one-finger 10px Update");
++	CHECK(xfc.lpArmed && !xfc.fallbackActive && mouse_events.count == 0,
++	      "10px one-finger motion remains below 12px slop");
++	CHECK(dispatch_touch(&xfc, XI_TouchUpdate, 71, 33, 30) == 0,
++	      "one-finger 13px Update");
++	CHECK(xfc.fallbackActive && mouse_events.count == 2 &&
++	          mouse_events.flags[0] == (PTR_FLAGS_DOWN | PTR_FLAGS_BUTTON1) &&
++	          mouse_events.flags[1] == PTR_FLAGS_MOVE,
++	      "13px one-finger motion claims a left-button drag");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 71, 33, 30) == 0, "one-finger End");
++	CHECK(mouse_events.count == 3 && mouse_events.flags[2] == PTR_FLAGS_BUTTON1,
++	      "one-finger drag releases its left button");
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++static int test_zero_calibration_two_finger_slop(void)
++{
++	rdpSettings* settings = new_settings();
++	rdpInput input = { 0 };
++	xfContext xfc;
++
++	CHECK(settings != NULL, "two-finger settings allocation");
++	init_context(&xfc, settings);
++	input.context = &xfc.common.context;
++	input.MouseEvent = capture_mouse_event;
++	xfc.common.context.input = &input;
++	mouse_events = (mouse_capture){ 0 };
++
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 81, 20, 30) == 0, "two-finger Begin(A)");
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 82, 20, 230) == 0, "two-finger Begin(B)");
++	CHECK(xfc.twoFingerPending, "two-finger starts pending");
++	CHECK(dispatch_touch(&xfc, XI_TouchUpdate, 81, 20, 50) == 0,
++	      "two-finger 10px midpoint Update");
++	CHECK(xfc.twoFingerPending && !xfc.scrollActive && mouse_events.count == 0,
++	      "10px two-finger translation remains below 12px claim slop");
++	CHECK(dispatch_touch(&xfc, XI_TouchUpdate, 82, 20, 234) == 0,
++	      "two-finger 12px midpoint Update");
++	CHECK(!xfc.twoFingerPending && xfc.scrollActive && mouse_events.count == 1 &&
++	          mouse_events.flags[0] == PTR_FLAGS_MOVE,
++	      "12px two-finger translation claims scroll");
++
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 81, 20, 50) == 0, "two-finger End(A)");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 82, 20, 234) == 0, "two-finger End(B)");
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++static int test_zero_calibration_three_finger_slop(void)
++{
++	rdpSettings* settings = new_settings();
++	rdpInput input = { 0 };
++	xfContext xfc;
++
++	CHECK(settings != NULL, "three-finger settings allocation");
++	init_context(&xfc, settings);
++	input.context = &xfc.common.context;
++	input.MouseEvent = capture_mouse_event;
++	xfc.common.context.input = &input;
++	mouse_events = (mouse_capture){ 0 };
++
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 91, 20, 30) == 0, "three-finger Begin(A)");
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 92, 20, 230) == 0, "three-finger Begin(B)");
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 93, 220, 130) == 0, "three-finger Begin(C)");
++	CHECK(xfc.threeFingerPending, "three-finger starts pending");
++	CHECK(dispatch_touch(&xfc, XI_TouchUpdate, 91, 20, 60) == 0,
++	      "three-finger 10px centroid Update");
++	CHECK(xfc.threeFingerPending && !xfc.midActive && mouse_events.count == 0,
++	      "10px three-finger translation remains below 12px claim slop");
++	CHECK(dispatch_touch(&xfc, XI_TouchUpdate, 91, 20, 66) == 0,
++	      "three-finger 12px centroid Update");
++	CHECK(!xfc.threeFingerPending && xfc.midActive && mouse_events.count == 1 &&
++	          mouse_events.flags[0] == (PTR_FLAGS_DOWN | PTR_FLAGS_BUTTON3),
++	      "12px three-finger translation claims middle-button drag");
++
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 91, 20, 66) == 0, "three-finger End(A)");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 92, 20, 230) == 0, "three-finger End(B)");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 93, 220, 130) == 0, "three-finger End(C)");
 +	freerdp_settings_free(settings);
 +	return 0;
 +}
@@ -2710,6 +2824,9 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 +{
 +	CHECK(configure_log_capture(), "configure WLog callback appender");
 +	CHECK(test_double_tap_anchor() == 0, "double-tap anchor scenario");
++	CHECK(test_zero_calibration_one_finger_slop() == 0, "zero calibration one-finger scenario");
++	CHECK(test_zero_calibration_two_finger_slop() == 0, "zero calibration two-finger scenario");
++	CHECK(test_zero_calibration_three_finger_slop() == 0, "zero calibration three-finger scenario");
 +	CHECK(test_quarantine_recovery() == 0, "quarantine recovery scenario");
 +	CHECK(test_diagnostic_lifecycle() == 0, "diagnostic lifecycle scenario");
 +	CHECK(test_third_finger_compaction() == 0, "third-finger compaction scenario");

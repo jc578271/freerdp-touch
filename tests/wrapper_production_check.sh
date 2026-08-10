@@ -103,6 +103,12 @@ fi
 if ! grep -q '+touch-pinch-wheel-fallback' "$td/normal.log"; then
   printf 'FAIL: normal: missing +touch-pinch-wheel-fallback in client argv\n' >&2; exit 1
 fi
+if ! grep -q '/touch-long-press:500' "$td/normal.log"; then
+  printf 'FAIL: normal: missing default /touch-long-press:500 in client argv\n' >&2; exit 1
+fi
+if ! grep -q '/touch-slop:12' "$td/normal.log"; then
+  printf 'FAIL: normal: missing default /touch-slop:12 in client argv\n' >&2; exit 1
+fi
 
 # --------------------------------------------------------------------------
 # 2. Mouse-only mode — no touch options
