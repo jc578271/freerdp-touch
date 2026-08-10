@@ -348,7 +348,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  					WLog_DBG(TAG, "%s button device (id: %d, mode: %d)", dev->name, dev->deviceid,
  					         t->num_buttons);
  					XISetMask(masks[nmasks], XI_ButtonPress);
-@@ -241,6 +300,53 @@ static BOOL register_device_events(xfCon
+@@ -241,6 +300,54 @@ static BOOL register_device_events(xfCon
  	return TRUE;
  }
  
@@ -372,6 +372,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 +	}
 +
 +	xfc->lpArmed = FALSE;
++	xfc->tapPairValid = FALSE;
 +
 +	freerdp_client_send_button_event(&xfc->common, FALSE,
 +	                                 PTR_FLAGS_DOWN | PTR_FLAGS_BUTTON2, x, y);
@@ -402,7 +403,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  int xf_input_init(xfContext* xfc, Window window)
  {
  	int major = XI_2_Major;
-@@ -256,6 +362,47 @@ int xf_input_init(xfContext* xfc, Window
+@@ -256,6 +363,51 @@ int xf_input_init(xfContext* xfc, Window
  	xfc->px_vector = 0;
  	xfc->py_vector = 0;
  	xfc->active_contacts = 0;
@@ -412,6 +413,10 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 +	xfc->quarantinedCount = 0;
 +	xfc->lpArmed = FALSE;
 +	xfc->lpFrozen = FALSE;
++	xfc->tapPairValid = FALSE;
++	xfc->tapPairX = 0;
++	xfc->tapPairY = 0;
++	xfc->tapPairTime = 0;
 +	xfc->ctrlHeld = FALSE;
 +	xfc->pinchActive = FALSE;
 +	xfc->pinchClaimed = FALSE;
@@ -450,7 +455,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  
  	if (!XQueryExtension(xfc->display, "XInputExtension", &opcode, &event, &error))
  	{
-@@ -282,6 +429,28 @@ int xf_input_init(xfContext* xfc, Window
+@@ -282,6 +434,28 @@ int xf_input_init(xfContext* xfc, Window
  			return -1;
  		if (!register_device_events(xfc, window))
  			return -1;
@@ -479,7 +484,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  	}
  
  	return 0;
-@@ -638,6 +807,795 @@ static void xf_input_show_cursor(xfConte
+@@ -638,6 +812,834 @@ static void xf_input_show_cursor(xfConte
  #endif
  }
  
@@ -891,6 +896,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 +				}
 +				xfc->lpArmed = FALSE;
 +				xfc->lpFrozen = FALSE;
++				xfc->tapPairValid = FALSE;
 +
 +				/* Record both fingers; claim pending only. */
 +				xfc->pinchFingerA = firstId;
@@ -1064,6 +1070,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 +				xfc->fallbackActive = TRUE;
 +				xfc->fallbackFinger = touchId;
 +				xfc->lpArmed = FALSE;
++				xfc->tapPairValid = FALSE;
 +    if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: state long-press=cancel drag x=%d y=%d", x, y);
 +    if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: synth left-down x=%d y=%d", xfc->lpDownX, xfc->lpDownY);
 +				WLog_DBG(TAG, "fallback: touch claimed mouse drag finger=%d", touchId);
@@ -1244,12 +1251,49 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 +			/* Short tap: deterministic left-click. */
 +			if (xfc->lpArmed && touchId == xfc->lpFinger)
 +			{
++				rdpSettings* settings = xfc->common.context.settings;
++				const int tapX = xfc->lpDownX;
++				const int tapY = xfc->lpDownY;
++				const UINT64 now = GetTickCount64();
++				UINT32 duration = freerdp_settings_get_uint32(
++				    settings, FreeRDP_TouchLongPressDurationMs);
++				UINT32 slop = freerdp_settings_get_uint32(settings, FreeRDP_TouchLongPressSlopPx);
++				BOOL reuseAnchor = FALSE;
++				int outputX = tapX;
++				int outputY = tapY;
++
++				if (duration == 0)
++					duration = 600;
++				if (slop == 0)
++					slop = 8;
++				if (xfc->tapPairValid &&
++				    now - xfc->tapPairTime <= (UINT64)duration &&
++				    hypot((double)tapX - (double)xfc->tapPairX,
++				          (double)tapY - (double)xfc->tapPairY) <= (double)slop)
++				{
++					reuseAnchor = TRUE;
++					outputX = xfc->tapPairX;
++					outputY = xfc->tapPairY;
++				}
++
 +				freerdp_client_send_button_event(&xfc->common, FALSE,
-+				    PTR_FLAGS_DOWN | PTR_FLAGS_BUTTON1, xfc->lpDownX, xfc->lpDownY);
++				    PTR_FLAGS_DOWN | PTR_FLAGS_BUTTON1, outputX, outputY);
 +				freerdp_client_send_button_event(&xfc->common, FALSE,
-+				    PTR_FLAGS_BUTTON1, xfc->lpDownX, xfc->lpDownY);
++				    PTR_FLAGS_BUTTON1, outputX, outputY);
 +				WLog_DBG(TAG, "fallback: short tap sent left-click finger=%d", touchId);
-+    if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: synth left-tap x=%d y=%d", xfc->lpDownX, xfc->lpDownY);
++    if (xfc->touchDiagEnabled) WLog_WARN(TAG, "touch-diag: synth left-tap x=%d y=%d", outputX, outputY);
++
++				if (reuseAnchor)
++				{
++					xfc->tapPairValid = FALSE;
++				}
++				else
++				{
++					xfc->tapPairValid = TRUE;
++					xfc->tapPairX = tapX;
++					xfc->tapPairY = tapY;
++					xfc->tapPairTime = now;
++				}
 +				xfc->lpArmed = FALSE;
 +				xfc->lpFinger = 0;
 +				return 0;
@@ -1275,7 +1319,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  static int xf_input_touch_remote(xfContext* xfc, XIDeviceEvent* event, int evtype)
  {
  	int x = 0;
-@@ -645,31 +1603,271 @@ static int xf_input_touch_remote(xfConte
+@@ -645,31 +1647,275 @@ static int xf_input_touch_remote(xfConte
  	int touchId = 0;
  	RdpeiClientContext* rdpei = xfc->common.rdpei;
  
@@ -1463,6 +1507,10 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 +	xfc->lpFinger = 0;
 +	xfc->lpDeadline = 0;
 +	xfc->lpStartTime = 0;
++	xfc->tapPairValid = FALSE;
++	xfc->tapPairX = 0;
++	xfc->tapPairY = 0;
++	xfc->tapPairTime = 0;
 +	xfc->pinchActive = FALSE;
 +	xfc->pinchClaimed = FALSE;
 +	xfc->pinchAccum = 0.0;
@@ -1558,7 +1606,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  }
  
  static BOOL xf_input_pen_remote(xfContext* xfc, XIDeviceEvent* event, int evtype, int deviceid)
-@@ -862,8 +2060,98 @@ static int xf_input_handle_event_remote(
+@@ -862,8 +2108,98 @@ static int xf_input_handle_event_remote(
  
  	if ((cookie.cc->type == GenericEvent) && (cookie.cc->extension == xfc->XInputOpcode))
  	{
@@ -1657,7 +1705,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  			case XI_TouchBegin:
  				xf_input_pens_unhover(xfc);
  				/* fallthrough */
-@@ -876,9 +2164,21 @@ static int xf_input_handle_event_remote(
+@@ -876,9 +2212,21 @@ static int xf_input_handle_event_remote(
  			case XI_Motion:
  			case XI_ButtonRelease:
  			{
@@ -1680,7 +1728,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  
  				if (freerdp_client_is_pen(&xfc->common, deviceid))
  				{
-@@ -889,6 +2189,12 @@ static int xf_input_handle_event_remote(
+@@ -889,6 +2237,12 @@ static int xf_input_handle_event_remote(
  					}
  					break;
  				}
@@ -1693,7 +1741,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  			}
  				/* fallthrough */
  				WINPR_FALLTHROUGH
-@@ -897,10 +2203,10 @@ static int xf_input_handle_event_remote(
+@@ -897,10 +2251,10 @@ static int xf_input_handle_event_remote(
  				xf_input_event(xfc, event, cookie.cc->data, cookie.cc->evtype);
  				break;
  		}
@@ -1705,7 +1753,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  }
  
  #else
-@@ -910,6 +2216,14 @@ int xf_input_init(xfContext* xfc, Window
+@@ -910,6 +2264,14 @@ int xf_input_init(xfContext* xfc, Window
  	return 0;
  }
  
@@ -1720,7 +1768,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  #endif
  
  int xf_input_handle_event(xfContext* xfc, const XEvent* event)
-@@ -921,7 +2235,8 @@ int xf_input_handle_event(xfContext* xfc
+@@ -921,7 +2283,8 @@ int xf_input_handle_event(xfContext* xfc
  	settings = xfc->common.context.settings;
  	WINPR_ASSERT(settings);
  
@@ -2030,7 +2078,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xfreerdp.h
  	touchContact contacts[MAX_CONTACTS];
  	int active_contacts;
  	int lastEvType;
-@@ -310,6 +312,46 @@ struct xf_context
+@@ -310,6 +312,49 @@ struct xf_context
  	double z_vector;
  	double px_vector;
  	double py_vector;
@@ -2049,6 +2097,9 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xfreerdp.h
 +	UINT64 lpStartTime;
 +	int lpFinger;
 +	BOOL lpFrozen;
++	BOOL tapPairValid;
++	INT32 tapPairX, tapPairY;
++	UINT64 tapPairTime;
 +	BOOL ctrlHeld;
 +	BOOL pinchActive;
 +	BOOL pinchClaimed;
