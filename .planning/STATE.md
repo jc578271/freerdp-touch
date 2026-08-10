@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
-stopped_at: Completed quick task 260810-e0n
-last_updated: "2026-08-10T04:08:34.670Z"
+stopped_at: Completed quick task 260810-qqz
+last_updated: "2026-08-10T12:55:17.583Z"
 last_activity: 2026-08-10
-last_activity_desc: Fresh clones now carry the exact pinned Debian source package under `src/`; the release script validates that local DSC and supports a non-publishing pre-build smoke check; diagnostic logs are no longer tracked.
+last_activity_desc: "Completed quick task 260810-qqz: hiện tại lúc tôi double touch để vào folder, gesture này không ổn định, lúc được lúc không, fix cho tôi"
 progress:
   total_phases: 4
   completed_phases: 4
@@ -32,7 +32,7 @@ progress:
 Phase: 4 of 4 (Diagnostics, Packaging & Launch Configuration)
 Plan: 7 of 7 in current phase
 Status: Verification waiver recorded; technical evidence remains gaps_found; normal GSD phase/milestone closure pending
-Last activity: 2026-08-10 — Fresh clones now carry the exact pinned Debian source package under `src/`; the release script validates that local DSC and supports a non-publishing pre-build smoke check; diagnostic logs are no longer tracked.
+Last activity: 2026-08-10 - Completed quick task 260810-qqz: hiện tại lúc tôi double touch để vào folder, gesture này không ổn định, lúc được lúc không, fix cho tôi
 
 Progress: [██████████] 100%
 
@@ -97,6 +97,7 @@ Progress: [██████████] 100%
 - [Phase ?]: Refresh one integrated onemix-touch.patch and require a second clean dpkg-source/quilt extraction to match the repaired X11 source and pass the dispatcher regression.
 - [2026-08-10] **Owner closure waiver:** The project owner accepts the bounded Phase 04 concerns for closure review as `USER-ACCEPTED/WAIVED`. Required Debian installation is limited to the exact four-package `+onemix1` closure (`libwinpr3-3`, `libfreerdp3-3`, `libfreerdp-client3-3`, `freerdp3-x11`); `scripts/menu`, `scripts/launch-touch.sh`, and `scripts/check-x11-session.sh` are optional custom/developer scripts. Authoritative record: `.planning/phases/04-diagnostics-packaging-launch-configuration/04-VERIFICATION.md`. The technical verdict remains `gaps_found`. D-25 remains the accepted HIGH `/cert:ignore` server-impersonation/MITM exposure; server certificate identity is not established.
 - [Quick 260810-e0n] Fresh-clone builds use exactly one tracked signed `src/*.dsc` plus its two checksum-bound source archives. `scripts/build-release.sh` derives the pinned base version from that local descriptor, reuses it for `dpkg-source -x`, and supports `BUILD_RELEASE_SMOKE=1`; `rdp-debug*.log` is ignored and the existing sensitive logs remain local but untracked.
+- [Phase ?]: Quick 260810-qqz: Keep the first local short tap immediate and reuse the first adjusted coordinate only for one nearby second tap within the existing duration/slop bounds; clear the anchor on drag, long press, multi-finger entry, and lifecycle cancellation.
 
 ### Todos
 
@@ -121,6 +122,7 @@ Progress: [██████████] 100%
 | 7 | Tạo INSTALLATION.md với quy trình fresh clone, build, kiểm tra và cài bốn package FreeRDP Touch | 2026-08-10 | be77978 | — |
 | 8 | Đơn giản hóa INSTALLATION.md thành quy trình clone, build và cài FreeRDP Touch tối thiểu | 2026-08-10 | b7086ea | — |
 | 9 | Thêm lệnh cài custom menu vào /usr/local/bin trong INSTALLATION.md | 2026-08-10 | 36f93c9 | — |
+| 260810-qqz | hiện tại lúc tôi double touch để vào folder, gesture này không ổn định, lúc được lúc không, fix cho tôi | 2026-08-10 | 0d21fa3 | [260810-qqz-hi-n-t-i-l-c-t-i-double-touch-v-o-folder](./quick/260810-qqz-hi-n-t-i-l-c-t-i-double-touch-v-o-folder/) |
 
 ### Research Flags (carried from research summary)
 
@@ -128,12 +130,12 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Last session:** 2026-08-10T03:47:05.334Z
-**Stopped at:** Completed quick task 260810-e0n source portability and log hygiene
+**Last session:** 2026-08-10T12:54:42.070Z
+**Stopped at:** Completed quick task 260810-qqz
 **Resume file:** None
 
-- **Last action**: Tracked the exact pinned Debian source package under `src/`, changed release source authority from mutable APT metadata to the local signed DSC, added the pre-build smoke path, and removed sensitive diagnostic logs from the Git index while retaining their local files.
-- **Next action**: Complete normal GSD phase/milestone closure after reviewing the owner waiver; retain the `gaps_found` evidence record and the unestablished server certificate identity.
+- **Last action**: Added bounded nearby double-tap coordinate anchoring to the local-only XI2 fallback, passed the production dispatcher regression in the Task 1 and second clean extraction workspaces, and passed the non-publishing release smoke check.
+- **Next action**: Perform the pending native OneMix 3/native-X11 folder double-tap UAT; then continue normal GSD phase/milestone closure while retaining the `gaps_found` evidence record and the unestablished server certificate identity.
 
 ---
 *State initialized: 2026-08-05*
