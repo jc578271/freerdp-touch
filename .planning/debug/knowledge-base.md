@@ -13,3 +13,13 @@ Resolved debug sessions. Used by `gsd-debugger` to surface known-pattern hypothe
 - **Why not caught:** No automated native-X11 gate test modeled a current-display Xorg alongside an unrelated host Xwayland process.
 - **Recurrence guard:** tests/check_x11_session_check.sh covers the positive current-display-Xorg-plus-Xwayland case and the negative foreign-Xorg case; it passed after the fix.
 ---
+
+## rare-double-tap-drop — Coupled gesture slop let rapid retaps miss double-click classification
+- **Date:** 2026-08-10
+- **Error patterns:** rare double-tap drop, single-click/select, rapid retap, 12–16 px coordinate split, Windows spatial double-click
+- **Root cause(s):** Code: `xf_input_touch_fallback` reused `FreeRDP_TouchLongPressSlopPx` (12 px default, 16 px maximum) as the double-tap anchor limit, so ordinary 12.65–16.64 px rapid retaps emitted distinct remote coordinates; contributing remote condition: Windows correctly classified those distinct coordinates as separate single clicks.
+- **Fix:** Use a dedicated 20 px `DOUBLE_TAP_ANCHOR_SLOP_PX` floor for rapid tap-pair coordinate reuse while retaining `/touch-slop:12` for long-press/drag/pan; cover the captured 16.64 px vector and 31 px/550 ms negative boundaries in the production dispatcher test.
+- **Files changed:** patches/onemix-touch.patch (X11 fallback implementation and TestXfInputDispatcher regression)
+- **Why not caught:** No regression gate covered capture-shaped rapid-retap coordinate separation beyond the drag/long-press slop; the existing dispatcher coverage did not exercise the 16.64 px anchor boundary.
+- **Recurrence guard:** `client/X11/test/TestXfInputDispatcher.c` in patches/onemix-touch.patch asserts the 16.64 px rapid retap reuses the first coordinate while 31 px and 550 ms cases remain independent; `ctest -R ^TestXfInputDispatcher$` passed and killed the scoped 20->12 revert mutation.
+---
