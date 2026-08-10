@@ -58,3 +58,15 @@ dpkg-query -W -f='${Package} ${Version}\n' \
 ```
 
 All four versions must contain `+onemix1`.
+
+## 6. Install the custom menu (optional)
+
+```bash
+sudo install -m 0755 ./scripts/menu /usr/local/bin/menu
+```
+
+Run it with:
+
+```bash
+menu
+```
