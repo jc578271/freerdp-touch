@@ -7,7 +7,11 @@ build/
 *.buildinfo
 *.changes
 run-rdp.sh
-rdp-debug.log
+rdp-debug*.log
+
+!src/freerdp3_3.15.0+dfsg-2.1+deb13u3.dsc
+!src/freerdp3_3.15.0+dfsg.orig.tar.xz
+!src/freerdp3_3.15.0+dfsg-2.1+deb13u3.debian.tar.xz
 dist
 .dist-bundle-*
 .dist.lock
