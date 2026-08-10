@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
-stopped_at: Completed quick task 260810-qqz
-last_updated: "2026-08-10T13:33:34.924Z"
+stopped_at: Completed quick task 260810-ss0
+last_updated: "2026-08-10T14:30:24.909Z"
 last_activity: 2026-08-10
-last_activity_desc: "Completed quick task 260810-qqz: hiện tại lúc tôi double touch để vào folder, gesture này không ổn định, lúc được lúc không, fix cho tôi"
+last_activity_desc: "Completed quick task 260810-ss0: đổi mặc định long press xuống 500 ms và touch slop lên 12 px"
 progress:
   total_phases: 4
   completed_phases: 4
@@ -32,7 +32,7 @@ progress:
 Phase: 4 of 4 (Diagnostics, Packaging & Launch Configuration)
 Plan: 7 of 7 in current phase
 Status: Verification waiver recorded; technical evidence remains gaps_found; normal GSD phase/milestone closure pending
-Last activity: 2026-08-10 - Completed quick task 260810-qqz: hiện tại lúc tôi double touch để vào folder, gesture này không ổn định, lúc được lúc không, fix cho tôi
+Last activity: 2026-08-10 - Completed quick task 260810-ss0: đổi mặc định long press xuống 500 ms và touch slop lên 12 px
 
 Progress: [██████████] 100%
 
@@ -98,6 +98,7 @@ Progress: [██████████] 100%
 - [2026-08-10] **Owner closure waiver:** The project owner accepts the bounded Phase 04 concerns for closure review as `USER-ACCEPTED/WAIVED`. Required Debian installation is limited to the exact four-package `+onemix1` closure (`libwinpr3-3`, `libfreerdp3-3`, `libfreerdp-client3-3`, `freerdp3-x11`); `scripts/menu`, `scripts/launch-touch.sh`, and `scripts/check-x11-session.sh` are optional custom/developer scripts. Authoritative record: `.planning/phases/04-diagnostics-packaging-launch-configuration/04-VERIFICATION.md`. The technical verdict remains `gaps_found`. D-25 remains the accepted HIGH `/cert:ignore` server-impersonation/MITM exposure; server certificate identity is not established.
 - [Quick 260810-e0n] Fresh-clone builds use exactly one tracked signed `src/*.dsc` plus its two checksum-bound source archives. `scripts/build-release.sh` derives the pinned base version from that local descriptor, reuses it for `dpkg-source -x`, and supports `BUILD_RELEASE_SMOKE=1`; `rdp-debug*.log` is ignored and the existing sensitive logs remain local but untracked.
 - [Phase ?]: Quick 260810-qqz: Keep the first local short tap immediate and reuse the first adjusted coordinate only for one nearby second tap within the existing duration/slop bounds; clear the anchor on drag, long press, multi-finger entry, and lifecycle cancellation.
+- [Quick 260810-ss0] Unset local-touch calibration now defaults to 500 ms long press and 12 px slop across the wrapper, X11 recognizer fallbacks, classifier model, CLI help, tests, and README; existing override ranges remain unchanged.
 
 ### Todos
 
@@ -125,6 +126,7 @@ Progress: [██████████] 100%
 | 260810-qqz | hiện tại lúc tôi double touch để vào folder, gesture này không ổn định, lúc được lúc không, fix cho tôi | 2026-08-10 | 0d21fa3 | [260810-qqz-hi-n-t-i-l-c-t-i-double-touch-v-o-folder](./quick/260810-qqz-hi-n-t-i-l-c-t-i-double-touch-v-o-folder/) |
 | 11 | Thêm script copy-paste cài lại đúng bốn package mới nhất từ dist vào INSTALLATION.md | 2026-08-10 | 49cc3c8 | — |
 | 12 | Thêm --reinstall để apt cài lại bundle +onemix1 cùng version | 2026-08-10 | d430780 | — |
+| 260810-ss0 | Đổi mặc định local-touch calibration: long press từ 600 ms xuống 500 ms và touch slop từ 8 px lên 12 px | 2026-08-10 | ff61284 | [260810-ss0-i-m-c-nh-local-touch-calibration-long-pr](./quick/260810-ss0-i-m-c-nh-local-touch-calibration-long-pr/) |
 
 ### Research Flags (carried from research summary)
 
@@ -132,12 +134,12 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Last session:** 2026-08-10T12:54:42.070Z
-**Stopped at:** Completed quick task 260810-qqz
+**Last session:** 2026-08-10T14:30:24.909Z
+**Stopped at:** Completed quick task 260810-ss0
 **Resume file:** None
 
-- **Last action**: Added bounded nearby double-tap coordinate anchoring to the local-only XI2 fallback, passed the production dispatcher regression in the Task 1 and second clean extraction workspaces, and passed the non-publishing release smoke check.
-- **Next action**: Perform the pending native OneMix 3/native-X11 folder double-tap UAT; then continue normal GSD phase/milestone closure while retaining the `gaps_found` evidence record and the unestablished server certificate identity.
+- **Last action**: Synchronized unset local-touch defaults to 500 ms long press and 12 px slop, refreshed the integrated quilt patch, and passed wrapper, classifier, dispatcher, clean-extraction, and release-smoke checks.
+- **Next action**: Build and reinstall the four-package bundle, then perform the pending native OneMix 3/native-X11 calibration UAT before normal phase/milestone closure.
 
 ---
 *State initialized: 2026-08-05*
