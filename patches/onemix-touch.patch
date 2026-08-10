@@ -277,7 +277,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 +
 +/* ponytail: OneMix 3's rapid retaps reach 16.64 px; expose a separate setting
 + * only if another panel needs a different double-tap anchor tolerance. */
-+#define DOUBLE_TAP_ANCHOR_SLOP_PX 20
++#define DOUBLE_TAP_ANCHOR_SLOP_PX 48
 +
 +/* ponytail: structural geometric ratio, not a physical calibration value;
 + * promote to an rdpSetting only if real hardware jitter requires tuning
@@ -2601,12 +2601,12 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 +
 +	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 65, 20, 30) == 0, "distant-pair first Begin");
 +	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 65, 20, 30) == 0, "distant-pair first End");
-+	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 66, 51, 30) == 0, "distant-pair second Begin");
-+	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 66, 51, 30) == 0, "distant-pair second End");
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 66, 70, 30) == 0, "distant-pair second Begin");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 66, 70, 30) == 0, "distant-pair second End");
 +	CHECK(mouse_events.count == 12, "distant pair still emits two complete clicks");
-+	CHECK(mouse_events.x[10] == 41 && mouse_events.y[10] == 10 && mouse_events.x[11] == 41 &&
++	CHECK(mouse_events.x[10] == 60 && mouse_events.y[10] == 10 && mouse_events.x[11] == 60 &&
 +	          mouse_events.y[11] == 10,
-+	      "31px rapid retap remains at its own adjusted coordinate");
++	      "50px rapid retap remains at its own adjusted coordinate");
 +
 +	xfc.tapPairTime -= 550;
 +	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 67, 60, 30) == 0, "old-anchor Begin");
