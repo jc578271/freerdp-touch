@@ -65,8 +65,8 @@ if [ "$mouse_only" -eq 0 ]; then
 		fi
 	}
 
-	lp_raw="${FREERDP_TOUCH_LONG_PRESS_MS:-600}"
-	slop_raw="${FREERDP_TOUCH_SLOP_PX:-8}"
+	lp_raw="${FREERDP_TOUCH_LONG_PRESS_MS:-500}"
+	slop_raw="${FREERDP_TOUCH_SLOP_PX:-12}"
 
 	validate_calibration "$lp_raw" 500 700 "FREERDP_TOUCH_LONG_PRESS_MS"
 	validate_calibration "$slop_raw" 4 16 "FREERDP_TOUCH_SLOP_PX"

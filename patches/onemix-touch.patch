@@ -671,7 +671,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 +
 +		panDb = freerdp_settings_get_uint32(s, FreeRDP_TouchLongPressSlopPx);
 +		if (panDb == 0)
-+			panDb = 8;
++			panDb = 12;
 +
 +		/* WR-01: shared classifier — production and tests call the same
 +		 * xf_classify_two_finger (GAP-02 closure). */
@@ -765,7 +765,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 +
 +		panDb = freerdp_settings_get_uint32(s, FreeRDP_TouchLongPressSlopPx);
 +		if (panDb == 0)
-+			panDb = 8;
++			panDb = 12;
 +
 +		if (panDelta >= (double)panDb)
 +		{
@@ -936,7 +936,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 +				UINT32 threshold = freerdp_settings_get_uint32(settings,
 +				    FreeRDP_TouchLongPressDurationMs);
 +				if (threshold == 0)
-+					threshold = 600;
++					threshold = 500;
 +				xfc->lpDownX = x;
 +				xfc->lpDownY = y;
 +				xfc->lpFinger = touchId;
@@ -1045,7 +1045,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 +				UINT32 slop = freerdp_settings_get_uint32(settings,
 +				    FreeRDP_TouchLongPressSlopPx);
 +				if (slop == 0)
-+					slop = 8;
++					slop = 12;
 +				double dist = sqrt(pow((double)x - (double)xfc->lpDownX, 2.0) +
 +				                   pow((double)y - (double)xfc->lpDownY, 2.0));
 +
@@ -1263,9 +1263,9 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 +				int outputY = tapY;
 +
 +				if (duration == 0)
-+					duration = 600;
++					duration = 500;
 +				if (slop == 0)
-+					slop = 8;
++					slop = 12;
 +				if (xfc->tapPairValid &&
 +				    now - xfc->tapPairTime <= (UINT64)duration &&
 +				    hypot((double)tapX - (double)xfc->tapPairX,
@@ -2199,11 +2199,11 @@ Index: freerdp3-3.15.0+dfsg/client/common/cmdline.h
  	{ "toggle-fullscreen", COMMAND_LINE_VALUE_BOOL, NULL, BoolValueTrue, NULL, -1, NULL,
  	  "Alt+Ctrl+Enter to toggle fullscreen" },
 +	{ "touch-long-press", COMMAND_LINE_VALUE_REQUIRED, "<ms>", NULL, NULL, -1, NULL,
-+	  "Long-press duration in ms for right-click (default 600)" },
++	  "Long-press duration in ms for right-click (default 500)" },
 +	{ "touch-pinch-wheel-fallback", COMMAND_LINE_VALUE_BOOL, NULL, BoolValueFalse, NULL, -1, NULL,
 +	  "Send Ctrl+Wheel instead of RDPEI zoom on pinch" },
 +	{ "touch-slop", COMMAND_LINE_VALUE_REQUIRED, "<px>", NULL, NULL, -1, NULL,
-+	  "Dead-zone radius in px to suppress touch jitter (default 8)" },
++	  "Dead-zone radius in px to suppress touch jitter (default 12)" },
  	{ "tune", COMMAND_LINE_VALUE_REQUIRED, "<setting:value>,<setting:value>", "", NULL, -1, NULL,
  	  "[experimental] directly manipulate freerdp settings, use with extreme caution!" },
  #if defined(WITH_FREERDP_DEPRECATED_COMMANDLINE)
@@ -2342,7 +2342,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 ===================================================================
 --- /dev/null
 +++ freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
-@@ -0,0 +1,492 @@
+@@ -0,0 +1,493 @@
 +#include <X11/Xlib.h>
 +#include <X11/extensions/XInput2.h>
 +
@@ -2638,20 +2638,20 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 +	mouse_events = (mouse_capture){ 0 };
 +
 +	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 81, 20, 30) == 0, "two-finger Begin(A)");
-+	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 82, 20, 230) == 0, "two-finger Begin(B)");
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 82, 20, 110) == 0, "two-finger Begin(B)");
 +	CHECK(xfc.twoFingerPending, "two-finger starts pending");
 +	CHECK(dispatch_touch(&xfc, XI_TouchUpdate, 81, 20, 50) == 0,
 +	      "two-finger 10px midpoint Update");
 +	CHECK(xfc.twoFingerPending && !xfc.scrollActive && mouse_events.count == 0,
 +	      "10px two-finger translation remains below 12px claim slop");
-+	CHECK(dispatch_touch(&xfc, XI_TouchUpdate, 82, 20, 234) == 0,
++	CHECK(dispatch_touch(&xfc, XI_TouchUpdate, 82, 20, 114) == 0,
 +	      "two-finger 12px midpoint Update");
 +	CHECK(!xfc.twoFingerPending && xfc.scrollActive && mouse_events.count == 1 &&
 +	          mouse_events.flags[0] == PTR_FLAGS_MOVE,
 +	      "12px two-finger translation claims scroll");
 +
 +	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 81, 20, 50) == 0, "two-finger End(A)");
-+	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 82, 20, 234) == 0, "two-finger End(B)");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 82, 20, 114) == 0, "two-finger End(B)");
 +	freerdp_settings_free(settings);
 +	return 0;
 +}
@@ -2670,8 +2670,9 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 +	mouse_events = (mouse_capture){ 0 };
 +
 +	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 91, 20, 30) == 0, "three-finger Begin(A)");
-+	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 92, 20, 230) == 0, "three-finger Begin(B)");
-+	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 93, 220, 130) == 0, "three-finger Begin(C)");
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 92, 20, 110) == 0, "three-finger Begin(B)");
++	CHECK(xfc.twoFingerPending, "three-finger has two-finger pending before C");
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 93, 100, 70) == 0, "three-finger Begin(C)");
 +	CHECK(xfc.threeFingerPending, "three-finger starts pending");
 +	CHECK(dispatch_touch(&xfc, XI_TouchUpdate, 91, 20, 60) == 0,
 +	      "three-finger 10px centroid Update");
@@ -2684,8 +2685,8 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 +	      "12px three-finger translation claims middle-button drag");
 +
 +	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 91, 20, 66) == 0, "three-finger End(A)");
-+	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 92, 20, 230) == 0, "three-finger End(B)");
-+	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 93, 220, 130) == 0, "three-finger End(C)");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 92, 20, 110) == 0, "three-finger End(B)");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 93, 100, 70) == 0, "three-finger End(C)");
 +	freerdp_settings_free(settings);
 +	return 0;
 +}
