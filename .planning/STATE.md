@@ -6,9 +6,9 @@ current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
 stopped_at: Completed 04-07-PLAN.md
-last_updated: "2026-08-09T23:11:05.882Z"
+last_updated: "2026-08-10T02:41:52.700Z"
 last_activity: 2026-08-10
-last_activity_desc: Plan 04-07 completed; targeted dispatcher and quilt gaps closed; GAP-07 remains USER-DEFERRED under D-25.
+last_activity_desc: Owner closure waiver recorded at .planning/phases/04-diagnostics-packaging-launch-configuration/04-VERIFICATION.md; technical verdict remains gaps_found; remaining concerns are USER-ACCEPTED/WAIVED for closure review, normal GSD phase/milestone closure pending; GAP-07 remains USER-DEFERRED under D-25.
 progress:
   total_phases: 4
   completed_phases: 4
@@ -31,8 +31,8 @@ progress:
 
 Phase: 4 of 4 (Diagnostics, Packaging & Launch Configuration)
 Plan: 7 of 7 in current phase
-Status: Phase complete — ready for verification
-Last activity: 2026-08-10 — Plan 04-07 completed; targeted dispatcher and quilt gaps closed; GAP-07 remains USER-DEFERRED under D-25.
+Status: Verification waiver recorded; technical evidence remains gaps_found; normal GSD phase/milestone closure pending
+Last activity: 2026-08-10 — Owner closure waiver recorded in 04-VERIFICATION.md; remaining concerns are USER-ACCEPTED/WAIVED for closure review, technical evidence remains gaps_found, and GAP-07 remains USER-DEFERRED under D-25.
 
 Progress: [██████████] 100%
 
@@ -95,15 +95,17 @@ Progress: [██████████] 100%
 - [Phase ?]: Exercise the production xf_input_handle_event dispatcher with synthetic XI2 cookies and linker-wrapped XGetEventData/XFreeEventData, not a copied state model.
 - [Phase ?]: Keep the canonical local-only configuration in the regression: FreeRDP_TouchPinchWheelFallback=true and FreeRDP_MultiTouchInput=false.
 - [Phase ?]: Refresh one integrated onemix-touch.patch and require a second clean dpkg-source/quilt extraction to match the repaired X11 source and pass the dispatcher regression.
+- [2026-08-10] **Owner closure waiver:** The project owner accepts the bounded Phase 04 concerns for closure review as `USER-ACCEPTED/WAIVED`. Required Debian installation is limited to the exact four-package `+onemix1` closure (`libwinpr3-3`, `libfreerdp3-3`, `libfreerdp-client3-3`, `freerdp3-x11`); `scripts/menu`, `scripts/launch-touch.sh`, and `scripts/check-x11-session.sh` are optional custom/developer scripts. Authoritative record: `.planning/phases/04-diagnostics-packaging-launch-configuration/04-VERIFICATION.md`. The technical verdict remains `gaps_found`. D-25 remains the accepted HIGH `/cert:ignore` server-impersonation/MITM exposure; server certificate identity is not established.
 
 ### Todos
 
-- Complete the Phase 4 verification/ship audit; keep GAP-07 explicitly USER-DEFERRED under D-25.
+- Complete normal GSD phase/milestone closure after reviewing the owner waiver in `.planning/phases/04-diagnostics-packaging-launch-configuration/04-VERIFICATION.md`; technical verification remains `gaps_found`, and GAP-07 remains USER-DEFERRED under D-25.
 
 ### Blockers
 
 - Planning verification override: the owner chose to execute without the final checker verdict after the last three plan fixes.
 - GAP-07 certificate hardening is deferred under D-25; `/cert:ignore` remains with accepted HIGH MITM/server-impersonation risk.
+- The owner closure waiver in `.planning/phases/04-diagnostics-packaging-launch-configuration/04-VERIFICATION.md` records the remaining delivery, privacy, test-evidence, and physical-UAT warnings as `USER-ACCEPTED/WAIVED` for closure review; their evidence remains `gaps_found`, and normal GSD phase/milestone closure is pending.
 
 ### Quick Tasks Completed
 
@@ -113,6 +115,7 @@ Progress: [██████████] 100%
 | 260808-956 | hiện tại freerdp đang để : lúc 2 ngón pan, thì hold wheel và drag chuột. tôi đổi ý muốn hold wheel thì dùng 3 ngón, nếu dùng 2 ngón thì lăn chuột. | 2026-08-08 | build-tree | [260808-956-hi-n-t-i-freerdp-ang-l-c-2-ng-n-pan-th-h](./quick/260808-956-hi-n-t-i-freerdp-ang-l-c-2-ng-n-pan-th-h/) |
 | 260808-b11 | tôi đã chuyển freerdp về KHÔNG multitouch, các thao tác phần lớn đã work, tuy nhiên có một vấn đề nhỏ: khi tôi để 2 ngón để dọc và vuốt xuống, expect scroll thì bị chuyển thành pinch (phóng to thu nhỏ) | 2026-08-08 | build-tree | [260808-b11-t-i-chuy-n-freerdp-v-kh-ng-multitouch-c-](./quick/260808-b11-t-i-chuy-n-freerdp-v-kh-ng-multitouch-c-/) |
 | 4 | Update /usr/local/bin/menu so FreeRDP option 3 uses the canonical patched launch parameters | 2026-08-08 | 67ac6d5 | — |
+| 260810-d0h | Record the owner waiver for remaining Phase 04 blockers and optional custom scripts | 2026-08-10 | 1a0e46d | [260810-d0h-record-owner-decision-that-only-freerdp-](./quick/260810-d0h-record-owner-decision-that-only-freerdp-/) |
 
 ### Research Flags (carried from research summary)
 
@@ -120,12 +123,12 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Last session:** 2026-08-09T23:11:05.859Z
-**Stopped at:** Completed 04-07-PLAN.md
+**Last session:** 2026-08-10T02:41:52.700Z
+**Stopped at:** Completed quick task 260810-d0h owner-waiver record
 **Resume file:** None
 
-- **Last action**: Completed Plan 04-07: exercised the real XI2 dispatcher, repaired canonical cancellation diagnostics, and synchronized the fresh Debian quilt source proof.
-- **Next action**: Complete the Phase 4 verification/ship audit; GAP-07 remains USER-DEFERRED and server certificate identity remains unverified.
+- **Last action**: Recorded the dated owner closure waiver in `.planning/phases/04-diagnostics-packaging-launch-configuration/04-VERIFICATION.md`; the technical verdict remains `gaps_found` and D-25 remains USER-DEFERRED.
+- **Next action**: Complete normal GSD phase/milestone closure after reviewing the owner waiver; retain the `gaps_found` evidence record and the unestablished server certificate identity.
 
 ---
 *State initialized: 2026-08-05*

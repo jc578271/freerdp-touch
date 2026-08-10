@@ -5,6 +5,12 @@ status: gaps_found
 score: 0/4 roadmap must-haves verified
 behavior_unverified: 2
 overrides_applied: 0
+owner_waiver:
+  accepted_by: "project owner"
+  accepted_at: "2026-08-10"
+  disposition: "USER-ACCEPTED/WAIVED"
+  formal_close: "pending normal GSD phase/milestone closure"
+owner_waiver_items: 7
 re_verification:
   previous_status: gaps_found
   previous_score: 0/4
@@ -353,6 +359,24 @@ Choose one of the following before declaring the launch flow security-complete:
 
 1. Replace argv password transport with a supported protected mechanism; or
 2. Explicitly accept the scoped argv exposure in a decision separate from D-25, including its platform assumptions.
+
+<!-- BEGIN: owner-closure-waiver -->
+## Owner Closure Waiver — 2026-08-10
+
+This bounded, non-scoring addendum is authoritative for the project owner's risk acceptance and milestone-close review only. It does not alter the existing Phase 04 evidence, verifier verdict, score, requirement statuses, or `gaps_found` result. Formal closure remains a separate normal GSD phase/milestone closure action. The exact owner disposition for every row is `USER-ACCEPTED/WAIVED`.
+
+| ID | Disposition | Owner-accepted scope | Technical evidence retained |
+|---|---|---|---|
+| OW-01 | USER-ACCEPTED/WAIVED | Required Debian installation is limited to the exact four-package `+onemix1` closure: `libwinpr3-3`, `libfreerdp3-3`, `libfreerdp-client3-3`, and `freerdp3-x11`. `scripts/menu`, `scripts/launch-touch.sh`, and `scripts/check-x11-session.sh` are optional custom/developer scripts and are not required Debian payloads. | The report retains the package-content finding that the four Debian packages do not install those custom scripts and that the documented launcher flow is not a package-only path. |
+| OW-02 | USER-ACCEPTED/WAIVED | The owner accepts the demonstrated Stage-8-to-Stage-9 publication provenance/TOCTOU finding and that `dist` predates the Plan 04-07 repair. | The report retains the release-path validation/bundle provenance failure and the stale-bundle timing evidence. |
+| OW-03 | USER-ACCEPTED/WAIVED | The owner accepts tracked connection/session metadata in diagnostic artifacts and launch material. | The report retains the finding that tracked logs and launch material contain connection/session material. |
+| OW-04 | USER-ACCEPTED/WAIVED | The owner accepts password transport through the FreeRDP process argument. | The report retains that the menu serializes `/p:<password>` into the client argument vector and that private temporary-file permissions do not protect process arguments. |
+| OW-05 | USER-ACCEPTED/WAIVED | The owner accepts the known limits in the signal fixture, wrapper-idempotency fixture, README fixture, and missing final checker verdict as insufficient technical evidence. | The report retains each fixture limitation and the absent final checker verdict without converting those limits into technical results. |
+| OW-06 | USER-ACCEPTED/WAIVED | The owner accepts that exact install/rollback and physical native-X11/RDPEI UAT were not repeated. | The report retains both behavior-unverified items and the requirement for fresh device/package-state evidence. |
+| OW-07 | USER-ACCEPTED/WAIVED | Under D-25, the owner accepts the `/cert:ignore` HIGH server-impersonation/MITM exposure. | The report retains that `/cert:ignore` remains unchanged and that server certificate identity is not established. |
+
+Classification rule: A waiver row is an owner risk-acceptance label, never a technical-success designation. The exact `USER-ACCEPTED/WAIVED` label remains separate from demonstrated failures, behavior-unverified observations, and all other retained evidence.
+<!-- END: owner-closure-waiver -->
 
 ## Human Verification Required After Gap Repair
 
