@@ -1,7 +1,7 @@
-Index: src/channels/rdpei/client/rdpei_main.c
+Index: freerdp3-3.15.0+dfsg/channels/rdpei/client/rdpei_main.c
 ===================================================================
---- src.orig/channels/rdpei/client/rdpei_main.c
-+++ src/channels/rdpei/client/rdpei_main.c
+--- freerdp3-3.15.0+dfsg.orig/channels/rdpei/client/rdpei_main.c
++++ freerdp3-3.15.0+dfsg/channels/rdpei/client/rdpei_main.c
 @@ -95,6 +95,7 @@ typedef struct
  	UINT64 lastPollEventTime;
  	BOOL running;
@@ -54,10 +54,10 @@ Index: src/channels/rdpei/client/rdpei_main.c
  	WINPR_ASSERT(rdpei->base.log);
  
  	InitializeCriticalSection(&rdpei->lock);
-Index: src/client/X11/test_scroll_classifier.c
+Index: freerdp3-3.15.0+dfsg/client/X11/test_scroll_classifier.c
 ===================================================================
 --- /dev/null
-+++ src/client/X11/test_scroll_classifier.c
++++ freerdp3-3.15.0+dfsg/client/X11/test_scroll_classifier.c
 @@ -0,0 +1,128 @@
 +/* Standalone regression model of the two-finger disambiguation rule in
 + * xf_input_two_finger_resolve.  Mirrors the exact claim order and thresholds
@@ -187,10 +187,10 @@ Index: src/client/X11/test_scroll_classifier.c
 +	printf("OK\n");
 +	return 0;
 +}
-Index: src/client/X11/xf_client.c
+Index: freerdp3-3.15.0+dfsg/client/X11/xf_client.c
 ===================================================================
---- src.orig/client/X11/xf_client.c
-+++ src/client/X11/xf_client.c
+--- freerdp3-3.15.0+dfsg.orig/client/X11/xf_client.c
++++ freerdp3-3.15.0+dfsg/client/X11/xf_client.c
 @@ -802,6 +802,7 @@ void xf_toggle_fullscreen(xfContext* xfc
  	if (xfc->debug)
  		xf_ungrab(xfc);
@@ -210,10 +210,10 @@ Index: src/client/X11/xf_client.c
  	PubSub_UnsubscribeChannelConnected(instance->context->pubSub,
  	                                   xf_OnChannelConnectedEventHandler);
  	PubSub_UnsubscribeChannelDisconnected(instance->context->pubSub,
-Index: src/client/X11/xf_event.c
+Index: freerdp3-3.15.0+dfsg/client/X11/xf_event.c
 ===================================================================
---- src.orig/client/X11/xf_event.c
-+++ src/client/X11/xf_event.c
+--- freerdp3-3.15.0+dfsg.orig/client/X11/xf_event.c
++++ freerdp3-3.15.0+dfsg/client/X11/xf_event.c
 @@ -709,6 +709,7 @@ static BOOL xf_event_FocusOut(xfContext*
  		XUngrabKeyboard(xfc->display, CurrentTime);
  
@@ -242,10 +242,10 @@ Index: src/client/X11/xf_event.c
  
  	if (!app)
  		return gdi_send_suppress_output(xfc->common.context.gdi, TRUE);
-Index: src/client/X11/xf_input.c
+Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 ===================================================================
---- src.orig/client/X11/xf_input.c
-+++ src/client/X11/xf_input.c
+--- freerdp3-3.15.0+dfsg.orig/client/X11/xf_input.c
++++ freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 @@ -39,6 +39,8 @@
  #include "xf_utils.h"
  
@@ -1730,10 +1730,10 @@ Index: src/client/X11/xf_input.c
  	{
  		return xf_input_handle_event_remote(xfc, event);
  	}
-Index: src/client/X11/xf_input.h
+Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.h
 ===================================================================
---- src.orig/client/X11/xf_input.h
-+++ src/client/X11/xf_input.h
+--- freerdp3-3.15.0+dfsg.orig/client/X11/xf_input.h
++++ freerdp3-3.15.0+dfsg/client/X11/xf_input.h
 @@ -30,4 +30,6 @@
  int xf_input_init(xfContext* xfc, Window window);
  int xf_input_handle_event(xfContext* xfc, const XEvent* event);
@@ -1741,10 +1741,10 @@ Index: src/client/X11/xf_input.h
 +void xf_touch_force_cancel(xfContext* xfc);
 +
  #endif /* FREERDP_CLIENT_X11_INPUT_H */
-Index: src/client/X11/xf_touch_internal.h
+Index: freerdp3-3.15.0+dfsg/client/X11/xf_touch_internal.h
 ===================================================================
 --- /dev/null
-+++ src/client/X11/xf_touch_internal.h
++++ freerdp3-3.15.0+dfsg/client/X11/xf_touch_internal.h
 @@ -0,0 +1,264 @@
 +/*
 + * xf_touch_internal.h — Shared pure helpers for the X11 touch gesture layer.
@@ -2010,10 +2010,10 @@ Index: src/client/X11/xf_touch_internal.h
 +}
 +
 +#endif /* XF_TOUCH_INTERNAL_H */
-Index: src/client/X11/xfreerdp.h
+Index: freerdp3-3.15.0+dfsg/client/X11/xfreerdp.h
 ===================================================================
---- src.orig/client/X11/xfreerdp.h
-+++ src/client/X11/xfreerdp.h
+--- freerdp3-3.15.0+dfsg.orig/client/X11/xfreerdp.h
++++ freerdp3-3.15.0+dfsg/client/X11/xfreerdp.h
 @@ -124,6 +124,7 @@ typedef struct
  } button_map;
  
@@ -2077,10 +2077,10 @@ Index: src/client/X11/xfreerdp.h
  #endif
  	BOOL xi_rawevent;
  	BOOL xi_event;
-Index: src/client/common/cmdline.c
+Index: freerdp3-3.15.0+dfsg/client/common/cmdline.c
 ===================================================================
---- src.orig/client/common/cmdline.c
-+++ src/client/common/cmdline.c
+--- freerdp3-3.15.0+dfsg.orig/client/common/cmdline.c
++++ freerdp3-3.15.0+dfsg/client/common/cmdline.c
 @@ -1171,6 +1171,57 @@ static int freerdp_client_command_line_p
  		if (!freerdp_settings_set_bool(settings, FreeRDP_MultiTouchGestures, enable))
  			return fail_at(arg, COMMAND_LINE_ERROR);
@@ -2139,10 +2139,10 @@ Index: src/client/common/cmdline.c
  	CommandLineSwitchCase(arg, "echo")
  	{
  		if (!freerdp_settings_set_bool(settings, FreeRDP_SupportEchoChannel, enable))
-Index: src/client/common/cmdline.h
+Index: freerdp3-3.15.0+dfsg/client/common/cmdline.h
 ===================================================================
---- src.orig/client/common/cmdline.h
-+++ src/client/common/cmdline.h
+--- freerdp3-3.15.0+dfsg.orig/client/common/cmdline.h
++++ freerdp3-3.15.0+dfsg/client/common/cmdline.h
 @@ -494,6 +494,12 @@ static const COMMAND_LINE_ARGUMENT_A glo
  #endif
  	{ "toggle-fullscreen", COMMAND_LINE_VALUE_BOOL, NULL, BoolValueTrue, NULL, -1, NULL,
@@ -2156,10 +2156,10 @@ Index: src/client/common/cmdline.h
  	{ "tune", COMMAND_LINE_VALUE_REQUIRED, "<setting:value>,<setting:value>", "", NULL, -1, NULL,
  	  "[experimental] directly manipulate freerdp settings, use with extreme caution!" },
  #if defined(WITH_FREERDP_DEPRECATED_COMMANDLINE)
-Index: src/debian/changelog
+Index: freerdp3-3.15.0+dfsg/debian/changelog
 ===================================================================
---- src.orig/debian/changelog
-+++ src/debian/changelog
+--- freerdp3-3.15.0+dfsg.orig/debian/changelog
++++ freerdp3-3.15.0+dfsg/debian/changelog
 @@ -1,3 +1,10 @@
 +freerdp3 (3.15.0+dfsg-2.1+deb13u3+onemix1) trixie; urgency=medium
 +
@@ -2171,10 +2171,10 @@ Index: src/debian/changelog
  freerdp3 (3.15.0+dfsg-2.1+deb13u3) trixie; urgency=medium
  
    * security fix from 3.25.0:
-Index: src/include/freerdp/settings_types_private.h
+Index: freerdp3-3.15.0+dfsg/include/freerdp/settings_types_private.h
 ===================================================================
---- src.orig/include/freerdp/settings_types_private.h
-+++ src/include/freerdp/settings_types_private.h
+--- freerdp3-3.15.0+dfsg.orig/include/freerdp/settings_types_private.h
++++ freerdp3-3.15.0+dfsg/include/freerdp/settings_types_private.h
 @@ -612,8 +612,11 @@ struct rdp_settings
  	SETTINGS_DEPRECATED(ALIGN64 BOOL SuspendInput);          /* 2636 */
  	SETTINGS_DEPRECATED(ALIGN64 char* KeyboardPipeName);     /* 2637 */
@@ -2189,10 +2189,10 @@ Index: src/include/freerdp/settings_types_private.h
  
  	/* Brush Capabilities */
  	SETTINGS_DEPRECATED(ALIGN64 UINT32 BrushSupportLevel); /* 2688 */
-Index: src/libfreerdp/common/settings_getters.c
+Index: freerdp3-3.15.0+dfsg/libfreerdp/common/settings_getters.c
 ===================================================================
---- src.orig/libfreerdp/common/settings_getters.c
-+++ src/libfreerdp/common/settings_getters.c
+--- freerdp3-3.15.0+dfsg.orig/libfreerdp/common/settings_getters.c
++++ freerdp3-3.15.0+dfsg/libfreerdp/common/settings_getters.c
 @@ -382,6 +382,9 @@ BOOL freerdp_settings_get_bool(WINPR_ATT
  		case FreeRDP_MultiTouchInput:
  			return settings->MultiTouchInput;
@@ -2242,10 +2242,10 @@ Index: src/libfreerdp/common/settings_getters.c
  		case FreeRDP_VCChunkSize:
  			settings->VCChunkSize = cnv.c;
  			break;
-Index: src/libfreerdp/common/settings_str.h
+Index: freerdp3-3.15.0+dfsg/libfreerdp/common/settings_str.h
 ===================================================================
---- src.orig/libfreerdp/common/settings_str.h
-+++ src/libfreerdp/common/settings_str.h
+--- freerdp3-3.15.0+dfsg.orig/libfreerdp/common/settings_str.h
++++ freerdp3-3.15.0+dfsg/libfreerdp/common/settings_str.h
 @@ -254,6 +254,8 @@ static const struct settings_str_entry s
  	{ FreeRDP_TcpKeepAlive, FREERDP_SETTINGS_TYPE_BOOL, "FreeRDP_TcpKeepAlive" },
  	{ FreeRDP_TlsSecurity, FREERDP_SETTINGS_TYPE_BOOL, "FreeRDP_TlsSecurity" },
@@ -2266,10 +2266,10 @@ Index: src/libfreerdp/common/settings_str.h
  	{ FreeRDP_VCChunkSize, FREERDP_SETTINGS_TYPE_UINT32, "FreeRDP_VCChunkSize" },
  	{ FreeRDP_VCFlags, FREERDP_SETTINGS_TYPE_UINT32, "FreeRDP_VCFlags" },
  	{ FreeRDP_MonitorLocalShiftX, FREERDP_SETTINGS_TYPE_INT32, "FreeRDP_MonitorLocalShiftX" },
-Index: src/client/X11/test/CMakeLists.txt
+Index: freerdp3-3.15.0+dfsg/client/X11/test/CMakeLists.txt
 ===================================================================
 --- /dev/null
-+++ src/client/X11/test/CMakeLists.txt
++++ freerdp3-3.15.0+dfsg/client/X11/test/CMakeLists.txt
 @@ -0,0 +1,16 @@
 +set(MODULE_NAME "TestXfInputDispatcher")
 +
@@ -2287,14 +2287,15 @@ Index: src/client/X11/test/CMakeLists.txt
 +
 +add_test(NAME ${MODULE_NAME} COMMAND ${TESTING_OUTPUT_DIRECTORY}/${MODULE_NAME})
 +set_property(TARGET ${MODULE_NAME} PROPERTY FOLDER "FreeRDP/Client/X11/Test")
-Index: src/client/X11/test/TestXfInputDispatcher.c
+Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 ===================================================================
 --- /dev/null
-+++ src/client/X11/test/TestXfInputDispatcher.c
-@@ -0,0 +1,310 @@
++++ freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
+@@ -0,0 +1,375 @@
 +#include <X11/Xlib.h>
 +#include <X11/extensions/XInput2.h>
 +
++#include <freerdp/input.h>
 +#include <freerdp/settings.h>
 +#include <winpr/wlog.h>
 +
@@ -2304,7 +2305,31 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +#include "../xf_input.h"
 +#include "../xfreerdp.h"
 +
++#define MAX_MOUSE_EVENTS 8
++
++typedef struct
++{
++	UINT16 flags[MAX_MOUSE_EVENTS];
++	UINT16 x[MAX_MOUSE_EVENTS];
++	UINT16 y[MAX_MOUSE_EVENTS];
++	size_t count;
++} mouse_capture;
++
 +static char log_capture[16384];
++static mouse_capture mouse_events;
++
++static BOOL capture_mouse_event(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y)
++{
++	(void)input;
++	if (mouse_events.count < MAX_MOUSE_EVENTS)
++	{
++		const size_t index = mouse_events.count++;
++		mouse_events.flags[index] = flags;
++		mouse_events.x[index] = x;
++		mouse_events.y[index] = y;
++	}
++	return TRUE;
++}
 +
 +Bool __wrap_XGetEventData(Display* display, XGenericEventCookie* cookie)
 +{
@@ -2461,6 +2486,45 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +		} \
 +	} while (0)
 +
++static int test_double_tap_anchor(void)
++{
++	rdpSettings* settings = new_settings();
++	rdpInput input = { 0 };
++	xfContext xfc;
++
++	CHECK(settings != NULL, "settings allocation");
++	init_context(&xfc, settings);
++	input.context = &xfc.common.context;
++	input.MouseEvent = capture_mouse_event;
++	xfc.common.context.input = &input;
++	mouse_events = (mouse_capture){ 0 };
++
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 61, 20, 30) == 0, "first Begin");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 61, 20, 30) == 0, "first End");
++	CHECK(mouse_events.count == 2, "first short tap is immediate");
++	CHECK(mouse_events.flags[0] == (PTR_FLAGS_DOWN | PTR_FLAGS_BUTTON1) &&
++	          mouse_events.flags[1] == PTR_FLAGS_BUTTON1,
++	      "first tap emits one left-click pair");
++	CHECK(mouse_events.x[0] == 10 && mouse_events.y[0] == 10 && mouse_events.x[1] == 10 &&
++	          mouse_events.y[1] == 10,
++	      "first tap uses adjusted coordinates");
++
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 62, 24, 33) == 0, "second Begin");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 62, 24, 33) == 0, "second End");
++	CHECK(mouse_events.count == 4, "two taps emit two complete click pairs");
++	for (size_t i = 0; i < mouse_events.count; i++)
++	{
++		CHECK(mouse_events.flags[i] ==
++		          ((i % 2 == 0) ? (PTR_FLAGS_DOWN | PTR_FLAGS_BUTTON1) : PTR_FLAGS_BUTTON1),
++		      "tap pair flags are ordered down/up");
++		CHECK(mouse_events.x[i] == 10 && mouse_events.y[i] == 10,
++		      "nearby second tap reuses the first adjusted coordinate");
++	}
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
 +static int test_quarantine_recovery(void)
 +{
 +	rdpSettings* settings = new_settings();
@@ -2594,6 +2658,7 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +int main(void)
 +{
 +	CHECK(configure_log_capture(), "configure WLog callback appender");
++	CHECK(test_double_tap_anchor() == 0, "double-tap anchor scenario");
 +	CHECK(test_quarantine_recovery() == 0, "quarantine recovery scenario");
 +	CHECK(test_diagnostic_lifecycle() == 0, "diagnostic lifecycle scenario");
 +	CHECK(test_third_finger_compaction() == 0, "third-finger compaction scenario");
@@ -2602,10 +2667,10 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +	(void)puts("OK");
 +	return 0;
 +}
-Index: src/client/X11/CMakeLists.txt
+Index: freerdp3-3.15.0+dfsg/client/X11/CMakeLists.txt
 ===================================================================
---- src.orig/client/X11/CMakeLists.txt
-+++ src/client/X11/CMakeLists.txt
+--- freerdp3-3.15.0+dfsg.orig/client/X11/CMakeLists.txt
++++ freerdp3-3.15.0+dfsg/client/X11/CMakeLists.txt
 @@ -194,3 +194,7 @@ add_subdirectory(cli)
  add_subdirectory(man)
  
