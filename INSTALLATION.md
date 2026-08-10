@@ -33,18 +33,24 @@ Run as the normal user, without `sudo`:
 
 This creates the four packages under `dist/`. It does not install them.
 
-## 4. Verify and install
+## 4. Verify and install or reinstall
+
+Run this copy-paste script from the repository root after each build. It verifies and installs exactly the four packages in the current `dist/` bundle, even when the version string has not changed.
 
 ```bash
-bundle="$(readlink -f dist)"
+(
+  set -eu
+  bundle="$(readlink -f dist)"
 
-(cd "$bundle" && sha256sum -c SHA256SUMS)
+  cd "$bundle"
+  sha256sum -c SHA256SUMS
 
-sudo apt install -y --allow-downgrades \
-  "$bundle/libwinpr3-3_3.15.0+dfsg-2.1+deb13u3+onemix1_amd64.deb" \
-  "$bundle/libfreerdp3-3_3.15.0+dfsg-2.1+deb13u3+onemix1_amd64.deb" \
-  "$bundle/libfreerdp-client3-3_3.15.0+dfsg-2.1+deb13u3+onemix1_amd64.deb" \
-  "$bundle/freerdp3-x11_3.15.0+dfsg-2.1+deb13u3+onemix1_amd64.deb"
+  sudo apt install -y --allow-downgrades \
+    "$bundle/libwinpr3-3_3.15.0+dfsg-2.1+deb13u3+onemix1_amd64.deb" \
+    "$bundle/libfreerdp3-3_3.15.0+dfsg-2.1+deb13u3+onemix1_amd64.deb" \
+    "$bundle/libfreerdp-client3-3_3.15.0+dfsg-2.1+deb13u3+onemix1_amd64.deb" \
+    "$bundle/freerdp3-x11_3.15.0+dfsg-2.1+deb13u3+onemix1_amd64.deb"
+)
 ```
 
 ## 5. Confirm
