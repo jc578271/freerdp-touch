@@ -268,12 +268,16 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  #include <winpr/wtypes.h>
  #include <freerdp/log.h>
  #define TAG CLIENT_TAG("x11")
-@@ -50,6 +52,30 @@
+@@ -50,6 +52,34 @@
  
  #define MIN_FINGER_DIST 5
  
 +/* D-08: two-finger distance change required before first wheel detent (px) */
 +#define PINCH_DEADBAND_PX 8
++
++/* ponytail: OneMix 3's rapid retaps reach 16.64 px; expose a separate setting
++ * only if another panel needs a different double-tap anchor tolerance. */
++#define DOUBLE_TAP_ANCHOR_SLOP_PX 20
 +
 +/* ponytail: structural geometric ratio, not a physical calibration value;
 + * promote to an rdpSetting only if real hardware jitter requires tuning
@@ -299,7 +303,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  static int xf_input_event(xfContext* xfc, WINPR_ATTR_UNUSED const XEvent* xevent,
                            XIDeviceEvent* event, int evtype);
  
-@@ -99,6 +125,29 @@ static BOOL register_input_events(xfCont
+@@ -99,6 +129,29 @@ static BOOL register_input_events(xfCont
  		if (strcmp(dev->name, "Virtual core pointer") == 0)
  			continue;
  
@@ -329,7 +333,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  		for (int j = 0; j < dev->num_classes; j++)
  		{
  			const XIAnyClassInfo* class = dev->classes[j];
-@@ -106,7 +155,8 @@ static BOOL register_input_events(xfCont
+@@ -106,7 +159,8 @@ static BOOL register_input_events(xfCont
  			switch (class->type)
  			{
  				case XITouchClass:
@@ -339,7 +343,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  					{
  						const XITouchClassInfo* t = (const XITouchClassInfo*)class;
  						if (t->mode == XIDirectTouch)
-@@ -119,12 +169,21 @@ static BOOL register_input_events(xfCont
+@@ -119,12 +173,21 @@ static BOOL register_input_events(xfCont
  							XISetMask(masks[nmasks], XI_TouchBegin);
  							XISetMask(masks[nmasks], XI_TouchUpdate);
  							XISetMask(masks[nmasks], XI_TouchEnd);
@@ -361,7 +365,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  					WLog_DBG(TAG, "%s button device (id: %d, mode: %d)", dev->name, dev->deviceid,
  					         t->num_buttons);
  					XISetMask(masks[nmasks], XI_ButtonPress);
-@@ -241,6 +300,54 @@ static BOOL register_device_events(xfCon
+@@ -241,6 +304,54 @@ static BOOL register_device_events(xfCon
  	return TRUE;
  }
  
@@ -416,7 +420,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  int xf_input_init(xfContext* xfc, Window window)
  {
  	int major = XI_2_Major;
-@@ -256,6 +363,51 @@ int xf_input_init(xfContext* xfc, Window
+@@ -256,6 +367,51 @@ int xf_input_init(xfContext* xfc, Window
  	xfc->px_vector = 0;
  	xfc->py_vector = 0;
  	xfc->active_contacts = 0;
@@ -468,7 +472,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  
  	if (!XQueryExtension(xfc->display, "XInputExtension", &opcode, &event, &error))
  	{
-@@ -282,6 +434,28 @@ int xf_input_init(xfContext* xfc, Window
+@@ -282,6 +438,28 @@ int xf_input_init(xfContext* xfc, Window
  			return -1;
  		if (!register_device_events(xfc, window))
  			return -1;
@@ -497,7 +501,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  	}
  
  	return 0;
-@@ -638,6 +812,834 @@ static void xf_input_show_cursor(xfConte
+@@ -638,6 +816,832 @@ static void xf_input_show_cursor(xfConte
  #endif
  }
  
@@ -1270,19 +1274,17 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
 +				const UINT64 now = GetTickCount64();
 +				UINT32 duration = freerdp_settings_get_uint32(
 +				    settings, FreeRDP_TouchLongPressDurationMs);
-+				UINT32 slop = freerdp_settings_get_uint32(settings, FreeRDP_TouchLongPressSlopPx);
 +				BOOL reuseAnchor = FALSE;
 +				int outputX = tapX;
 +				int outputY = tapY;
 +
 +				if (duration == 0)
 +					duration = 500;
-+				if (slop == 0)
-+					slop = 12;
 +				if (xfc->tapPairValid &&
 +				    now - xfc->tapPairTime <= (UINT64)duration &&
 +				    hypot((double)tapX - (double)xfc->tapPairX,
-+				          (double)tapY - (double)xfc->tapPairY) <= (double)slop)
++				          (double)tapY - (double)xfc->tapPairY) <=
++				        (double)DOUBLE_TAP_ANCHOR_SLOP_PX)
 +				{
 +					reuseAnchor = TRUE;
 +					outputX = xfc->tapPairX;
@@ -1332,7 +1334,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  static int xf_input_touch_remote(xfContext* xfc, XIDeviceEvent* event, int evtype)
  {
  	int x = 0;
-@@ -645,31 +1647,275 @@ static int xf_input_touch_remote(xfConte
+@@ -645,31 +1649,275 @@ static int xf_input_touch_remote(xfConte
  	int touchId = 0;
  	RdpeiClientContext* rdpei = xfc->common.rdpei;
  
@@ -1619,7 +1621,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  }
  
  static BOOL xf_input_pen_remote(xfContext* xfc, XIDeviceEvent* event, int evtype, int deviceid)
-@@ -862,8 +2108,98 @@ static int xf_input_handle_event_remote(
+@@ -862,8 +2110,98 @@ static int xf_input_handle_event_remote(
  
  	if ((cookie.cc->type == GenericEvent) && (cookie.cc->extension == xfc->XInputOpcode))
  	{
@@ -1718,7 +1720,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  			case XI_TouchBegin:
  				xf_input_pens_unhover(xfc);
  				/* fallthrough */
-@@ -876,9 +2212,21 @@ static int xf_input_handle_event_remote(
+@@ -876,9 +2214,21 @@ static int xf_input_handle_event_remote(
  			case XI_Motion:
  			case XI_ButtonRelease:
  			{
@@ -1741,7 +1743,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  
  				if (freerdp_client_is_pen(&xfc->common, deviceid))
  				{
-@@ -889,6 +2237,12 @@ static int xf_input_handle_event_remote(
+@@ -889,6 +2239,12 @@ static int xf_input_handle_event_remote(
  					}
  					break;
  				}
@@ -1754,7 +1756,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  			}
  				/* fallthrough */
  				WINPR_FALLTHROUGH
-@@ -897,10 +2251,10 @@ static int xf_input_handle_event_remote(
+@@ -897,10 +2253,10 @@ static int xf_input_handle_event_remote(
  				xf_input_event(xfc, event, cookie.cc->data, cookie.cc->evtype);
  				break;
  		}
@@ -1766,7 +1768,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  }
  
  #else
-@@ -910,6 +2264,14 @@ int xf_input_init(xfContext* xfc, Window
+@@ -910,6 +2266,14 @@ int xf_input_init(xfContext* xfc, Window
  	return 0;
  }
  
@@ -1781,7 +1783,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  #endif
  
  int xf_input_handle_event(xfContext* xfc, const XEvent* event)
-@@ -921,7 +2283,8 @@ int xf_input_handle_event(xfContext* xfc
+@@ -921,7 +2285,8 @@ int xf_input_handle_event(xfContext* xfc
  	settings = xfc->common.context.settings;
  	WINPR_ASSERT(settings);
  
@@ -2355,7 +2357,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 ===================================================================
 --- /dev/null
 +++ freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
-@@ -0,0 +1,493 @@
+@@ -0,0 +1,511 @@
 +#include <X11/Xlib.h>
 +#include <X11/extensions/XInput2.h>
 +
@@ -2369,7 +2371,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 +#include "../xf_input.h"
 +#include "../xfreerdp.h"
 +
-+#define MAX_MOUSE_EVENTS 8
++#define MAX_MOUSE_EVENTS 14
 +
 +typedef struct
 +{
@@ -2585,15 +2587,33 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 +		      "10px nearby second tap reuses the first adjusted coordinate");
 +	}
 +
-+	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 63, 40, 30) == 0, "old-anchor third Begin");
-+	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 63, 40, 30) == 0, "old-anchor third End");
-+	CHECK(mouse_events.count == 6, "third tap creates a fresh anchor");
-+	xfc.tapPairTime -= 550;
-+	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 64, 50, 30) == 0, "old-anchor fourth Begin");
-+	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 64, 50, 30) == 0, "old-anchor fourth End");
-+	CHECK(mouse_events.count == 8, "old anchor still emits a complete click");
-+	CHECK(mouse_events.x[6] == 40 && mouse_events.y[6] == 10 && mouse_events.x[7] == 40 &&
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 63, 20, 30) == 0, "capture-vector first Begin");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 63, 20, 30) == 0, "capture-vector first End");
++	CHECK(mouse_events.count == 6, "capture-vector first tap creates a fresh anchor");
++	/* The capture includes a 14-by-9 px (16.64 px) rapid retap.  It must
++	 * preserve the first remote coordinate without loosening drag/pan slop. */
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 64, 34, 39) == 0, "capture-vector second Begin");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 64, 34, 39) == 0, "capture-vector second End");
++	CHECK(mouse_events.count == 8, "capture-vector emits a complete second click");
++	CHECK(mouse_events.x[6] == 10 && mouse_events.y[6] == 10 && mouse_events.x[7] == 10 &&
 +	          mouse_events.y[7] == 10,
++	      "16.64px rapid retap reuses the first adjusted coordinate");
++
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 65, 20, 30) == 0, "distant-pair first Begin");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 65, 20, 30) == 0, "distant-pair first End");
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 66, 51, 30) == 0, "distant-pair second Begin");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 66, 51, 30) == 0, "distant-pair second End");
++	CHECK(mouse_events.count == 12, "distant pair still emits two complete clicks");
++	CHECK(mouse_events.x[10] == 41 && mouse_events.y[10] == 10 && mouse_events.x[11] == 41 &&
++	          mouse_events.y[11] == 10,
++	      "31px rapid retap remains at its own adjusted coordinate");
++
++	xfc.tapPairTime -= 550;
++	CHECK(dispatch_touch(&xfc, XI_TouchBegin, 67, 60, 30) == 0, "old-anchor Begin");
++	CHECK(dispatch_touch(&xfc, XI_TouchEnd, 67, 60, 30) == 0, "old-anchor End");
++	CHECK(mouse_events.count == 14, "old anchor still emits a complete click");
++	CHECK(mouse_events.x[12] == 50 && mouse_events.y[12] == 10 && mouse_events.x[13] == 50 &&
++	          mouse_events.y[13] == 10,
 +	      "550ms-old tap anchor is too old to reuse");
 +
 +	freerdp_settings_free(settings);
