@@ -38,12 +38,13 @@ S
 #!/bin/bash
 set -eu
 [ "$1" = "-MDpkg::Control" ]
-case "$2" in
+[ "$2" = "-e" ]
+case "$3" in
   *Dpkg::Control*CTRL_DSC*allow_pgp*) ;;
   *) printf 'FAIL: unexpected Perl control parser expression\n' >&2; exit 1 ;;
 esac
-printf '%s|%s\n' "$4" "$3" >> "${FIXTURE_PERL_LOG:?}"
-case "$4" in
+printf '%s|%s\n' "$5" "$4" >> "${FIXTURE_PERL_LOG:?}"
+case "$5" in
   Source) printf 'freerdp3' ;;
   Version) printf '3.15.0+dfsg-2.1+deb13u3' ;;
   Build-Depends) printf 'debhelper-compat (= 13)' ;;

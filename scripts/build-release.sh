@@ -12,22 +12,51 @@
 
 set -eu
 
+# Resolve repo root (scripts/ is always one level below the repo root)
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
 # ---------------------------------------------------------------------------
 # Stage 1: version pin-check
 # ---------------------------------------------------------------------------
 printf '=== Stage 1: version pin-check ===\n' >&2
 PINNED="3.15.0+dfsg-2.1+deb13u3"
-resolved=$(apt-cache showsrc freerdp3 | awk '/^Version:/{print $2; exit}')
-if [ "$resolved" != "$PINNED" ]; then
-  printf 'ERROR: apt source freerdp3 resolves to %s, expected %s.\n' \
-    "$resolved" "$PINNED" >&2
+shopt -s nullglob
+DSC_CANDIDATES=("${REPO_ROOT}"/src/*.dsc)
+shopt -u nullglob
+if [ "${#DSC_CANDIDATES[@]}" -ne 1 ]; then
+  printf 'ERROR: expected exactly one readable DSC under %s/src; found %d.\n' \
+    "$REPO_ROOT" "${#DSC_CANDIDATES[@]}" >&2
+  exit 1
+fi
+DSC="${DSC_CANDIDATES[0]}"
+if [ ! -f "$DSC" ] || [ ! -r "$DSC" ]; then
+  printf 'ERROR: local DSC is not a readable regular file: %s\n' "$DSC" >&2
+  exit 1
+fi
+
+dsc_field() {
+  local field="$1"
+  perl -MDpkg::Control -e '$c=Dpkg::Control->new(type => CTRL_DSC, allow_pgp => 1); $c->load($ARGV[0]); print $c->{$ARGV[1]};' "$DSC" "$field"
+}
+
+SOURCE_NAME=$(dsc_field Source)
+BASE_VERSION=$(dsc_field Version)
+BUILD_DEPENDS=$(dsc_field Build-Depends)
+if [ -z "$SOURCE_NAME" ] || [ -z "$BASE_VERSION" ] || [ -z "$BUILD_DEPENDS" ]; then
+  printf 'ERROR: local DSC is missing Source, Version, or Build-Depends metadata: %s\n' "$DSC" >&2
+  exit 1
+fi
+if [ "$SOURCE_NAME" != "freerdp3" ]; then
+  printf 'ERROR: local DSC Source is %s, expected freerdp3.\n' "$SOURCE_NAME" >&2
+  exit 1
+fi
+if [ "$BASE_VERSION" != "$PINNED" ]; then
+  printf 'ERROR: local DSC version is %s, expected %s.\n' \
+    "$BASE_VERSION" "$PINNED" >&2
   printf '       Updating the release requires an explicit project decision.\n' >&2
   exit 1
 fi
-printf 'Pin-check OK: resolved version %s matches pinned %s.\n' "$resolved" "$PINNED" >&2
-
-# Resolve repo root (scripts/ is always one level below the repo root)
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+printf 'Local source pin-check OK: %s %s.\n' "$SOURCE_NAME" "$BASE_VERSION" >&2
 
 # ---------------------------------------------------------------------------
 # Stage 2: acquire non-blocking lock
@@ -46,6 +75,7 @@ printf 'Lock acquired.\n' >&2
 bundle_dir=""
 tmp_link=""
 classifier_bin=""
+WORKDIR=""
 
 # Publication-aware cleanup trap: never deletes a bundle that dist currently
 # resolves to. Old-bundle sweep happens explicitly after swap success.
@@ -62,6 +92,7 @@ cleanup() {
   fi
   rm -f "$tmp_link"
   [ -n "$classifier_bin" ] && rm -f "$classifier_bin"
+  [ -n "$WORKDIR" ] && [ -d "$WORKDIR" ] && rm -rf "$WORKDIR"
   exit $rc
 }
 trap cleanup EXIT
@@ -73,12 +104,6 @@ trap 'exit 143' TERM
 # Stage 3: fresh extraction from pinned .dsc
 # ---------------------------------------------------------------------------
 printf '=== Stage 3: fresh extraction ===\n' >&2
-DSC="${REPO_ROOT}/build/freerdp3_3.15.0+dfsg-2.1+deb13u3.dsc"
-if [ ! -f "$DSC" ]; then
-  printf 'ERROR: DSC file not found: %s\n' "$DSC" >&2
-  exit 1
-fi
-
 WORKDIR=$(mktemp -u /tmp/onemix-build-XXXXXX)
 printf 'Extracting to %s\n' "$WORKDIR" >&2
 dpkg-source -x "$DSC" "$WORKDIR" >/dev/null 2>&1
@@ -119,7 +144,7 @@ printf 'Patch applied OK.\n' >&2
 # Stage 5: version assertion
 # ---------------------------------------------------------------------------
 printf '=== Stage 5: version assertion ===\n' >&2
-EXPECTED_VER="3.15.0+dfsg-2.1+deb13u3+onemix1"
+EXPECTED_VER="${BASE_VERSION}+onemix1"
 ACTUAL_VER=$(cd "$WORKDIR" && dpkg-parsechangelog -SVersion)
 if [ "$ACTUAL_VER" != "$EXPECTED_VER" ]; then
   printf 'ERROR: changelog version is %s, expected %s.\n' \
@@ -143,6 +168,11 @@ fi
 rm -f "$classifier_bin"
 classifier_bin=""
 printf 'Classifier check: OK.\n' >&2
+
+if [ "${BUILD_RELEASE_SMOKE:-}" = "1" ]; then
+  printf 'Pre-build smoke completed; package build and publication skipped.\n' >&2
+  exit 0
+fi
 
 # ---------------------------------------------------------------------------
 # Stage 7: build
@@ -269,6 +299,7 @@ done
 # Stage 12: clean up build workspace
 # ---------------------------------------------------------------------------
 rm -rf "$WORKDIR"
+WORKDIR=""
 printf 'Cleaned up build workspace.\n' >&2
 
 # ---------------------------------------------------------------------------
