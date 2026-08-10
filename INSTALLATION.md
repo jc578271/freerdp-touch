@@ -17,7 +17,7 @@ Replace `<GITHUB_REPOSITORY_URL>` with your repository URL.
 ## 2. Install build dependencies
 
 ```bash
-sudo apt install -y quilt build-essential dpkg-dev
+sudo apt install -y quilt build-essential dpkg-dev xinput
 
 sudo apt-get build-dep -y \
   ./src/freerdp3_3.15.0+dfsg-2.1+deb13u3.dsc
