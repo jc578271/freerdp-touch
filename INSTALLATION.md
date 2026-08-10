@@ -45,7 +45,7 @@ Run this copy-paste script from the repository root after each build. It verifie
   cd "$bundle"
   sha256sum -c SHA256SUMS
 
-  sudo apt install -y --allow-downgrades \
+  sudo apt install -y --reinstall --allow-downgrades \
     "$bundle/libwinpr3-3_3.15.0+dfsg-2.1+deb13u3+onemix1_amd64.deb" \
     "$bundle/libfreerdp3-3_3.15.0+dfsg-2.1+deb13u3+onemix1_amd64.deb" \
     "$bundle/libfreerdp-client3-3_3.15.0+dfsg-2.1+deb13u3+onemix1_amd64.deb" \
