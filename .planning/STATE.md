@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
-stopped_at: Completed 04-07-PLAN.md
-last_updated: "2026-08-10T02:41:52.700Z"
+stopped_at: Completed quick task 260810-e0n
+last_updated: "2026-08-10T03:47:05.334Z"
 last_activity: 2026-08-10
-last_activity_desc: Owner closure waiver recorded at .planning/phases/04-diagnostics-packaging-launch-configuration/04-VERIFICATION.md; technical verdict remains gaps_found; remaining concerns are USER-ACCEPTED/WAIVED for closure review, normal GSD phase/milestone closure pending; GAP-07 remains USER-DEFERRED under D-25.
+last_activity_desc: Quick task 260810-e0n completed; pinned Debian source inputs are tracked under src/, build-release uses the local signed DSC with a pre-build smoke path, and sensitive diagnostic logs are ignored and untracked.
 progress:
   total_phases: 4
   completed_phases: 4
@@ -32,7 +32,7 @@ progress:
 Phase: 4 of 4 (Diagnostics, Packaging & Launch Configuration)
 Plan: 7 of 7 in current phase
 Status: Verification waiver recorded; technical evidence remains gaps_found; normal GSD phase/milestone closure pending
-Last activity: 2026-08-10 — Owner closure waiver recorded in 04-VERIFICATION.md; remaining concerns are USER-ACCEPTED/WAIVED for closure review, technical evidence remains gaps_found, and GAP-07 remains USER-DEFERRED under D-25.
+Last activity: 2026-08-10 — Fresh clones now carry the exact pinned Debian source package under `src/`; the release script validates that local DSC and supports a non-publishing pre-build smoke check; diagnostic logs are no longer tracked.
 
 Progress: [██████████] 100%
 
@@ -96,6 +96,7 @@ Progress: [██████████] 100%
 - [Phase ?]: Keep the canonical local-only configuration in the regression: FreeRDP_TouchPinchWheelFallback=true and FreeRDP_MultiTouchInput=false.
 - [Phase ?]: Refresh one integrated onemix-touch.patch and require a second clean dpkg-source/quilt extraction to match the repaired X11 source and pass the dispatcher regression.
 - [2026-08-10] **Owner closure waiver:** The project owner accepts the bounded Phase 04 concerns for closure review as `USER-ACCEPTED/WAIVED`. Required Debian installation is limited to the exact four-package `+onemix1` closure (`libwinpr3-3`, `libfreerdp3-3`, `libfreerdp-client3-3`, `freerdp3-x11`); `scripts/menu`, `scripts/launch-touch.sh`, and `scripts/check-x11-session.sh` are optional custom/developer scripts. Authoritative record: `.planning/phases/04-diagnostics-packaging-launch-configuration/04-VERIFICATION.md`. The technical verdict remains `gaps_found`. D-25 remains the accepted HIGH `/cert:ignore` server-impersonation/MITM exposure; server certificate identity is not established.
+- [Quick 260810-e0n] Fresh-clone builds use exactly one tracked signed `src/*.dsc` plus its two checksum-bound source archives. `scripts/build-release.sh` derives the pinned base version from that local descriptor, reuses it for `dpkg-source -x`, and supports `BUILD_RELEASE_SMOKE=1`; `rdp-debug*.log` is ignored and the existing sensitive logs remain local but untracked.
 
 ### Todos
 
@@ -116,6 +117,7 @@ Progress: [██████████] 100%
 | 260808-b11 | tôi đã chuyển freerdp về KHÔNG multitouch, các thao tác phần lớn đã work, tuy nhiên có một vấn đề nhỏ: khi tôi để 2 ngón để dọc và vuốt xuống, expect scroll thì bị chuyển thành pinch (phóng to thu nhỏ) | 2026-08-08 | build-tree | [260808-b11-t-i-chuy-n-freerdp-v-kh-ng-multitouch-c-](./quick/260808-b11-t-i-chuy-n-freerdp-v-kh-ng-multitouch-c-/) |
 | 4 | Update /usr/local/bin/menu so FreeRDP option 3 uses the canonical patched launch parameters | 2026-08-08 | 67ac6d5 | — |
 | 260810-d0h | Record the owner waiver for remaining Phase 04 blockers and optional custom scripts | 2026-08-10 | 22ac689 | [260810-d0h-record-owner-decision-that-only-freerdp-](./quick/260810-d0h-record-owner-decision-that-only-freerdp-/) |
+| 260810-e0n | Track pinned Debian source inputs, use the local DSC for release builds, and ignore sensitive diagnostic logs | 2026-08-10 | d043fe5 | [260810-e0n-create-src-containing-the-three-pinned-d](./quick/260810-e0n-create-src-containing-the-three-pinned-d/) |
 
 ### Research Flags (carried from research summary)
 
@@ -123,11 +125,11 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Last session:** 2026-08-10T02:41:52.700Z
-**Stopped at:** Completed quick task 260810-d0h owner-waiver record
+**Last session:** 2026-08-10T03:47:05.334Z
+**Stopped at:** Completed quick task 260810-e0n source portability and log hygiene
 **Resume file:** None
 
-- **Last action**: Recorded the dated owner closure waiver in `.planning/phases/04-diagnostics-packaging-launch-configuration/04-VERIFICATION.md`; the technical verdict remains `gaps_found` and D-25 remains USER-DEFERRED.
+- **Last action**: Tracked the exact pinned Debian source package under `src/`, changed release source authority from mutable APT metadata to the local signed DSC, added the pre-build smoke path, and removed sensitive diagnostic logs from the Git index while retaining their local files.
 - **Next action**: Complete normal GSD phase/milestone closure after reviewing the owner waiver; retain the `gaps_found` evidence record and the unestablished server certificate identity.
 
 ---
