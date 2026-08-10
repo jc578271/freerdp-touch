@@ -58,7 +58,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test_scroll_classifier.c
 ===================================================================
 --- /dev/null
 +++ freerdp3-3.15.0+dfsg/client/X11/test_scroll_classifier.c
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,141 @@
 +/* Standalone regression model of the two-finger disambiguation rule in
 + * xf_input_two_finger_resolve.  Mirrors the exact claim order and thresholds
 + * from the source.  If this model drifts from the source the static guard
@@ -115,32 +115,43 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test_scroll_classifier.c
 +	 * With 2.5 ratio: 9 > 2.5*4=10 → FALSE → PENDING (fix). */
 +	{
 +		Claim c = resolve(200.0, 100.0, 200.0,
-+		                  100.0, 109.0, 100.0, 300.0, 8.0);
++		                  100.0, 109.0, 100.0, 300.0, 12.0);
 +		assert(c == PENDING);
 +		assert(c != PINCH);
 +	}
 +
-+	/* --- Case 2: Vertical 9px first update, second finger catches up.
-+	 * A stays at (100,109), B moves to (100,309).
-+	 * pinchDelta = |sqrt(0^2+200^2)-200| = 0, panDelta=9 → SCROLL. */
++	/* --- Case 2: Vertical translation stays pending below 12px, then claims.
++	 * A=(100,100), B=(100,300), baseline mid=(100,200).
++	 * At A=(100,109), B=(100,309), distance stays 200 and panDelta=9:
++	 * below the 12px pan deadband, so the classifier remains PENDING.
++	 * At A=(100,112), B=(100,312), panDelta=12: the boundary claims SCROLL. */
 +	{
 +		Claim c = resolve(200.0, 100.0, 200.0,
-+		                  100.0, 109.0, 100.0, 309.0, 8.0);
++		                  100.0, 109.0, 100.0, 309.0, 12.0);
++		assert(c == PENDING);
++
++		c = resolve(200.0, 100.0, 200.0,
++		            100.0, 112.0, 100.0, 312.0, 12.0);
 +		assert(c == SCROLL);
 +	}
 +
-+	/* --- Case 3: Horizontal 8px one-finger-first swipe → PENDING.
-+	 * A=(100,200), B=(300,200).  A→(108,200): pinchDelta=8, int midX=204, panDelta=4.
-+	 * 8 > 2.5*4=10 → FALSE → PENDING. */
++	/* --- Case 3: Horizontal translation stays pending below 12px, then claims.
++	 * A=(100,200), B=(300,200), baseline mid=(200,200).
++	 * A→(108,200) alone changes the distance by 8px and moves the midpoint
++	 * by 4px, so it remains PENDING. Both fingers at x=111 move the midpoint
++	 * by 11px and remain PENDING; at x=112 the midpoint moves 12px → SCROLL. */
 +	{
 +		Claim c = resolve(200.0, 200.0, 200.0,
-+		                  108.0, 200.0, 300.0, 200.0, 8.0);
++		                  108.0, 200.0, 300.0, 200.0, 12.0);
 +		assert(c == PENDING);
 +		assert(c != PINCH);
 +
-+		/* Both catch up: A→(109,200), B→(309,200) → SCROLL. */
 +		c = resolve(200.0, 200.0, 200.0,
-+		            109.0, 200.0, 309.0, 200.0, 8.0);
++		            111.0, 200.0, 311.0, 200.0, 12.0);
++		assert(c == PENDING);
++
++		c = resolve(200.0, 200.0, 200.0,
++		            112.0, 200.0, 312.0, 200.0, 12.0);
 +		assert(c == SCROLL);
 +	}
 +
@@ -150,14 +161,14 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test_scroll_classifier.c
 +	 * 8 > 2.5*4=10 → FALSE → PENDING. */
 +	{
 +		Claim c = resolve(200.0, 100.0, 200.0,
-+		                  100.0, 108.0, 100.0, 300.0, 8.0);
++		                  100.0, 108.0, 100.0, 300.0, 12.0);
 +		assert(c == PENDING);
 +
 +		/* Second: B also moves →(100,292). Total A=108, B=292.
 +		 * dist=|sqrt(0^2+184^2)-200|=16, midY=200, panDelta=0.
 +		 * 16 > 2.5*0=0, 16 ≥ 8 → PINCH. */
 +		c = resolve(200.0, 100.0, 200.0,
-+		            100.0, 108.0, 100.0, 292.0, 8.0);
++		            100.0, 108.0, 100.0, 292.0, 12.0);
 +		assert(c == PINCH);
 +	}
 +
@@ -165,7 +176,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test_scroll_classifier.c
 +	 * A→(100,120), B→(100,280): pinchDelta=40, mid stays, panDelta=0 → PINCH. */
 +	{
 +		Claim c = resolve(200.0, 100.0, 200.0,
-+		                  100.0, 120.0, 100.0, 280.0, 8.0);
++		                  100.0, 120.0, 100.0, 280.0, 12.0);
 +		assert(c == PINCH);
 +	}
 +
@@ -173,14 +184,16 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test_scroll_classifier.c
 +	 * A→(100,80), B→(100,320): pinchDelta=40, panDelta=0 → PINCH. */
 +	{
 +		Claim c = resolve(200.0, 100.0, 200.0,
-+		                  100.0, 80.0, 100.0, 320.0, 8.0);
++		                  100.0, 80.0, 100.0, 320.0, 12.0);
 +		assert(c == PINCH);
 +	}
 +
-+	/* --- Case 7: Diagonal scroll — both fingers translate together. */
++	/* --- Case 7: Diagonal scroll — both fingers translate together.
++	 * A/B move by (9,9), so the midpoint displacement is sqrt(162)=12.7px
++	 * and clears the 12px pan deadband without changing inter-finger distance. */
 +	{
 +		Claim c = resolve(200.0, 100.0, 200.0,
-+		                  108.0, 108.0, 108.0, 308.0, 8.0);
++		                  109.0, 109.0, 109.0, 309.0, 12.0);
 +		assert(c == SCROLL);
 +	}
 +

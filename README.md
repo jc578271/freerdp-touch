@@ -7,7 +7,7 @@ actions -- no external mouse needed for common interactions.
 ## What it does
 
 - One-finger tap / drag = left-click / left-button drag
-- One-finger long-press (600 ms) = right-click
+- One-finger long-press (500 ms) = right-click
 - Two-finger vertical/horizontal scroll = wheel scroll
 - Two-finger pinch = Ctrl + wheel (zoom)
 - Three-finger translation = middle-button drag
@@ -119,7 +119,7 @@ rotation -> wrapper -> installed `/usr/bin/xfreerdp3`.
 menu
 ```
 
-Choose option 3. Defaults: long-press 600 ms, slop 8 px.
+Choose option 3. Defaults: long-press 500 ms, slop 12 px.
 
 ### Diagnostic mode
 
