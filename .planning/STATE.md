@@ -6,7 +6,7 @@ current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
 stopped_at: Completed quick task 260810-qqz
-last_updated: "2026-08-10T13:30:01.427Z"
+last_updated: "2026-08-10T13:33:34.924Z"
 last_activity: 2026-08-10
 last_activity_desc: "Completed quick task 260810-qqz: hiện tại lúc tôi double touch để vào folder, gesture này không ổn định, lúc được lúc không, fix cho tôi"
 progress:
@@ -124,6 +124,7 @@ Progress: [██████████] 100%
 | 9 | Thêm lệnh cài custom menu vào /usr/local/bin trong INSTALLATION.md | 2026-08-10 | 36f93c9 | — |
 | 260810-qqz | hiện tại lúc tôi double touch để vào folder, gesture này không ổn định, lúc được lúc không, fix cho tôi | 2026-08-10 | 0d21fa3 | [260810-qqz-hi-n-t-i-l-c-t-i-double-touch-v-o-folder](./quick/260810-qqz-hi-n-t-i-l-c-t-i-double-touch-v-o-folder/) |
 | 11 | Thêm script copy-paste cài lại đúng bốn package mới nhất từ dist vào INSTALLATION.md | 2026-08-10 | 49cc3c8 | — |
+| 12 | Thêm --reinstall để apt cài lại bundle +onemix1 cùng version | 2026-08-10 | d430780 | — |
 
 ### Research Flags (carried from research summary)
 
