@@ -6,7 +6,7 @@ current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
 stopped_at: Completed quick task 260810-e0n
-last_updated: "2026-08-10T03:58:12.248Z"
+last_updated: "2026-08-10T04:05:22.384Z"
 last_activity: 2026-08-10
 last_activity_desc: Fresh clones now carry the exact pinned Debian source package under `src/`; the release script validates that local DSC and supports a non-publishing pre-build smoke check; diagnostic logs are no longer tracked.
 progress:
@@ -119,6 +119,7 @@ Progress: [██████████] 100%
 | 260810-d0h | Record the owner waiver for remaining Phase 04 blockers and optional custom scripts | 2026-08-10 | 22ac689 | [260810-d0h-record-owner-decision-that-only-freerdp-](./quick/260810-d0h-record-owner-decision-that-only-freerdp-/) |
 | 260810-e0n | Track pinned Debian source inputs, use the local DSC for release builds, and ignore sensitive diagnostic logs | 2026-08-10 | d043fe5 | [260810-e0n-create-src-containing-the-three-pinned-d](./quick/260810-e0n-create-src-containing-the-three-pinned-d/) |
 | 7 | Tạo INSTALLATION.md với quy trình fresh clone, build, kiểm tra và cài bốn package FreeRDP Touch | 2026-08-10 | be77978 | — |
+| 8 | Đơn giản hóa INSTALLATION.md thành quy trình clone, build và cài FreeRDP Touch tối thiểu | 2026-08-10 | b7086ea | — |
 
 ### Research Flags (carried from research summary)
 
