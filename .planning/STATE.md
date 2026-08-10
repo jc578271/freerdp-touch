@@ -115,7 +115,7 @@ Progress: [██████████] 100%
 | 260808-956 | hiện tại freerdp đang để : lúc 2 ngón pan, thì hold wheel và drag chuột. tôi đổi ý muốn hold wheel thì dùng 3 ngón, nếu dùng 2 ngón thì lăn chuột. | 2026-08-08 | build-tree | [260808-956-hi-n-t-i-freerdp-ang-l-c-2-ng-n-pan-th-h](./quick/260808-956-hi-n-t-i-freerdp-ang-l-c-2-ng-n-pan-th-h/) |
 | 260808-b11 | tôi đã chuyển freerdp về KHÔNG multitouch, các thao tác phần lớn đã work, tuy nhiên có một vấn đề nhỏ: khi tôi để 2 ngón để dọc và vuốt xuống, expect scroll thì bị chuyển thành pinch (phóng to thu nhỏ) | 2026-08-08 | build-tree | [260808-b11-t-i-chuy-n-freerdp-v-kh-ng-multitouch-c-](./quick/260808-b11-t-i-chuy-n-freerdp-v-kh-ng-multitouch-c-/) |
 | 4 | Update /usr/local/bin/menu so FreeRDP option 3 uses the canonical patched launch parameters | 2026-08-08 | 67ac6d5 | — |
-| 260810-d0h | Record the owner waiver for remaining Phase 04 blockers and optional custom scripts | 2026-08-10 | 1a0e46d | [260810-d0h-record-owner-decision-that-only-freerdp-](./quick/260810-d0h-record-owner-decision-that-only-freerdp-/) |
+| 260810-d0h | Record the owner waiver for remaining Phase 04 blockers and optional custom scripts | 2026-08-10 | 22ac689 | [260810-d0h-record-owner-decision-that-only-freerdp-](./quick/260810-d0h-record-owner-decision-that-only-freerdp-/) |
 
 ### Research Flags (carried from research summary)
 
