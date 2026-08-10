@@ -6,7 +6,7 @@ current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
 stopped_at: Completed quick task 260810-ss0
-last_updated: "2026-08-10T14:30:24.909Z"
+last_updated: "2026-08-10T17:21:35.227Z"
 last_activity: 2026-08-10
 last_activity_desc: "Completed quick task 260810-ss0: đổi mặc định long press xuống 500 ms và touch slop lên 12 px"
 progress:
@@ -127,6 +127,7 @@ Progress: [██████████] 100%
 | 11 | Thêm script copy-paste cài lại đúng bốn package mới nhất từ dist vào INSTALLATION.md | 2026-08-10 | 49cc3c8 | — |
 | 12 | Thêm --reinstall để apt cài lại bundle +onemix1 cùng version | 2026-08-10 | d430780 | — |
 | 260810-ss0 | Đổi mặc định local-touch calibration: long press từ 600 ms xuống 500 ms và touch slop từ 8 px lên 12 px | 2026-08-10 | ff61284 | [260810-ss0-i-m-c-nh-local-touch-calibration-long-pr](./quick/260810-ss0-i-m-c-nh-local-touch-calibration-long-pr/) |
+| 14 | Tăng double-tap anchor tolerance từ 20 px lên 48 px, giữ drag/pan slop 12 px | 2026-08-10 | 046502b | — |
 
 ### Research Flags (carried from research summary)
 
