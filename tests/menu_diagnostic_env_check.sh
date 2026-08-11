@@ -28,8 +28,6 @@ printf '%s\n' \
 	'exit 0' > "$MOCK_BIN/xrandr"
 chmod 700 "$MOCK_BIN/xrandr"
 cp "$MOCK_BIN/xrandr" "$MOCK_BIN/xinput"
-cp "$MOCK_BIN/xrandr" "$MOCK_BIN/openbox"
-cp "$MOCK_BIN/xrandr" "$MOCK_BIN/wmctrl"
 
 printf '%s\n' \
 	'#!/bin/sh' \
@@ -52,10 +50,6 @@ printf '%s\n' \
 	'  printf "%s\\n" "unresolved XDIAG in generated xinitrc" > "$STARTX_ERROR"' \
 	'  exit 1' \
 	'fi' \
-	'grep -Fqx "openbox &" "$xinitrc" || { printf "%s\\n" "missing Openbox launch" > "$STARTX_ERROR"; exit 1; }' \
-	'grep -Fq "/size:2048x1280" "$xinitrc" || { printf "%s\\n" "missing 2048x1280 RDP size" > "$STARTX_ERROR"; exit 1; }' \
-	'grep -Fq "/scale-desktop:200" "$xinitrc" || { printf "%s\\n" "missing 200 percent desktop scale" > "$STARTX_ERROR"; exit 1; }' \
-	'grep -Fq "wmctrl -F -r FreeRDP-Touch -b add,fullscreen" "$xinitrc" || { printf "%s\\n" "missing wmctrl fullscreen request" > "$STARTX_ERROR"; exit 1; }' \
 	'generated_diag=0' \
 	'grep -Fqx "export FREERDP_TOUCH_DIAG=1" "$xinitrc" && generated_diag=1' \
 	'if [ "$generated_diag" != "${EXPECTED_DIAG:-}" ]; then' \

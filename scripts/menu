@@ -76,33 +76,11 @@ xinput set-prop "GXTP7386:00 27C6:0113" \
 
 XEOF
 
-    cat >> "$xinitrc" <<'XEOF'
-
-if ! command -v openbox >/dev/null || ! command -v wmctrl >/dev/null; then
-    printf '%s\n' 'ERROR: openbox and wmctrl are required for the RDP session.' >&2
-    exit 1
-fi
-
-openbox &
-XEOF
-
-    printf '/home/hoang/freerdp-touch/scripts/launch-touch.sh' >> "$xinitrc"
+    printf 'exec /home/hoang/freerdp-touch/scripts/launch-touch.sh' >> "$xinitrc"
     if [ "$mouse_only" -eq 1 ]; then
         printf ' --mouse-only' >> "$xinitrc"
     fi
-    printf ' /v:192.168.1.10 /u:ngleh %s /t:FreeRDP-Touch /size:2048x1280 /smart-sizing:2560x1600 /scale-desktop:200 /clipboard /sound:sys:pulse /microphone:sys:pulse /drive:Onemix,$HOME /cert:ignore &\n' "$pass_arg_q" >> "$xinitrc"
-
-    cat >> "$xinitrc" <<'XEOF'
-
-rdp_pid=$!
-for _ in {1..50}; do
-    if wmctrl -F -r FreeRDP-Touch -b add,fullscreen 2>/dev/null; then
-        break
-    fi
-    sleep 0.1
-done
-wait "$rdp_pid"
-XEOF
+    printf ' /v:192.168.1.10 /u:ngleh %s /f /smart-sizing:2560x1600 /scale-desktop:200 /clipboard /sound:sys:pulse /microphone:sys:pulse /drive:Onemix,$HOME /cert:ignore\n' "$pass_arg_q" >> "$xinitrc"
 
     startx "$xinitrc"
     startx_rc=$?
