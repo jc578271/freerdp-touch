@@ -6,7 +6,7 @@ current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
 stopped_at: Completed quick task 260810-ss0
-last_updated: "2026-08-11T15:04:42.716Z"
+last_updated: "2026-08-11T15:08:16.896Z"
 last_activity: 2026-08-10
 last_activity_desc: "Completed quick task 260810-ss0: đổi mặc định long press xuống 500 ms và touch slop lên 12 px"
 progress:
@@ -131,6 +131,7 @@ Progress: [██████████] 100%
 | 15 | trong script menu, hiện tại freerdp chạy trực tiếp trên xorg, tôi muốn nó chạy qua openbox và wmctrl để fullscreen với resolution 1600x1000. update script cho tôi. | 2026-08-11 | 393374f | — |
 | 16 | xóa scale, chỉnh resolution nhìn như 2560x1600 với scale 250, nhưng với scale 100 | 2026-08-11 | 282616e | — |
 | 17 | chỉnh lại /scale-desktop là 200 và điều chỉnh resolution tương đương mục tiêu 2560x1600 @250% | 2026-08-11 | 6c20c38 | — |
+| 18 | xóa Openbox/wmctrl khỏi menu và khôi phục luồng launch FreeRDP trực tiếp như trước các thay đổi Openbox | 2026-08-11 | 5d1a40a | — |
 
 ### Research Flags (carried from research summary)
 
