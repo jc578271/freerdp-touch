@@ -6,7 +6,7 @@ current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
 stopped_at: Completed quick task 260810-ss0
-last_updated: "2026-08-11T14:49:30.404Z"
+last_updated: "2026-08-11T15:00:26.539Z"
 last_activity: 2026-08-10
 last_activity_desc: "Completed quick task 260810-ss0: đổi mặc định long press xuống 500 ms và touch slop lên 12 px"
 progress:
@@ -129,6 +129,7 @@ Progress: [██████████] 100%
 | 260810-ss0 | Đổi mặc định local-touch calibration: long press từ 600 ms xuống 500 ms và touch slop từ 8 px lên 12 px | 2026-08-10 | ff61284 | [260810-ss0-i-m-c-nh-local-touch-calibration-long-pr](./quick/260810-ss0-i-m-c-nh-local-touch-calibration-long-pr/) |
 | 14 | Tăng double-tap anchor tolerance từ 20 px lên 48 px, giữ drag/pan slop 12 px | 2026-08-10 | 046502b | — |
 | 15 | trong script menu, hiện tại freerdp chạy trực tiếp trên xorg, tôi muốn nó chạy qua openbox và wmctrl để fullscreen với resolution 1600x1000. update script cho tôi. | 2026-08-11 | 393374f | — |
+| 16 | xóa scale, chỉnh resolution nhìn như 2560x1600 với scale 250, nhưng với scale 100 | 2026-08-11 | 282616e | — |
 
 ### Research Flags (carried from research summary)
 
