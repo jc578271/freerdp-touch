@@ -64,7 +64,9 @@ sed -i "s|startx |$td/mock-startx |" "$menu_fixture"
 mkdir -p "$td/bin"
 printf '#!/bin/sh\nexit 0\n' > "$td/bin/xrandr"
 printf '#!/bin/sh\nexit 0\n' > "$td/bin/xinput"
-chmod +x "$td/bin/xrandr" "$td/bin/xinput"
+printf '#!/bin/sh\nexit 0\n' > "$td/bin/openbox"
+printf '#!/bin/sh\nexit 0\n' > "$td/bin/wmctrl"
+chmod +x "$td/bin/xrandr" "$td/bin/xinput" "$td/bin/openbox" "$td/bin/wmctrl"
 
 # --------------------------------------------------------------------------
 # Helper: run wrapper — env vars before --, wrapper args after
