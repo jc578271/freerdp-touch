@@ -53,8 +53,8 @@ printf '%s\n' \
 	'  exit 1' \
 	'fi' \
 	'grep -Fqx "openbox &" "$xinitrc" || { printf "%s\\n" "missing Openbox launch" > "$STARTX_ERROR"; exit 1; }' \
-	'grep -Fq "/size:1024x640" "$xinitrc" || { printf "%s\\n" "missing 1024x640 RDP size" > "$STARTX_ERROR"; exit 1; }' \
-	'! grep -Fq "/scale-desktop:" "$xinitrc" || { printf "%s\\n" "unexpected desktop scale" > "$STARTX_ERROR"; exit 1; }' \
+	'grep -Fq "/size:2048x1280" "$xinitrc" || { printf "%s\\n" "missing 2048x1280 RDP size" > "$STARTX_ERROR"; exit 1; }' \
+	'grep -Fq "/scale-desktop:200" "$xinitrc" || { printf "%s\\n" "missing 200 percent desktop scale" > "$STARTX_ERROR"; exit 1; }' \
 	'grep -Fq "wmctrl -F -r FreeRDP-Touch -b add,fullscreen" "$xinitrc" || { printf "%s\\n" "missing wmctrl fullscreen request" > "$STARTX_ERROR"; exit 1; }' \
 	'generated_diag=0' \
 	'grep -Fqx "export FREERDP_TOUCH_DIAG=1" "$xinitrc" && generated_diag=1' \
