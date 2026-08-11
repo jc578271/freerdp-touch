@@ -6,7 +6,7 @@ current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
 stopped_at: Completed quick task 260810-ss0
-last_updated: "2026-08-11T15:00:26.539Z"
+last_updated: "2026-08-11T15:04:42.716Z"
 last_activity: 2026-08-10
 last_activity_desc: "Completed quick task 260810-ss0: đổi mặc định long press xuống 500 ms và touch slop lên 12 px"
 progress:
@@ -130,6 +130,7 @@ Progress: [██████████] 100%
 | 14 | Tăng double-tap anchor tolerance từ 20 px lên 48 px, giữ drag/pan slop 12 px | 2026-08-10 | 046502b | — |
 | 15 | trong script menu, hiện tại freerdp chạy trực tiếp trên xorg, tôi muốn nó chạy qua openbox và wmctrl để fullscreen với resolution 1600x1000. update script cho tôi. | 2026-08-11 | 393374f | — |
 | 16 | xóa scale, chỉnh resolution nhìn như 2560x1600 với scale 250, nhưng với scale 100 | 2026-08-11 | 282616e | — |
+| 17 | chỉnh lại /scale-desktop là 200 và điều chỉnh resolution tương đương mục tiêu 2560x1600 @250% | 2026-08-11 | 6c20c38 | — |
 
 ### Research Flags (carried from research summary)
 
