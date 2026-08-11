@@ -90,7 +90,7 @@ XEOF
     if [ "$mouse_only" -eq 1 ]; then
         printf ' --mouse-only' >> "$xinitrc"
     fi
-    printf ' /v:192.168.1.10 /u:ngleh %s /t:FreeRDP-Touch /size:1600x1000 /smart-sizing:2560x1600 /scale-desktop:200 /clipboard /sound:sys:pulse /microphone:sys:pulse /drive:Onemix,$HOME /cert:ignore &\n' "$pass_arg_q" >> "$xinitrc"
+    printf ' /v:192.168.1.10 /u:ngleh %s /t:FreeRDP-Touch /size:1024x640 /smart-sizing:2560x1600 /clipboard /sound:sys:pulse /microphone:sys:pulse /drive:Onemix,$HOME /cert:ignore &\n' "$pass_arg_q" >> "$xinitrc"
 
     cat >> "$xinitrc" <<'XEOF'
 
