@@ -4,7 +4,6 @@ export FREERDP_ONEMIX_OUTPUT="${FREERDP_ONEMIX_OUTPUT-eDP-1}"
 if [ "${FREERDP_EXTERNAL_OUTPUT+x}" = x ]; then
     external_output_auto=0
 else
-    FREERDP_EXTERNAL_OUTPUT=DP-1
     external_output_auto=1
 fi
 export FREERDP_EXTERNAL_OUTPUT
@@ -100,10 +99,6 @@ reject_output() {
 
 [ -n "$onemix_output" ] || reject_output 'FREERDP_ONEMIX_OUTPUT is required'
 
-if [ -n "$external_output" ] && [ "$onemix_output" = "$external_output" ]; then
-    reject_output 'FREERDP_ONEMIX_OUTPUT and FREERDP_EXTERNAL_OUTPUT must differ'
-fi
-
 output_is_connected() {
     wanted=$1
     while IFS=' ' read -r name status rest; do
@@ -119,12 +114,23 @@ EOF
 output_is_connected "$onemix_output" || \
     reject_output "FREERDP_ONEMIX_OUTPUT '$onemix_output' is not connected"
 
+if [ "$external_output_auto" -eq 1 ] && [ -z "$external_output" ]; then
+    while IFS=' ' read -r candidate status rest; do
+        if [ "$status" = connected ] && [ "$candidate" != "$onemix_output" ]; then
+            external_output=$candidate
+            break
+        fi
+    done <<EOF
+$xrandr_query
+EOF
+fi
+
+if [ -n "$external_output" ] && [ "$onemix_output" = "$external_output" ]; then
+    reject_output 'FREERDP_ONEMIX_OUTPUT and FREERDP_EXTERNAL_OUTPUT must differ'
+fi
+
 if [ -n "$external_output" ] && ! output_is_connected "$external_output"; then
-    if [ "$external_output_auto" -eq 1 ]; then
-        external_output=
-    else
-        reject_output "FREERDP_EXTERNAL_OUTPUT '$external_output' is not connected"
-    fi
+    reject_output "FREERDP_EXTERNAL_OUTPUT '$external_output' is not connected"
 fi
 
 xrandr --output "$onemix_output" --mode 1600x2560 --rotate left --primary
