@@ -157,10 +157,11 @@ xrandr --query
 Use the first field on the two lines marked `connected` as the values below.
 Replace the placeholders with the names reported by your machine; do not
 assume a fixed connector name. On this OneMix installation, `menu` defaults to
-`eDP-1` for the panel and `DP-1` for the external display; the variables below
-remain available to override those defaults. The menu requires the OneMix
-name, accepts an optional external name, rejects equal or disconnected names,
-and prints the active server's connected-output listing when validation fails.
+`eDP-1` for the panel. An external output is opt-in: configure
+`FREERDP_EXTERNAL_OUTPUT` only while that display is connected. The menu
+requires the OneMix name, accepts an optional external name, rejects equal or
+disconnected configured names, and prints the active server's connected-output
+listing when validation fails.
 
 For a one-shot dual-monitor launch, set both variables on the `menu`
 invocation:
@@ -197,7 +198,11 @@ Log in again, or source the profile in the current shell, before launching
 `1600x2560`, rotates it left, and marks it `--primary`; the external display
 uses its preferred mode and is placed `--right-of` the OneMix panel. The
 fullscreen FreeRDP invocation receives exactly one `/multimon`, preserving
-the two monitor geometries instead of spanning them into one display.
+the two monitor geometries instead of spanning them into one display. After
+the layout, the launcher runs
+`xinput map-to-output "GXTP7386:00 27C6:0113" "$FREERDP_ONEMIX_OUTPUT"` so the
+absolute touchscreen stays on the OneMix output instead of being scaled across
+the combined desktop.
 
 The dual-monitor path prints `xrandr --listmonitors` before FreeRDP starts.
 Verify that the list contains two monitors, the OneMix line carries the
@@ -207,26 +212,32 @@ that the pointer crosses from the OneMix panel to the external display on
 the configured right-hand side, and that the OneMix touch gestures still
 behave normally.
 
+#### Verify touch mapping
+
+With both displays connected, tap and drag from the center and all four
+corners of the OneMix panel, including the panel edge beside the external
+display. The remote pointer and action must remain on the OneMix display; it
+must not jump to the external display. The automated fixture verifies the
+launcher command wiring only, so this physical check remains required.
+
 #### Return to OneMix-only mode
 
 This rollback changes only the display layout; it does not change installed
 packages. Exit the RDP session so its private `startx` server stops, then
-explicitly empty the external-output setting while retaining the validated
-OneMix name:
+explicitly empty the external-output setting:
 
 ```
 FREERDP_EXTERNAL_OUTPUT= menu
 ```
 
-Choose option 3. With `FREERDP_EXTERNAL_OUTPUT` empty, the launcher keeps the
-OneMix rotation and primary marker, omits the external XRandR layout and
-`/multimon`, and returns to the OneMix-only path. The built-in `DP-1` default
-means `unset FREERDP_EXTERNAL_OUTPUT` re-enables dual-monitor mode. If the
-variables were added to `~/.profile`, set
-`export FREERDP_EXTERNAL_OUTPUT=` there for a persistent OneMix-only launch,
-then log in again or source the profile before the next launch. Keep the
-package rollback instructions below separate if the patched FreeRDP packages
-themselves must be removed.
+Choose option 3. With `FREERDP_EXTERNAL_OUTPUT` empty or unset, the launcher
+keeps the OneMix rotation and primary marker, omits the external XRandR layout
+and `/multimon`, and returns to the OneMix-only path. Plain `menu` therefore
+works when no external output is configured. If the variables were added to
+`~/.profile`, set `export FREERDP_EXTERNAL_OUTPUT=` there for a persistent
+OneMix-only launch, then log in again or source the profile before the next
+launch. Keep the package rollback instructions below separate if the patched
+FreeRDP packages themselves must be removed.
 
 ## Calibration overrides
 
