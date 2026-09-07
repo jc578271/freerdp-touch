@@ -374,7 +374,7 @@ assert_plain_default_no_external_case() {
 	fi
 	grep -Fqx 'OUTPUT: --output eDP-1 --mode 1600x2560 --rotate left --primary' "$XRANDR_LOG" || {
 		printf 'FAIL: plain menu did not configure the default OneMix output\n' >&2; exit 1; }
-	if grep -Fq 'ExternalPanel' "$XRANDR_LOG" || grep -Fqx '/multimon' "$OBSERVED_ARGS"; then
+	if grep -Fq 'OUTPUT: --output DP-1' "$XRANDR_LOG" || grep -Fq 'ExternalPanel' "$XRANDR_LOG" || grep -Fqx '/multimon' "$OBSERVED_ARGS"; then
 		printf 'FAIL: plain menu enabled external-display layout without a monitor\n' >&2
 		exit 1
 	fi
