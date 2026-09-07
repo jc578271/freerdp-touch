@@ -62,8 +62,28 @@ chmod +x "$menu_fixture"
 sed -i "s|startx |$td/mock-startx |" "$menu_fixture"
 
 mkdir -p "$td/bin"
-printf '#!/bin/sh\nexit 0\n' > "$td/bin/xrandr"
-printf '#!/bin/sh\nexit 0\n' > "$td/bin/xinput"
+xrandr_log="$td/xrandr.log"
+printf '%s\n' \
+  '#!/bin/sh' \
+  'set -eu' \
+  'case "${1:-}" in' \
+  '  --query)' \
+  '    printf "%s\\n" "Screen 0: minimum 8 x 8, current 3520 x 2560, maximum 32767 x 32767"' \
+  '    printf "%s\\n" "OneMixPanel connected 1600x2560+0+0 (normal left inverted right x axis y axis) 286mm x 179mm"' \
+  '    printf "%s\\n" "ExternalPanel connected 1920x1080+1600+0 (normal left inverted right x axis y axis) 600mm x 340mm"' \
+  '    ;;' \
+  '  --listmonitors)' \
+  '    printf "%s\\n" "LISTMONITORS" >> "$XRANDR_LOG"' \
+  '    printf "%s\\n" "Monitors: 2" " 0: +*OneMixPanel 1600/286x2560/179+0+0 OneMixPanel" " 1: +ExternalPanel 1920/600x1080/340+1600+0 ExternalPanel"' \
+  '    ;;' \
+  '  --output)' \
+  '    printf "%s" "OUTPUT:" >> "$XRANDR_LOG"' \
+  '    for arg in "$@"; do printf " %s" "$arg" >> "$XRANDR_LOG"; done' \
+  '    printf "\\n" >> "$XRANDR_LOG"' \
+  '    ;;' \
+  '  *) exit 1 ;;' \
+  'esac' > "$td/bin/xrandr"
+printf '%s\n' '#!/bin/sh' 'exit 0' > "$td/bin/xinput"
 chmod +x "$td/bin/xrandr" "$td/bin/xinput"
 
 # --------------------------------------------------------------------------
@@ -244,8 +264,11 @@ chmod +x "$td/mock-startx"
 
 # Test menu success path
 printf '3\n\n\n6\n' > "$td/menu-input-success"
+: > "$xrandr_log"
 menu_success_rc=0
 env -i TERM=dumb HOME="$td" XDG_STATE_HOME="$td/state" \
+  FREERDP_ONEMIX_OUTPUT=OneMixPanel FREERDP_EXTERNAL_OUTPUT=ExternalPanel \
+  XRANDR_LOG="$xrandr_log" \
   PATH="$td/bin:$td:$PATH" \
   LAUNCH_WRAPPER="$wrapper_fixture" \
   "$menu_fixture" < "$td/menu-input-success" > "$td/menu-success.out" 2> "$td/menu-success.err" || menu_success_rc=$?
@@ -254,11 +277,23 @@ if [ "$menu_success_rc" -ne 0 ]; then
   printf 'stderr:\n' >&2; cat "$td/menu-success.err" >&2
   exit 1
 fi
+if ! grep -q '/multimon' "$fixture_log"; then
+  printf 'FAIL: menu success: /multimon was not forwarded to the client\n' >&2
+  exit 1
+fi
+grep -Fq 'OUTPUT: --output OneMixPanel --mode 1600x2560 --rotate left --primary' "$xrandr_log" || {
+  printf 'FAIL: menu success: missing primary XRandR layout\n' >&2; exit 1; }
+grep -Fq 'OUTPUT: --output ExternalPanel --auto --right-of OneMixPanel' "$xrandr_log" || {
+  printf 'FAIL: menu success: missing external XRandR layout\n' >&2; exit 1; }
+grep -Fqx 'LISTMONITORS' "$xrandr_log" || {
+  printf 'FAIL: menu success: missing XRandR monitor listing\n' >&2; exit 1; }
 
 # Test menu failure path (startx fails)
 printf '3\n\n6\n' > "$td/menu-input-fail"
 menu_fail_rc=0
 env -i TERM=dumb HOME="$td" XDG_STATE_HOME="$td/state" \
+  FREERDP_ONEMIX_OUTPUT=OneMixPanel FREERDP_EXTERNAL_OUTPUT=ExternalPanel \
+  XRANDR_LOG="$xrandr_log" \
   PATH="$td/bin:$td:$PATH" \
   LAUNCH_WRAPPER="$wrapper_fixture" \
   STARTX_FAIL=1 \
