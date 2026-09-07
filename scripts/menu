@@ -58,6 +58,7 @@ while true; do
     cat > "$xinitrc" <<'XEOF'
 #!/usr/bin/env bash
 
+set -eu
 export XDG_SESSION_TYPE=x11
 XEOF
 
@@ -66,9 +67,58 @@ XEOF
         printf 'export FREERDP_TOUCH_DIAG=1\n' >> "$xinitrc"
     fi
 
-    cat >> "$xinitrc" <<XEOF
+    cat >> "$xinitrc" <<'XEOF'
 
-xrandr --output eDP-1 --mode 1600x2560 --rotate left
+onemix_output="${FREERDP_ONEMIX_OUTPUT:-}"
+external_output="${FREERDP_EXTERNAL_OUTPUT:-}"
+
+if ! xrandr_query="$(xrandr --query)"; then
+    printf '%s\n' 'ERROR: unable to query outputs from the private X server' >&2
+    exit 1
+fi
+
+show_outputs() {
+    printf '%s\n' 'Connected-output listing from the private X server:' >&2
+    printf '%s\n' "$xrandr_query" >&2
+}
+
+reject_output() {
+    printf 'ERROR: %s\n' "$1" >&2
+    show_outputs
+    exit 1
+}
+
+[ -n "$onemix_output" ] || reject_output 'FREERDP_ONEMIX_OUTPUT is required'
+
+if [ -n "$external_output" ] && [ "$onemix_output" = "$external_output" ]; then
+    reject_output 'FREERDP_ONEMIX_OUTPUT and FREERDP_EXTERNAL_OUTPUT must differ'
+fi
+
+output_is_connected() {
+    wanted=$1
+    while IFS=' ' read -r name status rest; do
+        if [ "$name" = "$wanted" ] && [ "$status" = connected ]; then
+            return 0
+        fi
+    done <<EOF
+$xrandr_query
+EOF
+    return 1
+}
+
+output_is_connected "$onemix_output" || \
+    reject_output "FREERDP_ONEMIX_OUTPUT '$onemix_output' is not connected"
+
+if [ -n "$external_output" ]; then
+    output_is_connected "$external_output" || \
+        reject_output "FREERDP_EXTERNAL_OUTPUT '$external_output' is not connected"
+fi
+
+xrandr --output "$onemix_output" --mode 1600x2560 --rotate left --primary
+if [ -n "$external_output" ]; then
+    xrandr --output "$external_output" --auto --right-of "$onemix_output"
+    xrandr --listmonitors
+fi
 
 xinput set-prop "GXTP7386:00 27C6:0113" \
 "Coordinate Transformation Matrix" \
@@ -79,6 +129,9 @@ XEOF
     printf 'exec /home/hoang/freerdp-touch/scripts/launch-touch.sh' >> "$xinitrc"
     if [ "$mouse_only" -eq 1 ]; then
         printf ' --mouse-only' >> "$xinitrc"
+    fi
+    if [ -n "${FREERDP_EXTERNAL_OUTPUT:-}" ]; then
+        printf ' /multimon' >> "$xinitrc"
     fi
     printf ' /v:192.168.1.10 /u:ngleh %s /f /smart-sizing:2560x1600 /scale-desktop:200 /clipboard /sound:sys:pulse /microphone:sys:pulse /drive:Onemix,$HOME /cert:ignore\n' "$pass_arg_q" >> "$xinitrc"
 

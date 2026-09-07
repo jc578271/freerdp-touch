@@ -147,12 +147,19 @@ assert_valid_case() {
 	external=$5
 
 	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_DIAG" "$OBSERVED_MOUSE_ONLY" \
-		"OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG"
+		"$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG"
 	: > "$XRANDR_LOG"
 	EXPECTED_DIAG=$expected_diag
 	export EXPECTED_DIAG
+	rc=0
 	run_menu "$name" OneMixPanel "$external" "$([ "$expected_diag" = 1 ] && printf 1 || printf '')" \
-		"$([ "$expected_mouse_only" = 1 ] && printf -- --mouse-only || printf '')"
+		"$([ "$expected_mouse_only" = 1 ] && printf -- --mouse-only || printf '')" || rc=$?
+	if [ "$rc" -ne 0 ]; then
+		printf 'FAIL: menu exited with rc=%s (%s)\n' "$rc" "$name" >&2
+		cat "$td/$name.err" >&2
+		if [ -f "$STARTX_ERROR" ]; then cat "$STARTX_ERROR" >&2; fi
+		exit 1
+	fi
 
 	if [ ! -f "$STARTX_PASSED" ]; then
 		failure=$(tr -d '\n' < "$STARTX_ERROR" 2>/dev/null || printf 'mock startx did not complete')

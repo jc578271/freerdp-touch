@@ -267,7 +267,7 @@ printf '3\n\n\n6\n' > "$td/menu-input-success"
 : > "$xrandr_log"
 menu_success_rc=0
 env -i TERM=dumb HOME="$td" XDG_STATE_HOME="$td/state" \
-  FREERDP_ONEMIX_OUTPUT=OneMixPanel FREERDP_EXTERNAL_OUTPUT=ExternalPanel \
+  FIXTURE_LOG="$fixture_log" FREERDP_ONEMIX_OUTPUT=OneMixPanel FREERDP_EXTERNAL_OUTPUT=ExternalPanel \
   XRANDR_LOG="$xrandr_log" \
   PATH="$td/bin:$td:$PATH" \
   LAUNCH_WRAPPER="$wrapper_fixture" \
@@ -292,7 +292,7 @@ grep -Fqx 'LISTMONITORS' "$xrandr_log" || {
 printf '3\n\n6\n' > "$td/menu-input-fail"
 menu_fail_rc=0
 env -i TERM=dumb HOME="$td" XDG_STATE_HOME="$td/state" \
-  FREERDP_ONEMIX_OUTPUT=OneMixPanel FREERDP_EXTERNAL_OUTPUT=ExternalPanel \
+  FIXTURE_LOG="$fixture_log" FREERDP_ONEMIX_OUTPUT=OneMixPanel FREERDP_EXTERNAL_OUTPUT=ExternalPanel \
   XRANDR_LOG="$xrandr_log" \
   PATH="$td/bin:$td:$PATH" \
   LAUNCH_WRAPPER="$wrapper_fixture" \
