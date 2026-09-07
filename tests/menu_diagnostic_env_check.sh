@@ -31,6 +31,7 @@ export OBSERVED_MOUSE_ONLY="$td/observed-mouse-only"
 export OBSERVED_ARGS="$td/observed-args"
 export WRAPPER_CALLS="$td/wrapper-calls"
 export XRANDR_LOG="$td/xrandr.log"
+export XINPUT_LOG="$td/xinput.log"
 export STARTX_PASSED="$td/startx-passed"
 export STARTX_ERROR="$td/startx-error"
 mkdir -p "$MOCK_BIN"
@@ -60,7 +61,16 @@ printf '%s\n' \
 	'    ;;' \
 	'esac' > "$MOCK_BIN/xrandr"
 chmod 700 "$MOCK_BIN/xrandr"
-printf '%s\n' '#!/bin/sh' 'exit 0' > "$MOCK_BIN/xinput"
+printf '%s\n' \
+	'#!/bin/sh' \
+	'set -eu' \
+	'printf "%s" "XINPUT:" >> "$XINPUT_LOG"' \
+	'for arg in "$@"; do printf " %s" "$arg" >> "$XINPUT_LOG"; done' \
+	'printf "\\n" >> "$XINPUT_LOG"' \
+	'if [ "${XINPUT_FAIL:-0}" -eq 1 ]; then' \
+	'  printf "%s\\n" "injected xinput map failure" >&2' \
+	'  exit 42' \
+	'fi' > "$MOCK_BIN/xinput"
 chmod 700 "$MOCK_BIN/xinput"
 
 printf '%s\n' \
@@ -118,6 +128,7 @@ run_menu() {
 	external=$3
 	diag=$4
 	mode=$5
+	map_fail=${6:-0}
 	input_file="$td/$name.input"
 	printf '3\n\n\n6\n' > "$input_file"
 
@@ -125,24 +136,24 @@ run_menu() {
 		if [ -n "$mode" ]; then
 			env FREERDP_EXTERNAL_OUTPUT= FREERDP_ONEMIX_OUTPUT="$onemix" \
 				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
-				TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" "$mode" < "$input_file" \
+				XINPUT_FAIL="$map_fail" TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" "$mode" < "$input_file" \
 				> "$td/$name.out" 2> "$td/$name.err"
 		else
 			env FREERDP_EXTERNAL_OUTPUT= FREERDP_ONEMIX_OUTPUT="$onemix" \
 				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
-				TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
+				XINPUT_FAIL="$map_fail" TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
 				> "$td/$name.out" 2> "$td/$name.err"
 		fi
 	else
 		if [ -n "$mode" ]; then
 			env FREERDP_ONEMIX_OUTPUT="$onemix" FREERDP_EXTERNAL_OUTPUT="$external" \
 				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
-				TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" "$mode" < "$input_file" \
+				XINPUT_FAIL="$map_fail" TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" "$mode" < "$input_file" \
 				> "$td/$name.out" 2> "$td/$name.err"
 		else
 			env FREERDP_ONEMIX_OUTPUT="$onemix" FREERDP_EXTERNAL_OUTPUT="$external" \
 				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
-				TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
+				XINPUT_FAIL="$map_fail" TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
 				> "$td/$name.out" 2> "$td/$name.err"
 		fi
 	fi
@@ -156,8 +167,9 @@ assert_valid_case() {
 	external=$5
 
 	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_DIAG" "$OBSERVED_MOUSE_ONLY" \
-		"$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG"
+		"$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
 	: > "$XRANDR_LOG"
+	: > "$XINPUT_LOG"
 	EXPECTED_DIAG=$expected_diag
 	export EXPECTED_DIAG
 	rc=0
@@ -195,7 +207,28 @@ assert_valid_case() {
 			printf 'FAIL: missing XRandR monitor listing (%s)\n' "$name" >&2; exit 1; }
 		grep -Fqx '/multimon' "$OBSERVED_ARGS" || {
 			printf 'FAIL: missing /multimon passthrough (%s)\n' "$name" >&2; exit 1; }
+		grep -Fqx 'XINPUT: map-to-output GXTP7386:00 27C6:0113 OneMixPanel' "$XINPUT_LOG" || {
+			printf 'FAIL: missing output-bound OneMix touchscreen map (%s)\n' "$name" >&2; exit 1; }
+		if [ "$(grep -Fc 'XINPUT:' "$XINPUT_LOG")" -ne 1 ]; then
+			printf 'FAIL: expected exactly one XInput mapping command (%s)\n' "$name" >&2; exit 1
+		fi
+		if grep -Fq 'XINPUT: set-prop' "$XINPUT_LOG"; then
+			printf 'FAIL: static matrix overwrote dual-display output map (%s)\n' "$name" >&2; exit 1
+		fi
+		one_mix_line=$(grep -nF 'xrandr --output "$onemix_output"' "$RENDERED_XINITRC" | cut -d: -f1)
+		external_line=$(grep -nF 'xrandr --output "$external_output"' "$RENDERED_XINITRC" | cut -d: -f1)
+		map_line=$(grep -nF 'xinput map-to-output "GXTP7386:00 27C6:0113" "$onemix_output"' "$RENDERED_XINITRC" | cut -d: -f1)
+		wrapper_line=$(grep -nF 'exec /home/hoang/freerdp-touch/scripts/launch-touch.sh' "$RENDERED_XINITRC" | cut -d: -f1)
+		if [ "$one_mix_line" -ge "$external_line" ] || [ "$external_line" -ge "$map_line" ] || [ "$map_line" -ge "$wrapper_line" ]; then
+			printf 'FAIL: dual-display setup order is not XRandR, map, wrapper (%s)\n' "$name" >&2; exit 1
+		fi
 	else
+		grep -Fqx 'XINPUT: set-prop GXTP7386:00 27C6:0113 Coordinate Transformation Matrix 0 -1 1 1 0 0 0 0 1' "$XINPUT_LOG" || {
+			printf 'FAIL: missing OneMix-only orientation matrix (%s)\n' "$name" >&2; exit 1; }
+		if grep -Fq 'XINPUT: map-to-output' "$XINPUT_LOG"; then
+			printf 'FAIL: output-bound map used during OneMix-only rollback (%s)\n' "$name" >&2
+			exit 1
+		fi
 		if grep -Fq 'ExternalPanel' "$XRANDR_LOG"; then
 			printf 'FAIL: external layout used during rollback (%s)\n' "$name" >&2
 			exit 1
@@ -213,8 +246,9 @@ assert_rejected_case() {
 	external=$3
 	expected_error=$4
 
-	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG"
+	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
 	: > "$XRANDR_LOG"
+	: > "$XINPUT_LOG"
 	rc=0
 	run_menu "$name" "$onemix" "$external" '' '' || rc=$?
 	if [ "$rc" -eq 0 ]; then
@@ -236,6 +270,27 @@ assert_rejected_case() {
 	}
 }
 
+assert_mapping_failure_case() {
+	name=map-failure
+	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
+	: > "$XRANDR_LOG"
+	: > "$XINPUT_LOG"
+	rc=0
+	run_menu "$name" OneMixPanel ExternalPanel 0 '' 1 || rc=$?
+	if [ "$rc" -eq 0 ]; then
+		printf 'FAIL: injected XInput mapping failure was ignored\n' >&2
+		exit 1
+	fi
+	if [ -e "$WRAPPER_CALLS" ]; then
+		printf 'FAIL: wrapper ran after XInput mapping failure\n' >&2
+		exit 1
+	fi
+	grep -Fqx 'XINPUT: map-to-output GXTP7386:00 27C6:0113 OneMixPanel' "$XINPUT_LOG" || {
+		printf 'FAIL: failure case did not invoke output-bound map\n' >&2; exit 1; }
+	grep -Fq 'injected xinput map failure' "$td/$name.err" || {
+		printf 'FAIL: failure case did not preserve xinput error\n' >&2; exit 1; }
+}
+
 assert_valid_case normal 0 0 1 ExternalPanel
 assert_valid_case diagnostic 1 0 1 ExternalPanel
 assert_valid_case mouse-only 0 1 1 ExternalPanel
@@ -243,4 +298,5 @@ assert_valid_case rollback 0 0 0 EMPTY
 assert_rejected_case missing-primary '' ExternalPanel 'ERROR: FREERDP_ONEMIX_OUTPUT is required'
 assert_rejected_case duplicate-output OneMixPanel OneMixPanel 'ERROR: FREERDP_ONEMIX_OUTPUT and FREERDP_EXTERNAL_OUTPUT must differ'
 assert_rejected_case missing-external OneMixPanel MissingPanel "ERROR: FREERDP_EXTERNAL_OUTPUT 'MissingPanel' is not connected"
-printf 'PASS: menu named XRandR layout, validation, and diagnostic propagation\n'
+assert_mapping_failure_case
+printf 'PASS: menu named XRandR layout, validation, mapping, and diagnostic propagation\n'
