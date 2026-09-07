@@ -14,7 +14,7 @@ grep -Fqx 'export FREERDP_ONEMIX_OUTPUT="${FREERDP_ONEMIX_OUTPUT-eDP-1}"' "$menu
 	printf 'FAIL: menu does not set the OneMix output default\n' >&2
 	exit 1
 }
-grep -Fqx 'export FREERDP_EXTERNAL_OUTPUT="${FREERDP_EXTERNAL_OUTPUT-DP-1}"' "$menu" || {
+grep -Fqx 'export FREERDP_EXTERNAL_OUTPUT="${FREERDP_EXTERNAL_OUTPUT-}"' "$menu" || {
 	printf 'FAIL: menu does not set the external output default\n' >&2
 	exit 1
 }
@@ -42,8 +42,12 @@ printf '%s\n' \
 	'case "${1:-}" in' \
 	'  --query)' \
 	'    printf "%s\\n" "Screen 0: minimum 8 x 8, current 3520 x 2560, maximum 32767 x 32767"' \
-	'    printf "%s\\n" "OneMixPanel connected 1600x2560+0+0 (normal left inverted right x axis y axis) 286mm x 179mm"' \
-	'    printf "%s\\n" "ExternalPanel connected 1920x1080+1600+0 (normal left inverted right x axis y axis) 600mm x 340mm"' \
+	'    if [ "${NO_EXTERNAL:-0}" -eq 1 ]; then' \
+	'      printf "%s\\n" "eDP-1 connected 1600x2560+0+0 (normal left inverted right x axis y axis) 286mm x 179mm"' \
+	'    else' \
+	'      printf "%s\\n" "OneMixPanel connected 1600x2560+0+0 (normal left inverted right x axis y axis) 286mm x 179mm"' \
+	'      printf "%s\\n" "ExternalPanel connected 1920x1080+1600+0 (normal left inverted right x axis y axis) 600mm x 340mm"' \
+	'    fi' \
 	'    printf "%s\\n" "DP-Disconnected disconnected (normal left inverted right x axis y axis)"' \
 	'    ;;' \
 	'  --listmonitors)' \
@@ -136,24 +140,24 @@ run_menu() {
 		if [ -n "$mode" ]; then
 			env FREERDP_EXTERNAL_OUTPUT= FREERDP_ONEMIX_OUTPUT="$onemix" \
 				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
-				XINPUT_FAIL="$map_fail" TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" "$mode" < "$input_file" \
+				XINPUT_FAIL="$map_fail" NO_EXTERNAL=0 TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" "$mode" < "$input_file" \
 				> "$td/$name.out" 2> "$td/$name.err"
 		else
 			env FREERDP_EXTERNAL_OUTPUT= FREERDP_ONEMIX_OUTPUT="$onemix" \
 				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
-				XINPUT_FAIL="$map_fail" TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
+				XINPUT_FAIL="$map_fail" NO_EXTERNAL=0 TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
 				> "$td/$name.out" 2> "$td/$name.err"
 		fi
 	else
 		if [ -n "$mode" ]; then
 			env FREERDP_ONEMIX_OUTPUT="$onemix" FREERDP_EXTERNAL_OUTPUT="$external" \
 				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
-				XINPUT_FAIL="$map_fail" TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" "$mode" < "$input_file" \
+				XINPUT_FAIL="$map_fail" NO_EXTERNAL=0 TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" "$mode" < "$input_file" \
 				> "$td/$name.out" 2> "$td/$name.err"
 		else
 			env FREERDP_ONEMIX_OUTPUT="$onemix" FREERDP_EXTERNAL_OUTPUT="$external" \
 				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
-				XINPUT_FAIL="$map_fail" TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
+				XINPUT_FAIL="$map_fail" NO_EXTERNAL=0 TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
 				> "$td/$name.out" 2> "$td/$name.err"
 		fi
 	fi
@@ -291,6 +295,48 @@ assert_mapping_failure_case() {
 		printf 'FAIL: failure case did not preserve xinput error\n' >&2; exit 1; }
 }
 
+assert_plain_default_no_external_case() {
+	name=plain-no-external
+	input_file="$td/$name.input"
+	printf '3\n\n\n6\n' > "$input_file"
+	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_DIAG" "$OBSERVED_MOUSE_ONLY" \
+		"$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
+	: > "$XRANDR_LOG"
+	: > "$XINPUT_LOG"
+	rc=0
+	env -u FREERDP_ONEMIX_OUTPUT -u FREERDP_EXTERNAL_OUTPUT \
+		FREERDP_TOUCH_DIAG= EXPECTED_DIAG=0 XINPUT_FAIL=0 NO_EXTERNAL=1 \
+		TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
+		> "$td/$name.out" 2> "$td/$name.err" || rc=$?
+	if [ "$rc" -ne 0 ]; then
+		printf 'FAIL: plain menu without an external monitor exited with rc=%s\n' "$rc" >&2
+		cat "$td/$name.err" >&2
+		if [ -f "$STARTX_ERROR" ]; then cat "$STARTX_ERROR" >&2; fi
+		exit 1
+	fi
+	if [ ! -f "$STARTX_PASSED" ]; then
+		printf 'FAIL: plain menu without an external monitor did not startx successfully\n' >&2
+		exit 1
+	fi
+	if [ "$(wc -l < "$WRAPPER_CALLS")" -ne 1 ]; then
+		printf 'FAIL: plain menu without an external monitor did not invoke the wrapper once\n' >&2
+		exit 1
+	fi
+	grep -Fqx 'OUTPUT: --output eDP-1 --mode 1600x2560 --rotate left --primary' "$XRANDR_LOG" || {
+		printf 'FAIL: plain menu did not configure the default OneMix output\n' >&2; exit 1; }
+	if grep -Fq 'ExternalPanel' "$XRANDR_LOG" || grep -Fqx '/multimon' "$OBSERVED_ARGS"; then
+		printf 'FAIL: plain menu enabled external-display layout without a monitor\n' >&2
+		exit 1
+	fi
+	grep -Fqx 'XINPUT: set-prop GXTP7386:00 27C6:0113 Coordinate Transformation Matrix 0 -1 1 1 0 0 0 0 1' "$XINPUT_LOG" || {
+		printf 'FAIL: plain menu without an external monitor did not retain the orientation map\n' >&2; exit 1; }
+	if grep -Fq 'XINPUT: map-to-output' "$XINPUT_LOG"; then
+		printf 'FAIL: plain menu used the dual-display map without an external monitor\n' >&2
+		exit 1
+	fi
+}
+
+assert_plain_default_no_external_case
 assert_valid_case normal 0 0 1 ExternalPanel
 assert_valid_case diagnostic 1 0 1 ExternalPanel
 assert_valid_case mouse-only 0 1 1 ExternalPanel
