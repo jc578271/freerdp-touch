@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
-stopped_at: Completed quick task 260810-ss0
-last_updated: "2026-08-11T15:08:16.896Z"
-last_activity: 2026-08-10
-last_activity_desc: "Completed quick task 260810-ss0: đổi mặc định long press xuống 500 ms và touch slop lên 12 px"
+stopped_at: Completed quick task 260907-t28
+last_updated: "2026-09-07T14:52:57Z"
+last_activity: 2026-09-07
+last_activity_desc: "Completed quick task 260907-t28: configure named dual-monitor FreeRDP launch"
 progress:
   total_phases: 4
   completed_phases: 4
@@ -32,7 +32,7 @@ progress:
 Phase: 4 of 4 (Diagnostics, Packaging & Launch Configuration)
 Plan: 7 of 7 in current phase
 Status: Verification waiver recorded; technical evidence remains gaps_found; normal GSD phase/milestone closure pending
-Last activity: 2026-08-10 - Completed quick task 260810-ss0: đổi mặc định long press xuống 500 ms và touch slop lên 12 px
+Last activity: 2026-09-07 - Completed quick task 260907-t28: configure named dual-monitor FreeRDP launch
 
 Progress: [██████████] 100%
 
@@ -132,6 +132,7 @@ Progress: [██████████] 100%
 | 16 | xóa scale, chỉnh resolution nhìn như 2560x1600 với scale 250, nhưng với scale 100 | 2026-08-11 | 282616e | — |
 | 17 | chỉnh lại /scale-desktop là 200 và điều chỉnh resolution tương đương mục tiêu 2560x1600 @250% | 2026-08-11 | 6c20c38 | — |
 | 18 | xóa Openbox/wmctrl khỏi menu và khôi phục luồng launch FreeRDP trực tiếp như trước các thay đổi Openbox | 2026-08-11 | 5d1a40a | — |
+| 260907-t28 | Thiết lập cấu hình chạy xfreerdp3 trên hai màn hình: màn hình OneMix là primary và màn hình ngoài là secondary. Kiểm tra launcher/tài liệu hiện có, rồi tạo hoặc cập nhật cấu hình tối thiểu, có hướng dẫn kiểm tra và rollback. | 2026-09-07 | 953afb3 | [260907-t28-thi-t-l-p-c-u-h-nh-ch-y-xfreerdp3-tr-n-h](./quick/260907-t28-thi-t-l-p-c-u-h-nh-ch-y-xfreerdp3-tr-n-h/) |
 
 ### Research Flags (carried from research summary)
 
