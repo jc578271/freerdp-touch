@@ -157,11 +157,13 @@ xrandr --query
 Use the first field on the two lines marked `connected` as the values below.
 Replace the placeholders with the names reported by your machine; do not
 assume a fixed connector name. On this OneMix installation, `menu` defaults to
-`eDP-1` for the panel. An external output is opt-in: configure
-`FREERDP_EXTERNAL_OUTPUT` only while that display is connected. The menu
-requires the OneMix name, accepts an optional external name, rejects equal or
-disconnected configured names, and prints the active server's connected-output
-listing when validation fails.
+`eDP-1` for the panel and automatically uses `DP-1` only when it is connected.
+If that default external output is absent, `menu` falls back to OneMix-only.
+Set `FREERDP_EXTERNAL_OUTPUT` to select another external output or to force an
+empty OneMix-only layout. The menu requires the OneMix name, accepts an
+optional external name, rejects equal or disconnected explicitly configured
+names, and prints the active server's connected-output listing when validation
+fails.
 
 For a one-shot dual-monitor launch, set both variables on the `menu`
 invocation:
@@ -230,14 +232,16 @@ explicitly empty the external-output setting:
 FREERDP_EXTERNAL_OUTPUT= menu
 ```
 
-Choose option 3. With `FREERDP_EXTERNAL_OUTPUT` empty or unset, the launcher
+Choose option 3. With `FREERDP_EXTERNAL_OUTPUT` explicitly empty, the launcher
 keeps the OneMix rotation and primary marker, omits the external XRandR layout
-and `/multimon`, and returns to the OneMix-only path. Plain `menu` therefore
-works when no external output is configured. If the variables were added to
-`~/.profile`, set `export FREERDP_EXTERNAL_OUTPUT=` there for a persistent
-OneMix-only launch, then log in again or source the profile before the next
-launch. Keep the package rollback instructions below separate if the patched
-FreeRDP packages themselves must be removed.
+and `/multimon`, and returns to the OneMix-only path. With the variable unset,
+plain `menu` uses the default `DP-1` only if it is connected and otherwise
+falls back to OneMix-only, so it works when no external output is connected.
+If the variables were added to `~/.profile`, set
+`export FREERDP_EXTERNAL_OUTPUT=` there for a persistent OneMix-only launch,
+then log in again or source the profile before the next launch. Keep the
+package rollback instructions below separate if the patched FreeRDP packages
+themselves must be removed.
 
 ## Calibration overrides
 

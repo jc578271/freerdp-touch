@@ -243,7 +243,7 @@ for required_text in \
   'xinput map-to-output "GXTP7386:00 27C6:0113" "$FREERDP_ONEMIX_OUTPUT"' \
   'center and all four' \
   'FREERDP_EXTERNAL_OUTPUT= menu' \
-  'works when no external output is configured.'; do
+  'works when no external output is connected.'; do
   if ! grep -Fq "$required_text" "$readme"; then
     printf 'FAIL: dual-monitor touch-map guidance missing: %s\n' "$required_text" >&2
     exit 1
