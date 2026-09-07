@@ -18,10 +18,10 @@ grep -Fqx 'if [ "${FREERDP_EXTERNAL_OUTPUT+x}" = x ]; then' "$menu" || {
 	printf 'FAIL: menu does not distinguish unset external output\n' >&2
 	exit 1
 }
-grep -Fqx '    FREERDP_EXTERNAL_OUTPUT=DP-1' "$menu" || {
-	printf 'FAIL: menu does not retain the DP-1 external default\n' >&2
+if grep -Fq 'FREERDP_EXTERNAL_OUTPUT=DP-1' "$menu"; then
+	printf 'FAIL: menu still assumes DP-1 as the automatic external output\n' >&2
 	exit 1
-}
+fi
 
 td=$(mktemp -d "${TMPDIR:-/tmp}/menu-diagnostic-env.XXXXXX")
 trap 'rm -rf "$td"' EXIT HUP INT TERM
@@ -48,9 +48,10 @@ printf '%s\n' \
 	'    printf "%s\\n" "Screen 0: minimum 8 x 8, current 3520 x 2560, maximum 32767 x 32767"' \
 	'    if [ "${NO_EXTERNAL:-0}" -eq 1 ]; then' \
 	'      printf "%s\\n" "eDP-1 connected 1600x2560+0+0 (normal left inverted right x axis y axis) 286mm x 179mm"' \
-	'    elif [ "${DEFAULT_EXTERNAL:-0}" -eq 1 ]; then' \
-	'      printf "%s\\n" "eDP-1 connected 1600x2560+0+0 (normal left inverted right x axis y axis) 286mm x 179mm"' \
-	'      printf "%s\\n" "DP-1 connected 1920x1080+1600+0 (normal left inverted right x axis y axis) 600mm x 340mm"' \
+	'    elif [ "${AUTO_SELECTION_FIXTURE:-0}" -eq 1 ]; then' \
+	'      printf "%s\\n" "OneMixPanel connected 1600x2560+0+0 (normal left inverted right x axis y axis) 286mm x 179mm"' \
+	'      printf "%s\\n" "USB-C-7 connected 1920x1080+1600+0 (normal left inverted right x axis y axis) 600mm x 340mm"' \
+	'      printf "%s\\n" "HDMI-A-3 connected 1920x1080+3520+0 (normal left inverted right x axis y axis) 600mm x 340mm"' \
 	'    else' \
 	'      printf "%s\\n" "OneMixPanel connected 1600x2560+0+0 (normal left inverted right x axis y axis) 286mm x 179mm"' \
 	'      printf "%s\\n" "ExternalPanel connected 1920x1080+1600+0 (normal left inverted right x axis y axis) 600mm x 340mm"' \
@@ -59,10 +60,10 @@ printf '%s\n' \
 	'    ;;' \
 	'  --listmonitors)' \
 	'    printf "%s\\n" "LISTMONITORS" >> "$XRANDR_LOG"' \
-	'    if [ "${DEFAULT_EXTERNAL:-0}" -eq 1 ]; then' \
-	'      printf "%s\\n" "Monitors: 2" " 0: +*eDP-1 1600/286x2560/179+0+0 eDP-1" " 1: +DP-1 1920/600x1080+1600+0 DP-1"' \
+	'    if [ "${AUTO_SELECTION_FIXTURE:-0}" -eq 1 ]; then' \
+	'      printf "%s\\n" "Monitors: 2" " 0: +*OneMixPanel 1600/286x2560/179+0+0 OneMixPanel" " 1: +USB-C-7 1920/600x1080+1600+0 USB-C-7" >> "$XRANDR_LOG"' \
 	'    else' \
-	'      printf "%s\\n" "Monitors: 2" " 0: +*OneMixPanel 1600/286x2560/179+0+0 OneMixPanel" " 1: +ExternalPanel 1920/600x1080/340+1600+0 ExternalPanel"' \
+	'      printf "%s\\n" "Monitors: 2" " 0: +*OneMixPanel 1600/286x2560/179+0+0 OneMixPanel" " 1: +ExternalPanel 1920/600x1080/340+1600+0 ExternalPanel" >> "$XRANDR_LOG"' \
 	'    fi' \
 	'    ;;' \
 	'  --output)' \
@@ -306,8 +307,8 @@ assert_mapping_failure_case() {
 		printf 'FAIL: failure case did not preserve xinput error\n' >&2; exit 1; }
 }
 
-assert_unset_default_external_connected_case() {
-	name=plain-default-external
+assert_unset_auto_external_connected_case() {
+	name=plain-auto-external
 	input_file="$td/$name.input"
 	printf '3\n\n\n6\n' > "$input_file"
 	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_DIAG" "$OBSERVED_MOUSE_ONLY" \
@@ -315,32 +316,38 @@ assert_unset_default_external_connected_case() {
 	: > "$XRANDR_LOG"
 	: > "$XINPUT_LOG"
 	rc=0
-	env -u FREERDP_ONEMIX_OUTPUT -u FREERDP_EXTERNAL_OUTPUT \
-		FREERDP_TOUCH_DIAG= EXPECTED_DIAG=0 XINPUT_FAIL=0 NO_EXTERNAL=0 DEFAULT_EXTERNAL=1 \
+	env -u FREERDP_EXTERNAL_OUTPUT FREERDP_ONEMIX_OUTPUT=OneMixPanel \
+		FREERDP_TOUCH_DIAG= EXPECTED_DIAG=0 XINPUT_FAIL=0 NO_EXTERNAL=0 AUTO_SELECTION_FIXTURE=1 \
 		TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
 		> "$td/$name.out" 2> "$td/$name.err" || rc=$?
 	if [ "$rc" -ne 0 ]; then
-		printf 'FAIL: plain menu with the default external output connected exited with rc=%s\n' "$rc" >&2
+		printf 'FAIL: plain menu with arbitrary connected external outputs exited with rc=%s\n' "$rc" >&2
 		cat "$td/$name.err" >&2
 		if [ -f "$STARTX_ERROR" ]; then cat "$STARTX_ERROR" >&2; fi
 		exit 1
 	fi
 	if [ "$(wc -l < "$WRAPPER_CALLS")" -ne 1 ]; then
-		printf 'FAIL: default connected external output did not invoke the wrapper once\n' >&2
+		printf 'FAIL: automatic connected external output did not invoke the wrapper once\n' >&2
 		exit 1
 	fi
-	grep -Fqx 'OUTPUT: --output eDP-1 --mode 1600x2560 --rotate left --primary' "$XRANDR_LOG" || {
-		printf 'FAIL: default connected external output missed the OneMix layout\n' >&2; exit 1; }
-	grep -Fqx 'OUTPUT: --output DP-1 --auto --right-of eDP-1' "$XRANDR_LOG" || {
-		printf 'FAIL: unset external output did not select connected DP-1\n' >&2; exit 1; }
+	grep -Fqx 'OUTPUT: --output OneMixPanel --mode 1600x2560 --rotate left --primary' "$XRANDR_LOG" || {
+		printf 'FAIL: automatic connected external output missed the OneMix layout\n' >&2; exit 1; }
+	grep -Fqx 'OUTPUT: --output USB-C-7 --auto --right-of OneMixPanel' "$XRANDR_LOG" || {
+		printf 'FAIL: unset external output did not select the first connected USB-C-7 output\n' >&2; exit 1; }
+	if grep -Fq 'OUTPUT: --output HDMI-A-3' "$XRANDR_LOG"; then
+		printf 'FAIL: automatic selection configured a later connected HDMI-A-3 output\n' >&2
+		exit 1
+	fi
 	grep -Fqx 'LISTMONITORS' "$XRANDR_LOG" || {
-		printf 'FAIL: default connected external output missed the monitor listing\n' >&2; exit 1; }
+		printf 'FAIL: automatic connected external output missed the monitor listing\n' >&2; exit 1; }
+	grep -Fqx ' 1: +USB-C-7 1920/600x1080+1600+0 USB-C-7' "$XRANDR_LOG" || {
+		printf 'FAIL: monitor listing did not report the selected USB-C-7 output\n' >&2; exit 1; }
 	grep -Fqx '/multimon' "$OBSERVED_ARGS" || {
-		printf 'FAIL: default connected external output missed /multimon\n' >&2; exit 1; }
-	grep -Fqx 'XINPUT: map-to-output GXTP7386:00 27C6:0113 eDP-1' "$XINPUT_LOG" || {
-		printf 'FAIL: default connected external output missed the output-bound touch map\n' >&2; exit 1; }
+		printf 'FAIL: automatic connected external output missed /multimon\n' >&2; exit 1; }
+	grep -Fqx 'XINPUT: map-to-output GXTP7386:00 27C6:0113 OneMixPanel' "$XINPUT_LOG" || {
+		printf 'FAIL: automatic connected external output missed the output-bound touch map\n' >&2; exit 1; }
 	if grep -Fq 'XINPUT: set-prop' "$XINPUT_LOG"; then
-		printf 'FAIL: default connected external output used the OneMix-only matrix\n' >&2
+		printf 'FAIL: automatic connected external output used the OneMix-only matrix\n' >&2
 		exit 1
 	fi
 }
@@ -386,7 +393,7 @@ assert_plain_default_no_external_case() {
 	fi
 }
 
-assert_unset_default_external_connected_case
+assert_unset_auto_external_connected_case
 assert_plain_default_no_external_case
 assert_valid_case normal 0 0 1 ExternalPanel
 assert_valid_case diagnostic 1 0 1 ExternalPanel
