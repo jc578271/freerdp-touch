@@ -140,6 +140,90 @@ menu --mouse-only
 Choose option 3. Omits all touch options. Same patched binary, no
 rollback needed. Touch does not trigger gestures.
 
+### Dual-monitor mode
+
+Dual-monitor mode uses the existing TTY -> `menu` option 3 -> private
+`startx` -> `scripts/launch-touch.sh` flow. It requires the native X11
+session already enforced by the wrapper; Wayland and Xwayland are not the
+v1 target. Connect the OneMix panel and the external display before finding
+their output names.
+
+From a terminal in the native X11 session, inspect the connected outputs:
+
+```
+xrandr --query
+```
+
+Use the first field on the two lines marked `connected` as the values below.
+Replace the placeholders with the names reported by your machine; do not
+assume a fixed connector name. The menu requires the OneMix name, accepts an
+optional external name, rejects equal or disconnected names, and prints the
+active server's connected-output listing when validation fails.
+
+For a one-shot dual-monitor launch, set both variables on the `menu`
+invocation:
+
+```
+FREERDP_ONEMIX_OUTPUT="<one-mix-output-name>" \\
+FREERDP_EXTERNAL_OUTPUT="<external-output-name>" \\
+menu
+```
+
+Choose option 3 and enter the RDP password when prompted. The same display
+configuration works with the existing diagnostic and mouse-only entry points:
+
+```
+FREERDP_ONEMIX_OUTPUT="<one-mix-output-name>" \\
+FREERDP_EXTERNAL_OUTPUT="<external-output-name>" \\
+FREERDP_TOUCH_DIAG=1 menu
+
+FREERDP_ONEMIX_OUTPUT="<one-mix-output-name>" \\
+FREERDP_EXTERNAL_OUTPUT="<external-output-name>" \\
+menu --mouse-only
+```
+
+If this is the normal setup, optionally add the pair to `~/.profile` so
+normal `menu`, `FREERDP_TOUCH_DIAG=1 menu`, and `menu --mouse-only` inherit it:
+
+```
+export FREERDP_ONEMIX_OUTPUT="<one-mix-output-name>"
+export FREERDP_EXTERNAL_OUTPUT="<external-output-name>"
+```
+
+Log in again, or source the profile in the current shell, before launching
+`menu`. The generated XRandR layout keeps the OneMix panel at
+`1600x2560`, rotates it left, and marks it `--primary`; the external display
+uses its preferred mode and is placed `--right-of` the OneMix panel. The
+fullscreen FreeRDP invocation receives exactly one `/multimon`, preserving
+the two monitor geometries instead of spanning them into one display.
+
+The dual-monitor path prints `xrandr --listmonitors` before FreeRDP starts.
+Verify that the list contains two monitors, the OneMix line carries the
+primary marker, and the external line is present as the secondary display.
+After the RDP session opens, confirm that both physical screens are active,
+that the pointer crosses from the OneMix panel to the external display on
+the configured right-hand side, and that the OneMix touch gestures still
+behave normally.
+
+#### Return to OneMix-only mode
+
+This rollback changes only the display layout; it does not change installed
+packages. Exit the RDP session so its private `startx` server stops, then
+remove the external-output setting while retaining the validated OneMix name:
+
+```
+unset FREERDP_EXTERNAL_OUTPUT
+menu
+```
+
+Choose option 3. With `FREERDP_EXTERNAL_OUTPUT` unset or empty, the launcher
+keeps the OneMix rotation and primary marker, omits the external XRandR
+layout and `/multimon`, and returns to the OneMix-only path. If the variables
+were added to `~/.profile`, remove or comment out the
+`FREERDP_EXTERNAL_OUTPUT` line there as well, then log in again or source the
+profile before the next launch. Keep the package rollback instructions below
+separate if the patched FreeRDP packages themselves must be removed.
+
 ## Calibration overrides
 
 Set before running `menu`:
