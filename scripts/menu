@@ -1,7 +1,13 @@
 #!/bin/bash
 
 export FREERDP_ONEMIX_OUTPUT="${FREERDP_ONEMIX_OUTPUT-eDP-1}"
-export FREERDP_EXTERNAL_OUTPUT="${FREERDP_EXTERNAL_OUTPUT-}"
+if [ "${FREERDP_EXTERNAL_OUTPUT+x}" = x ]; then
+    external_output_auto=0
+else
+    FREERDP_EXTERNAL_OUTPUT=DP-1
+    external_output_auto=1
+fi
+export FREERDP_EXTERNAL_OUTPUT
 
 # Parse CLI arguments — accept only optional --mouse-only
 mouse_only=0
@@ -69,6 +75,7 @@ XEOF
     if [ "${FREERDP_TOUCH_DIAG:-}" = "1" ]; then
         printf 'export FREERDP_TOUCH_DIAG=1\n' >> "$xinitrc"
     fi
+    printf 'external_output_auto=%s\n' "$external_output_auto" >> "$xinitrc"
 
     cat >> "$xinitrc" <<'XEOF'
 
@@ -112,9 +119,12 @@ EOF
 output_is_connected "$onemix_output" || \
     reject_output "FREERDP_ONEMIX_OUTPUT '$onemix_output' is not connected"
 
-if [ -n "$external_output" ]; then
-    output_is_connected "$external_output" || \
+if [ -n "$external_output" ] && ! output_is_connected "$external_output"; then
+    if [ "$external_output_auto" -eq 1 ]; then
+        external_output=
+    else
         reject_output "FREERDP_EXTERNAL_OUTPUT '$external_output' is not connected"
+    fi
 fi
 
 xrandr --output "$onemix_output" --mode 1600x2560 --rotate left --primary
@@ -131,15 +141,18 @@ else
     0 -1 1 1 0 0 0 0 1
 fi
 
+multimon_arg=
+if [ -n "$external_output" ]; then
+    multimon_arg=/multimon
+fi
+
 XEOF
 
     printf 'exec /home/hoang/freerdp-touch/scripts/launch-touch.sh' >> "$xinitrc"
     if [ "$mouse_only" -eq 1 ]; then
         printf ' --mouse-only' >> "$xinitrc"
     fi
-    if [ -n "${FREERDP_EXTERNAL_OUTPUT:-}" ]; then
-        printf ' /multimon' >> "$xinitrc"
-    fi
+    printf ' ${multimon_arg:+$multimon_arg}' >> "$xinitrc"
     printf ' /v:192.168.1.10 /u:ngleh %s /f /smart-sizing:2560x1600 /scale-desktop:200 /clipboard /sound:sys:pulse /microphone:sys:pulse /drive:Onemix,$HOME /cert:ignore\n' "$pass_arg_q" >> "$xinitrc"
 
     startx "$xinitrc"
