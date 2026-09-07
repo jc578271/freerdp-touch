@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
-stopped_at: Completed quick task 260907-vzf
-last_updated: "2026-09-07T23:48:30+07:00"
+stopped_at: Completed quick task 260907-x9e
+last_updated: "2026-09-07T17:19:47.352Z"
 last_activity: 2026-09-07
-last_activity_desc: "Completed quick task 260907-vzf: repair OneMix dual-display touch mapping and no-monitor fallback"
+last_activity_desc: "Completed quick task 260907-x9e: auto-detect external output and preserve OneMix-only fallback"
 progress:
   total_phases: 4
   completed_phases: 4
@@ -32,7 +32,7 @@ progress:
 Phase: 4 of 4 (Diagnostics, Packaging & Launch Configuration)
 Plan: 7 of 7 in current phase
 Status: Verification waiver recorded; technical evidence remains gaps_found; normal GSD phase/milestone closure pending
-Last activity: 2026-09-07 - Completed quick task 260907-vzf: repair OneMix dual-display touch mapping and no-monitor fallback
+Last activity: 2026-09-07 - Completed quick task 260907-x9e: auto-detect external output and preserve OneMix-only fallback
 
 Progress: [██████████] 100%
 
@@ -60,6 +60,7 @@ Progress: [██████████] 100%
 | Phase 04 P05 | 1371 | 3 tasks | 9 files |
 | Phase 04 P06 | 182 | 4 tasks | 7 files |
 | Phase 04 P07 | 12 min | 2 tasks | 6 files |
+| Phase quick P260907-x9e | 9min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,8 @@ Progress: [██████████] 100%
 - [Quick 260810-e0n] Fresh-clone builds use exactly one tracked signed `src/*.dsc` plus its two checksum-bound source archives. `scripts/build-release.sh` derives the pinned base version from that local descriptor, reuses it for `dpkg-source -x`, and supports `BUILD_RELEASE_SMOKE=1`; `rdp-debug*.log` is ignored and the existing sensitive logs remain local but untracked.
 - [Phase ?]: Quick 260810-qqz: Keep the first local short tap immediate and reuse the first adjusted coordinate only for one nearby second tap within the existing duration/slop bounds; clear the anchor on drag, long press, multi-finger entry, and lifecycle cancellation.
 - [Quick 260810-ss0] Unset local-touch calibration now defaults to 500 ms long press and 12 px slop across the wrapper, X11 recognizer fallbacks, classifier model, CLI help, tests, and README; existing override ranges remain unchanged.
+- [Phase ?]: Quick 260907-x9e: automatic external selection scans the private xrandr query for the first connected non-OneMix output.
+- [Phase ?]: Quick 260907-x9e: unset, explicit-empty, and named FREERDP_EXTERNAL_OUTPUT states remain distinct; named overrides fail closed.
 
 ### Todos
 
@@ -134,6 +137,7 @@ Progress: [██████████] 100%
 | 18 | xóa Openbox/wmctrl khỏi menu và khôi phục luồng launch FreeRDP trực tiếp như trước các thay đổi Openbox | 2026-08-11 | 5d1a40a | — |
 | 260907-t28 | Thiết lập cấu hình chạy xfreerdp3 trên hai màn hình: màn hình OneMix là primary và màn hình ngoài là secondary. Kiểm tra launcher/tài liệu hiện có, rồi tạo hoặc cập nhật cấu hình tối thiểu, có hướng dẫn kiểm tra và rollback. | 2026-09-07 | 953afb3 | [260907-t28-thi-t-l-p-c-u-h-nh-ch-y-xfreerdp3-tr-n-h](./quick/260907-t28-thi-t-l-p-c-u-h-nh-ch-y-xfreerdp3-tr-n-h/) |
 | 260907-vzf | hiện tại khi tôi cắm màn hình ngoài, extend screen đã work nhưng touch bị lỗi. cụ thể khi tôi di chuyển chuột ở màn onemix thì, chuột lại hiện ở màn ngoài | 2026-09-07 | 8053406 | [260907-vzf-hi-n-t-i-khi-t-i-c-m-m-n-h-nh-ngo-i-exte](./quick/260907-vzf-hi-n-t-i-khi-t-i-c-m-m-n-h-nh-ngo-i-exte/) |
+| 260907-x9e | Auto-detect the first connected private-X-server external output while preserving explicit overrides and OneMix touch mapping | 2026-09-07 | 6767470 | [260907-x9e-t-ng-ph-t-hi-n-m-n-h-nh-ngo-i-trong-scri](./quick/260907-x9e-t-ng-ph-t-hi-n-m-n-h-nh-ngo-i-trong-scri/) |
 
 ### Research Flags (carried from research summary)
 
@@ -141,12 +145,12 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Last session:** 2026-08-10T14:30:24.909Z
-**Stopped at:** Completed quick task 260810-ss0
+**Last session:** 2026-09-07T17:18:47.185Z
+**Stopped at:** Completed quick task 260907-x9e
 **Resume file:** None
 
-- **Last action**: Synchronized unset local-touch defaults to 500 ms long press and 12 px slop, refreshed the integrated quilt patch, and passed wrapper, classifier, dispatcher, clean-extraction, and release-smoke checks.
-- **Next action**: Build and reinstall the four-package bundle, then perform the pending native OneMix 3/native-X11 calibration UAT before normal phase/milestone closure.
+- **Last action**: Added private-X-server automatic external-output selection, explicit override semantics, and launcher/documentation regressions.
+- **Next action**: Run the pending native OneMix 3/native-X11 external-display and OneMix-only hardware UAT before normal phase/milestone closure.
 
 ---
 *State initialized: 2026-08-05*
