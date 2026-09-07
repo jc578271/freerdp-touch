@@ -156,9 +156,11 @@ xrandr --query
 
 Use the first field on the two lines marked `connected` as the values below.
 Replace the placeholders with the names reported by your machine; do not
-assume a fixed connector name. The menu requires the OneMix name, accepts an
-optional external name, rejects equal or disconnected names, and prints the
-active server's connected-output listing when validation fails.
+assume a fixed connector name. On this OneMix installation, `menu` defaults to
+`eDP-1` for the panel and `DP-1` for the external display; the variables below
+remain available to override those defaults. The menu requires the OneMix
+name, accepts an optional external name, rejects equal or disconnected names,
+and prints the active server's connected-output listing when validation fails.
 
 For a one-shot dual-monitor launch, set both variables on the `menu`
 invocation:
@@ -209,20 +211,22 @@ behave normally.
 
 This rollback changes only the display layout; it does not change installed
 packages. Exit the RDP session so its private `startx` server stops, then
-remove the external-output setting while retaining the validated OneMix name:
+explicitly empty the external-output setting while retaining the validated
+OneMix name:
 
 ```
-unset FREERDP_EXTERNAL_OUTPUT
-menu
+FREERDP_EXTERNAL_OUTPUT= menu
 ```
 
-Choose option 3. With `FREERDP_EXTERNAL_OUTPUT` unset or empty, the launcher
-keeps the OneMix rotation and primary marker, omits the external XRandR
-layout and `/multimon`, and returns to the OneMix-only path. If the variables
-were added to `~/.profile`, remove or comment out the
-`FREERDP_EXTERNAL_OUTPUT` line there as well, then log in again or source the
-profile before the next launch. Keep the package rollback instructions below
-separate if the patched FreeRDP packages themselves must be removed.
+Choose option 3. With `FREERDP_EXTERNAL_OUTPUT` empty, the launcher keeps the
+OneMix rotation and primary marker, omits the external XRandR layout and
+`/multimon`, and returns to the OneMix-only path. The built-in `DP-1` default
+means `unset FREERDP_EXTERNAL_OUTPUT` re-enables dual-monitor mode. If the
+variables were added to `~/.profile`, set
+`export FREERDP_EXTERNAL_OUTPUT=` there for a persistent OneMix-only launch,
+then log in again or source the profile before the next launch. Keep the
+package rollback instructions below separate if the patched FreeRDP packages
+themselves must be removed.
 
 ## Calibration overrides
 

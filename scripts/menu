@@ -1,5 +1,8 @@
 #!/bin/bash
 
+export FREERDP_ONEMIX_OUTPUT="${FREERDP_ONEMIX_OUTPUT-eDP-1}"
+export FREERDP_EXTERNAL_OUTPUT="${FREERDP_EXTERNAL_OUTPUT-DP-1}"
+
 # Parse CLI arguments — accept only optional --mouse-only
 mouse_only=0
 for arg in "$@"; do

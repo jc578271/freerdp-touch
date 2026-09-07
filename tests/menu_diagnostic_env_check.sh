@@ -10,6 +10,15 @@ if [ ! -x "$menu" ]; then
 	exit 1
 fi
 
+grep -Fqx 'export FREERDP_ONEMIX_OUTPUT="${FREERDP_ONEMIX_OUTPUT-eDP-1}"' "$menu" || {
+	printf 'FAIL: menu does not set the OneMix output default\n' >&2
+	exit 1
+}
+grep -Fqx 'export FREERDP_EXTERNAL_OUTPUT="${FREERDP_EXTERNAL_OUTPUT-DP-1}"' "$menu" || {
+	printf 'FAIL: menu does not set the external output default\n' >&2
+	exit 1
+}
+
 td=$(mktemp -d "${TMPDIR:-/tmp}/menu-diagnostic-env.XXXXXX")
 trap 'rm -rf "$td"' EXIT HUP INT TERM
 
@@ -112,14 +121,14 @@ run_menu() {
 	input_file="$td/$name.input"
 	printf '3\n\n\n6\n' > "$input_file"
 
-	if [ "$external" = UNSET ]; then
+	if [ "$external" = EMPTY ]; then
 		if [ -n "$mode" ]; then
-			env -u FREERDP_EXTERNAL_OUTPUT FREERDP_ONEMIX_OUTPUT="$onemix" \
+			env FREERDP_EXTERNAL_OUTPUT= FREERDP_ONEMIX_OUTPUT="$onemix" \
 				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
 				TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" "$mode" < "$input_file" \
 				> "$td/$name.out" 2> "$td/$name.err"
 		else
-			env -u FREERDP_EXTERNAL_OUTPUT FREERDP_ONEMIX_OUTPUT="$onemix" \
+			env FREERDP_EXTERNAL_OUTPUT= FREERDP_ONEMIX_OUTPUT="$onemix" \
 				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
 				TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
 				> "$td/$name.out" 2> "$td/$name.err"
@@ -230,7 +239,7 @@ assert_rejected_case() {
 assert_valid_case normal 0 0 1 ExternalPanel
 assert_valid_case diagnostic 1 0 1 ExternalPanel
 assert_valid_case mouse-only 0 1 1 ExternalPanel
-assert_valid_case rollback 0 0 0 UNSET
+assert_valid_case rollback 0 0 0 EMPTY
 assert_rejected_case missing-primary '' ExternalPanel 'ERROR: FREERDP_ONEMIX_OUTPUT is required'
 assert_rejected_case duplicate-output OneMixPanel OneMixPanel 'ERROR: FREERDP_ONEMIX_OUTPUT and FREERDP_EXTERNAL_OUTPUT must differ'
 assert_rejected_case missing-external OneMixPanel MissingPanel "ERROR: FREERDP_EXTERNAL_OUTPUT 'MissingPanel' is not connected"
