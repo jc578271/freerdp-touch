@@ -154,19 +154,26 @@ From a terminal in the native X11 session, inspect the connected outputs:
 xrandr --query
 ```
 
-Use the first field on the two lines marked `connected` as the values below.
-Replace the placeholders with the names reported by your machine; do not
-assume a fixed connector name. On this OneMix installation, `menu` defaults to
-`eDP-1` for the panel and automatically uses `DP-1` only when it is connected.
-If that default external output is absent, `menu` falls back to OneMix-only.
-Set `FREERDP_EXTERNAL_OUTPUT` to select another external output or to force an
-empty OneMix-only layout. The menu requires the OneMix name, accepts an
-optional external name, rejects equal or disconnected explicitly configured
-names, and prints the active server's connected-output listing when validation
-fails.
+The private X server makes the external-display choice from its own
+`xrandr --query` snapshot; no connector-specific external default is assumed.
+The three `FREERDP_EXTERNAL_OUTPUT` states are exclusive:
 
-For a one-shot dual-monitor launch, set both variables on the `menu`
-invocation:
+- **Unset:** when `FREERDP_EXTERNAL_OUTPUT` is unset, `menu` chooses the first
+  other `connected` output in query order after validating the OneMix output.
+  If no other output is connected, it keeps the OneMix-only layout.
+- **Explicitly empty:** `FREERDP_EXTERNAL_OUTPUT= menu` forces the OneMix-only
+  layout even when other outputs are connected.
+- **Named:** `FREERDP_EXTERNAL_OUTPUT="<output-name>"` selects that output. The
+  private xinitrc rejects it before the wrapper starts if it is disconnected or
+  equals the OneMix output, and prints the active connected-output listing.
+
+`FREERDP_ONEMIX_OUTPUT` defaults to `eDP-1`, but it is also validated against
+that private-server snapshot. Use `xrandr --query` to confirm the output names
+when selecting an explicit OneMix or external output; automatic mode does not
+need a connector-name assumption.
+
+For a one-shot dual-monitor launch with an explicit external output, set both
+variables on the `menu` invocation:
 
 ```
 FREERDP_ONEMIX_OUTPUT="<one-mix-output-name>" \\
@@ -187,8 +194,16 @@ FREERDP_EXTERNAL_OUTPUT="<external-output-name>" \\
 menu --mouse-only
 ```
 
-If this is the normal setup, optionally add the pair to `~/.profile` so
-normal `menu`, `FREERDP_TOUCH_DIAG=1 menu`, and `menu --mouse-only` inherit it:
+For automatic selection, leave `FREERDP_EXTERNAL_OUTPUT` unset and run the
+same menu-only flow:
+
+```
+FREERDP_ONEMIX_OUTPUT="<one-mix-output-name>" menu
+```
+
+If an explicit external output is the normal setup, optionally add the pair to
+`~/.profile` so normal `menu`, `FREERDP_TOUCH_DIAG=1 menu`, and
+`menu --mouse-only` inherit it:
 
 ```
 export FREERDP_ONEMIX_OUTPUT="<one-mix-output-name>"
@@ -235,9 +250,9 @@ FREERDP_EXTERNAL_OUTPUT= menu
 Choose option 3. With `FREERDP_EXTERNAL_OUTPUT` explicitly empty, the launcher
 keeps the OneMix rotation and primary marker, omits the external XRandR layout
 and `/multimon`, and returns to the OneMix-only path. With the variable unset,
-plain `menu` uses the default `DP-1` only if it is connected and otherwise
-falls back to OneMix-only, so it works when no external output is connected.
-If the variables were added to `~/.profile`, set
+plain `menu` automatically chooses the first other connected output in the
+private server's query order and falls back to OneMix-only when none is
+connected. If the variables were added to `~/.profile`, set
 `export FREERDP_EXTERNAL_OUTPUT=` there for a persistent OneMix-only launch,
 then log in again or source the profile before the next launch. Keep the
 package rollback instructions below separate if the patched FreeRDP packages
