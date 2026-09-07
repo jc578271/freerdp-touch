@@ -218,7 +218,7 @@ assert_valid_case() {
 		one_mix_line=$(grep -nF 'xrandr --output "$onemix_output"' "$RENDERED_XINITRC" | cut -d: -f1)
 		external_line=$(grep -nF 'xrandr --output "$external_output"' "$RENDERED_XINITRC" | cut -d: -f1)
 		map_line=$(grep -nF 'xinput map-to-output "GXTP7386:00 27C6:0113" "$onemix_output"' "$RENDERED_XINITRC" | cut -d: -f1)
-		wrapper_line=$(grep -nF 'exec /home/hoang/freerdp-touch/scripts/launch-touch.sh' "$RENDERED_XINITRC" | cut -d: -f1)
+		wrapper_line=$(grep -nF "exec $MOCK_WRAPPER" "$RENDERED_XINITRC" | cut -d: -f1)
 		if [ "$one_mix_line" -ge "$external_line" ] || [ "$external_line" -ge "$map_line" ] || [ "$map_line" -ge "$wrapper_line" ]; then
 			printf 'FAIL: dual-display setup order is not XRandR, map, wrapper (%s)\n' "$name" >&2; exit 1
 		fi

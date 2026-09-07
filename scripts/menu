@@ -123,9 +123,13 @@ if [ -n "$external_output" ]; then
     xrandr --listmonitors
 fi
 
-xinput set-prop "GXTP7386:00 27C6:0113" \
-"Coordinate Transformation Matrix" \
-0 -1 1 1 0 0 0 0 1
+if [ -n "$external_output" ]; then
+    xinput map-to-output "GXTP7386:00 27C6:0113" "$onemix_output"
+else
+    xinput set-prop "GXTP7386:00 27C6:0113" \
+    "Coordinate Transformation Matrix" \
+    0 -1 1 1 0 0 0 0 1
+fi
 
 XEOF
 
