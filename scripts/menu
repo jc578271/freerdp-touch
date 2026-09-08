@@ -147,7 +147,7 @@ fi
 
 xrandr --output "$onemix_output" --mode 1600x2560 --rotate left --primary
 if [ -n "$external_output" ]; then
-    xrandr --output "$external_output" --auto --right-of "$onemix_output"
+    xrandr --output "$external_output" --auto --above "$onemix_output"
     xrandr --listmonitors
 fi
 

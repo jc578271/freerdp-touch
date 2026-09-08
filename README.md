@@ -213,7 +213,7 @@ export FREERDP_EXTERNAL_OUTPUT="<external-output-name>"
 Log in again, or source the profile in the current shell, before launching
 `menu`. The generated XRandR layout keeps the OneMix panel at
 `1600x2560`, rotates it left, and marks it `--primary`; the external display
-uses its preferred mode and is placed `--right-of` the OneMix panel. The
+uses its preferred mode and is placed `--above` the OneMix panel. The
 fullscreen FreeRDP invocation receives exactly one `/multimon`, preserving
 the two monitor geometries instead of spanning them into one display. After
 the layout, the launcher runs

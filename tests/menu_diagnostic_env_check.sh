@@ -233,7 +233,7 @@ assert_valid_case() {
 	grep -Fqx 'OUTPUT: --output OneMixPanel --mode 1600x2560 --rotate left --primary' "$XRANDR_LOG" || {
 		printf 'FAIL: missing primary XRandR layout (%s)\n' "$name" >&2; exit 1; }
 	if [ "$expected_multimon" -eq 1 ]; then
-		grep -Fqx 'OUTPUT: --output ExternalPanel --auto --right-of OneMixPanel' "$XRANDR_LOG" || {
+		grep -Fqx 'OUTPUT: --output ExternalPanel --auto --above OneMixPanel' "$XRANDR_LOG" || {
 			printf 'FAIL: missing external XRandR layout (%s)\n' "$name" >&2; exit 1; }
 		grep -Fqx 'LISTMONITORS' "$XRANDR_LOG" || {
 			printf 'FAIL: missing XRandR monitor listing (%s)\n' "$name" >&2; exit 1; }
@@ -380,7 +380,7 @@ assert_unset_auto_external_connected_case() {
 	fi
 	grep -Fqx 'OUTPUT: --output OneMixPanel --mode 1600x2560 --rotate left --primary' "$XRANDR_LOG" || {
 		printf 'FAIL: automatic connected external output missed the OneMix layout\n' >&2; exit 1; }
-	grep -Fqx 'OUTPUT: --output USB-C-7 --auto --right-of OneMixPanel' "$XRANDR_LOG" || {
+	grep -Fqx 'OUTPUT: --output USB-C-7 --auto --above OneMixPanel' "$XRANDR_LOG" || {
 		printf 'FAIL: unset external output did not select the first connected USB-C-7 output\n' >&2; exit 1; }
 	if grep -Fq 'OUTPUT: --output HDMI-A-3' "$XRANDR_LOG"; then
 		printf 'FAIL: automatic selection configured a later connected HDMI-A-3 output\n' >&2
