@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
-stopped_at: Resolved debug session external-scale-stays-200
-last_updated: "2026-09-08T05:27:24.366Z"
+stopped_at: Completed quick task 260908-hqd
+last_updated: "2026-09-08T08:04:09.417Z"
 last_activity: 2026-09-08
-last_activity_desc: "Completed quick task 260908-dyi: physical mouse wheel scrolls RDP under local-only touch"
+last_activity_desc: "Completed quick task 260908-hqd: per-monitor mouse speed for secondary display"
 progress:
   total_phases: 4
   completed_phases: 4
@@ -32,7 +32,7 @@ progress:
 Phase: 4 of 4 (Diagnostics, Packaging & Launch Configuration)
 Plan: 7 of 7 in current phase
 Status: Verification waiver recorded; technical evidence remains gaps_found; normal GSD phase/milestone closure pending
-Last activity: 2026-09-08 - Completed quick task 260908-dyi: physical mouse wheel scrolls RDP under local-only touch
+Last activity: 2026-09-08 - Completed quick task 260908-hqd: per-monitor mouse speed for secondary display
 
 Progress: [██████████] 100%
 
@@ -61,6 +61,7 @@ Progress: [██████████] 100%
 | Phase 04 P06 | 182 | 4 tasks | 7 files |
 | Phase 04 P07 | 12 min | 2 tasks | 6 files |
 | Phase quick P260907-x9e | 9min | 2 tasks | 4 files |
+| Phase quick P260908-hqd | 39min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,9 @@ Progress: [██████████] 100%
 - [Quick 260810-ss0] Unset local-touch calibration now defaults to 500 ms long press and 12 px slop across the wrapper, X11 recognizer fallbacks, classifier model, CLI help, tests, and README; existing override ranges remain unchanged.
 - [Phase ?]: Quick 260907-x9e: automatic external selection scans the private xrandr query for the first connected non-OneMix output.
 - [Phase ?]: Quick 260907-x9e: unset, explicit-empty, and named FREERDP_EXTERNAL_OUTPUT states remain distinct; named overrides fail closed.
+- [Phase ?]: Skip global smart-sizing squash when nmonitors>1; hit-test real CRTC rectangles against rdpMonitor records.
+- [Phase ?]: Scale X/libinput accel only on CRTC change for the non-primary monitor; restore the original ratio on OneMix.
+- [Phase ?]: FREERDP_EXTERNAL_POINTER_SPEED is menu-owned environment metadata (default 50, canonical 10-200), not a FreeRDP CLI flag.
 
 ### Todos
 
@@ -141,6 +145,7 @@ Progress: [██████████] 100%
 | 260908-1fa | thêm param để scale riêng màn phụ | 2026-09-08 | 0de8802 | [260908-1fa-th-m-param-scale-ri-ng-m-n-ph](./quick/260908-1fa-th-m-param-scale-ri-ng-m-n-ph/) |
 | 260908-dyi | hiện tại khi tôi kết nối rdp mà cắm chuột, thì con lăn chuột lúc cuộn ko work | 2026-09-08 | fd3803f | [260908-dyi-hi-n-t-i-khi-t-i-k-t-n-i-rdp-m-c-m-chu-t](./quick/260908-dyi-hi-n-t-i-khi-t-i-k-t-n-i-rdp-m-c-m-chu-t/) |
 | 24 | update lại script menu, tôi muốn màn phụ nằm bên trên màn chính onemix | 2026-09-08 | a842267 | — |
+| 260908-hqd | per-monitor mouse speed: OneMix OK, secondary display too fast | 2026-09-08 | 4f91f92 | [260908-hqd-per-monitor-mouse-speed-onemix-ok-second](./quick/260908-hqd-per-monitor-mouse-speed-onemix-ok-second/) |
 
 ### Research Flags (carried from research summary)
 
@@ -148,12 +153,12 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Last session:** 2026-09-08T09:50:17+07:00
-**Stopped at:** Resolved debug session external-scale-stays-200
+**Last session:** 2026-09-08T08:04:09.393Z
+**Stopped at:** Completed quick task 260908-hqd
 **Resume file:** None
 
-- **Last action**: Invoked the per-monitor scale helper from `xf_detect_monitors` and rebuilt the four-package `+onemix1` closure so `xfreerdp3` reads `FREERDP_EXTERNAL_DESKTOP_SCALE`.
-- **Next action**: Reinstall the rebuilt bundle and confirm native-X11 Windows Display settings show 200% on OneMix and 100% on the external display.
+- **Last action**: Mapped dual-monitor absolute mouse per CRTC/rdpMonitor and exported FREERDP_EXTERNAL_POINTER_SPEED (default 50) from menu option 3.
+- **Next action**: Reinstall the rebuilt +onemix1 bundle and physically check USB-mouse speed on both screens (OneMix unchanged, external no longer racing).
 
 ---
 *State initialized: 2026-08-05*
