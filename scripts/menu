@@ -133,6 +133,18 @@ if [ -n "$external_output" ] && ! output_is_connected "$external_output"; then
     reject_output "FREERDP_EXTERNAL_OUTPUT '$external_output' is not connected"
 fi
 
+if [ -n "$external_output" ]; then
+    external_desktop_scale="${FREERDP_EXTERNAL_DESKTOP_SCALE-}"
+    [ -n "$external_desktop_scale" ] || external_desktop_scale=100
+    case "$external_desktop_scale" in
+        [1-4][0-9][0-9]|500) ;;
+        *) reject_output 'FREERDP_EXTERNAL_DESKTOP_SCALE must be a whole percent from 100 through 500' ;;
+    esac
+    export FREERDP_EXTERNAL_DESKTOP_SCALE="$external_desktop_scale"
+else
+    unset FREERDP_EXTERNAL_DESKTOP_SCALE
+fi
+
 xrandr --output "$onemix_output" --mode 1600x2560 --rotate left --primary
 if [ -n "$external_output" ]; then
     xrandr --output "$external_output" --auto --right-of "$onemix_output"

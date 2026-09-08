@@ -221,6 +221,30 @@ the layout, the launcher runs
 absolute touchscreen stays on the OneMix output instead of being scaled across
 the combined desktop.
 
+#### Per-monitor remote desktop scale
+
+The launcher keeps the OneMix primary at 200% and gives the selected external
+monitor its own remote desktop scale. When an external output is selected,
+`FREERDP_EXTERNAL_DESKTOP_SCALE` defaults to 100%; set a canonical whole-percent
+value from 100 through 500 to override it:
+
+```
+FREERDP_ONEMIX_OUTPUT="<one-mix-output-name>" \\
+FREERDP_EXTERNAL_OUTPUT="<external-output-name>" \\
+FREERDP_EXTERNAL_DESKTOP_SCALE=140 \\
+menu
+```
+
+The same setting works with diagnostic and mouse-only launches. Leave
+`FREERDP_EXTERNAL_OUTPUT` unset for automatic first-external selection; the
+external scale still defaults to 100. Set `FREERDP_EXTERNAL_OUTPUT=` for
+OneMix-only mode; `menu` clears `FREERDP_EXTERNAL_DESKTOP_SCALE` before the
+wrapper runs, so a stale external value cannot affect a local-only session.
+Malformed, leading-zero, below-range, and above-range values are rejected
+before the wrapper starts. The external value is monitor-layout metadata
+consumed by the patched client, not a second `/scale-desktop` command-line
+argument; the launcher retains exactly one global `/scale-desktop:200`.
+
 The dual-monitor path prints `xrandr --listmonitors` before FreeRDP starts.
 Verify that the list contains two monitors, the OneMix line carries the
 primary marker, and the external line is present as the secondary display.

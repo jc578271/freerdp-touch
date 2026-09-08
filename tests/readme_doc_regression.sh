@@ -257,4 +257,23 @@ done
 printf 'PASS: dual-monitor touch-map guidance verified\n'
 
 # --------------------------------------------------------------------------
+# 7. Per-monitor external desktop-scale contract
+# --------------------------------------------------------------------------
+for required_text in \
+  'FREERDP_EXTERNAL_DESKTOP_SCALE=140' \
+  'defaults to 100%' \
+  '100 through 500' \
+  'OneMix primary at 200%' \
+  'automatic first-external selection' \
+  'clears `FREERDP_EXTERNAL_DESKTOP_SCALE`' \
+  'monitor-layout metadata' \
+  'not a second `/scale-desktop`'; do
+  if ! grep -Fq "$required_text" "$readme"; then
+    printf 'FAIL: external desktop-scale guidance missing: %s\n' "$required_text" >&2
+    exit 1
+  fi
+done
+printf 'PASS: per-monitor external desktop-scale guidance verified\n'
+
+# --------------------------------------------------------------------------
 printf 'PASS: README documentation regression complete\n'

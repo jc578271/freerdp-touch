@@ -192,6 +192,8 @@ assert_valid_case() {
 	expected_multimon=$4
 	external=$5
 	expected_scale=$6
+	expected_observed_scale=${7-$expected_scale}
+	[ "$expected_observed_scale" = UNSET ] && expected_observed_scale=unset
 
 	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_DIAG" "$OBSERVED_EXTERNAL_SCALE" \
 		"$OBSERVED_MOUSE_ONLY" "$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
@@ -218,10 +220,10 @@ assert_valid_case() {
 	actual_external_scale=$(tr -d '\n' < "$OBSERVED_EXTERNAL_SCALE")
 	actual_mouse_only=$(tr -d '\n' < "$OBSERVED_MOUSE_ONLY")
 	expected_diag_value=$([ "$expected_diag" = 1 ] && printf 1 || printf '')
-	if [ "$actual_diag" != "$expected_diag_value" ] || [ "$actual_external_scale" != "$expected_scale" ] || \
+	if [ "$actual_diag" != "$expected_diag_value" ] || [ "$actual_external_scale" != "$expected_observed_scale" ] || \
 		[ "$actual_mouse_only" != "$expected_mouse_only" ]; then
 		printf 'FAIL: wrapper environment or mouse-only argument mismatch (%s): scale=%s expected=%s\n' \
-			"$name" "$actual_external_scale" "$expected_scale" >&2
+			"$name" "$actual_external_scale" "$expected_observed_scale" >&2
 		exit 1
 	fi
 	if [ "$(wc -l < "$WRAPPER_CALLS")" -ne 1 ]; then
@@ -461,8 +463,8 @@ assert_valid_case empty-scale 0 0 1 ExternalPanel 100
 assert_valid_case override 0 0 1 ExternalPanel 140
 assert_valid_case diagnostic 1 0 1 ExternalPanel 100
 assert_valid_case mouse-only 0 1 1 ExternalPanel 100
-assert_valid_case rollback 0 0 0 EMPTY UNSET
-assert_valid_case stale-scale-rollback 0 0 0 EMPTY 140
+assert_valid_case rollback 0 0 0 '' UNSET
+assert_valid_case stale-scale-rollback 0 0 0 '' 140 UNSET
 assert_rejected_case missing-primary '' ExternalPanel 'ERROR: FREERDP_ONEMIX_OUTPUT is required'
 assert_rejected_case duplicate-output OneMixPanel OneMixPanel 'ERROR: FREERDP_ONEMIX_OUTPUT and FREERDP_EXTERNAL_OUTPUT must differ'
 assert_rejected_case missing-external OneMixPanel MissingPanel "ERROR: FREERDP_EXTERNAL_OUTPUT 'MissingPanel' is not connected"
