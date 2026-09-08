@@ -6,9 +6,9 @@ current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
 stopped_at: Resolved debug session external-scale-stays-200
-last_updated: "2026-09-08T09:50:17+07:00"
+last_updated: "2026-09-08T10:50:00+07:00"
 last_activity: 2026-09-08
-last_activity_desc: "Resolved debug session external-scale-stays-200: invoke per-monitor scale helper from xf_detect_monitors"
+last_activity_desc: "Completed quick task 260908-dyi: physical mouse wheel scrolls RDP under local-only touch"
 progress:
   total_phases: 4
   completed_phases: 4
@@ -32,7 +32,7 @@ progress:
 Phase: 4 of 4 (Diagnostics, Packaging & Launch Configuration)
 Plan: 7 of 7 in current phase
 Status: Verification waiver recorded; technical evidence remains gaps_found; normal GSD phase/milestone closure pending
-Last activity: 2026-09-08 - Resolved debug session external-scale-stays-200: invoke per-monitor scale helper from xf_detect_monitors
+Last activity: 2026-09-08 - Completed quick task 260908-dyi: physical mouse wheel scrolls RDP under local-only touch
 
 Progress: [██████████] 100%
 
@@ -139,6 +139,7 @@ Progress: [██████████] 100%
 | 260907-vzf | hiện tại khi tôi cắm màn hình ngoài, extend screen đã work nhưng touch bị lỗi. cụ thể khi tôi di chuyển chuột ở màn onemix thì, chuột lại hiện ở màn ngoài | 2026-09-07 | 8053406 | [260907-vzf-hi-n-t-i-khi-t-i-c-m-m-n-h-nh-ngo-i-exte](./quick/260907-vzf-hi-n-t-i-khi-t-i-c-m-m-n-h-nh-ngo-i-exte/) |
 | 260907-x9e | Auto-detect the first connected private-X-server external output while preserving explicit overrides and OneMix touch mapping | 2026-09-07 | 6767470 | [260907-x9e-t-ng-ph-t-hi-n-m-n-h-nh-ngo-i-trong-scri](./quick/260907-x9e-t-ng-ph-t-hi-n-m-n-h-nh-ngo-i-trong-scri/) |
 | 260908-1fa | thêm param để scale riêng màn phụ | 2026-09-08 | 0de8802 | [260908-1fa-th-m-param-scale-ri-ng-m-n-ph](./quick/260908-1fa-th-m-param-scale-ri-ng-m-n-ph/) |
+| 260908-dyi | hiện tại khi tôi kết nối rdp mà cắm chuột, thì con lăn chuột lúc cuộn ko work | 2026-09-08 | fd3803f | [260908-dyi-hi-n-t-i-khi-t-i-k-t-n-i-rdp-m-c-m-chu-t](./quick/260908-dyi-hi-n-t-i-khi-t-i-k-t-n-i-rdp-m-c-m-chu-t/) |
 
 ### Research Flags (carried from research summary)
 
