@@ -245,6 +245,29 @@ before the wrapper starts. The external value is monitor-layout metadata
 consumed by the patched client, not a second `/scale-desktop` command-line
 argument; the launcher retains exactly one global `/scale-desktop:200`.
 
+#### Dual-monitor pointer speed
+
+The patched client keeps the original X pointer acceleration on the OneMix
+CRTC and scales only the external CRTC by `FREERDP_EXTERNAL_POINTER_SPEED`.
+When an external output is selected, that environment value defaults to 50
+(range 10 through 200, canonical whole percent, no leading zeros). It is
+environment metadata consumed by the patched client, not a FreeRDP CLI flag,
+and it combines with `FREERDP_EXTERNAL_DESKTOP_SCALE` without adding a second
+`/scale-desktop` argument. OneMix-only launches (`FREERDP_EXTERNAL_OUTPUT=`)
+clear `FREERDP_EXTERNAL_POINTER_SPEED` before the wrapper.
+
+```
+FREERDP_ONEMIX_OUTPUT="<one-mix-output-name>" \\
+FREERDP_EXTERNAL_OUTPUT="<external-output-name>" \\
+FREERDP_EXTERNAL_POINTER_SPEED=80 \\
+menu
+```
+
+Physical check on native X11: move the USB mouse on the OneMix panel (feel
+unchanged), move it onto the external display (cursor no longer too fast;
+raise toward 80/100 if too slow), and click a known target on each screen
+(the action stays on that remote monitor).
+
 The dual-monitor path prints `xrandr --listmonitors` before FreeRDP starts.
 Verify that the list contains two monitors, the OneMix line carries the
 primary marker, and the external line is present as the secondary display.

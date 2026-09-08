@@ -276,4 +276,23 @@ done
 printf 'PASS: per-monitor external desktop-scale guidance verified\n'
 
 # --------------------------------------------------------------------------
+# 8. Dual-monitor pointer-speed contract
+# --------------------------------------------------------------------------
+for required_text in \
+  'FREERDP_EXTERNAL_POINTER_SPEED' \
+  'defaults to 50' \
+  'range 10 through 200' \
+  'original X pointer acceleration on the OneMix' \
+  'environment metadata consumed by the patched client, not a FreeRDP CLI flag' \
+  'move the USB mouse on the OneMix panel' \
+  'cursor no longer too fast' \
+  'the action stays on that remote monitor'; do
+  if ! grep -Fq "$required_text" "$readme"; then
+    printf 'FAIL: dual-monitor pointer-speed guidance missing: %s\n' "$required_text" >&2
+    exit 1
+  fi
+done
+printf 'PASS: dual-monitor pointer-speed guidance verified\n'
+
+# --------------------------------------------------------------------------
 printf 'PASS: README documentation regression complete\n'

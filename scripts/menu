@@ -141,8 +141,17 @@ if [ -n "$external_output" ]; then
         *) reject_output 'FREERDP_EXTERNAL_DESKTOP_SCALE must be a whole percent from 100 through 500' ;;
     esac
     export FREERDP_EXTERNAL_DESKTOP_SCALE="$external_desktop_scale"
+
+    external_pointer_speed="${FREERDP_EXTERNAL_POINTER_SPEED-}"
+    [ -n "$external_pointer_speed" ] || external_pointer_speed=50
+    case "$external_pointer_speed" in
+        [1-9][0-9]|1[0-9][0-9]|200) ;;
+        *) reject_output 'FREERDP_EXTERNAL_POINTER_SPEED must be a whole percent from 10 through 200' ;;
+    esac
+    export FREERDP_EXTERNAL_POINTER_SPEED="$external_pointer_speed"
 else
     unset FREERDP_EXTERNAL_DESKTOP_SCALE
+    unset FREERDP_EXTERNAL_POINTER_SPEED
 fi
 
 xrandr --output "$onemix_output" --mode 1600x2560 --rotate left --primary

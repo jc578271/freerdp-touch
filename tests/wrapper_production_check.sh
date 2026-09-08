@@ -283,7 +283,7 @@ if ! grep -q '/multimon' "$fixture_log"; then
 fi
 grep -Fq 'OUTPUT: --output OneMixPanel --mode 1600x2560 --rotate left --primary' "$xrandr_log" || {
   printf 'FAIL: menu success: missing primary XRandR layout\n' >&2; exit 1; }
-grep -Fq 'OUTPUT: --output ExternalPanel --auto --right-of OneMixPanel' "$xrandr_log" || {
+grep -Fq 'OUTPUT: --output ExternalPanel --auto --above OneMixPanel' "$xrandr_log" || {
   printf 'FAIL: menu success: missing external XRandR layout\n' >&2; exit 1; }
 grep -Fqx 'LISTMONITORS' "$xrandr_log" || {
   printf 'FAIL: menu success: missing XRandR monitor listing\n' >&2; exit 1; }

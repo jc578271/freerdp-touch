@@ -32,6 +32,7 @@ export MOCK_WRAPPER="$td/mock-wrapper"
 export RENDERED_XINITRC="$td/rendered-xinitrc"
 export OBSERVED_DIAG="$td/observed-diag"
 export OBSERVED_EXTERNAL_SCALE="$td/observed-external-scale"
+export OBSERVED_EXTERNAL_POINTER_SPEED="$td/observed-external-pointer-speed"
 export OBSERVED_MOUSE_ONLY="$td/observed-mouse-only"
 export OBSERVED_ARGS="$td/observed-args"
 export WRAPPER_CALLS="$td/wrapper-calls"
@@ -96,6 +97,7 @@ printf '%s\n' \
 	'printf "%s\\n" called >> "$WRAPPER_CALLS"' \
 	'printf "%s\\n" "${FREERDP_TOUCH_DIAG:-}" > "$OBSERVED_DIAG"' \
 	'printf "%s\\n" "${FREERDP_EXTERNAL_DESKTOP_SCALE-unset}" > "$OBSERVED_EXTERNAL_SCALE"' \
+		'printf "%s\\n" "${FREERDP_EXTERNAL_POINTER_SPEED-unset}" > "$OBSERVED_EXTERNAL_POINTER_SPEED"' \
 	'mouse_only=0' \
 	'for arg in "$@"; do' \
 	'  [ "$arg" = "--mouse-only" ] && mouse_only=1' \
@@ -148,6 +150,7 @@ run_menu() {
 	mode=$5
 	map_fail=${6:-0}
 	scale=${7-UNSET}
+	pointer=${8-UNSET}
 	input_file="$td/$name.input"
 	printf '3\n\n\n6\n' > "$input_file"
 
@@ -175,6 +178,12 @@ run_menu() {
 			*) FREERDP_EXTERNAL_DESKTOP_SCALE="$scale"; export FREERDP_EXTERNAL_DESKTOP_SCALE ;;
 		esac
 
+		case "$pointer" in
+			UNSET) unset FREERDP_EXTERNAL_POINTER_SPEED ;;
+			EMPTY) FREERDP_EXTERNAL_POINTER_SPEED=; export FREERDP_EXTERNAL_POINTER_SPEED ;;
+			*) FREERDP_EXTERNAL_POINTER_SPEED="$pointer"; export FREERDP_EXTERNAL_POINTER_SPEED ;;
+		esac
+
 		if [ -n "$mode" ]; then
 			PATH="$MOCK_BIN:$PATH" "$menu" "$mode" < "$input_file" \
 				> "$td/$name.out" 2> "$td/$name.err"
@@ -193,9 +202,22 @@ assert_valid_case() {
 	external=$5
 	expected_scale=$6
 	expected_observed_scale=${7-$expected_scale}
+	expected_pointer=${8-UNSET}
+	if [ "$#" -ge 9 ]; then
+		expected_observed_pointer=$9
+	elif [ "$expected_multimon" -eq 1 ]; then
+		if [ "$expected_pointer" = UNSET ] || [ "$expected_pointer" = EMPTY ]; then
+			expected_observed_pointer=50
+		else
+			expected_observed_pointer=$expected_pointer
+		fi
+	else
+		expected_observed_pointer=UNSET
+	fi
 	[ "$expected_observed_scale" = UNSET ] && expected_observed_scale=unset
+	[ "$expected_observed_pointer" = UNSET ] && expected_observed_pointer=unset
 
-	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_DIAG" "$OBSERVED_EXTERNAL_SCALE" \
+	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_DIAG" "$OBSERVED_EXTERNAL_SCALE" "$OBSERVED_EXTERNAL_POINTER_SPEED" \
 		"$OBSERVED_MOUSE_ONLY" "$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
 	: > "$XRANDR_LOG"
 	: > "$XINPUT_LOG"
@@ -203,7 +225,7 @@ assert_valid_case() {
 	export EXPECTED_DIAG
 	rc=0
 	run_menu "$name" OneMixPanel "$external" "$([ "$expected_diag" = 1 ] && printf 1 || printf '')" \
-		"$([ "$expected_mouse_only" = 1 ] && printf -- --mouse-only || printf '')" 0 "$expected_scale" || rc=$?
+		"$([ "$expected_mouse_only" = 1 ] && printf -- --mouse-only || printf '')" 0 "$expected_scale" "$expected_pointer" || rc=$?
 	if [ "$rc" -ne 0 ]; then
 		printf 'FAIL: menu exited with rc=%s (%s)\n' "$rc" "$name" >&2
 		cat "$td/$name.err" >&2
@@ -218,12 +240,14 @@ assert_valid_case() {
 	fi
 	actual_diag=$(tr -d '\n' < "$OBSERVED_DIAG")
 	actual_external_scale=$(tr -d '\n' < "$OBSERVED_EXTERNAL_SCALE")
+	actual_external_pointer=$(tr -d '\n' < "$OBSERVED_EXTERNAL_POINTER_SPEED")
 	actual_mouse_only=$(tr -d '\n' < "$OBSERVED_MOUSE_ONLY")
 	expected_diag_value=$([ "$expected_diag" = 1 ] && printf 1 || printf '')
 	if [ "$actual_diag" != "$expected_diag_value" ] || [ "$actual_external_scale" != "$expected_observed_scale" ] || \
+		[ "$actual_external_pointer" != "$expected_observed_pointer" ] || \
 		[ "$actual_mouse_only" != "$expected_mouse_only" ]; then
-		printf 'FAIL: wrapper environment or mouse-only argument mismatch (%s): scale=%s expected=%s\n' \
-			"$name" "$actual_external_scale" "$expected_observed_scale" >&2
+		printf 'FAIL: wrapper environment or mouse-only argument mismatch (%s): scale=%s expected=%s pointer=%s expected=%s\n' \
+			"$name" "$actual_external_scale" "$expected_observed_scale" "$actual_external_pointer" "$expected_observed_pointer" >&2
 		exit 1
 	fi
 	if [ "$(wc -l < "$WRAPPER_CALLS")" -ne 1 ]; then
@@ -307,6 +331,32 @@ assert_rejected_case() {
 	}
 }
 
+assert_rejected_pointer_case() {
+	name=$1
+	pointer=$2
+	expected_error=$3
+
+	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_EXTERNAL_POINTER_SPEED" "$OBSERVED_ARGS" \
+		"$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
+	: > "$XRANDR_LOG"
+	: > "$XINPUT_LOG"
+	rc=0
+	run_menu "$name" OneMixPanel ExternalPanel '' '' 0 UNSET "$pointer" || rc=$?
+	if [ "$rc" -eq 0 ]; then
+		printf 'FAIL: invalid external pointer speed was accepted (%s)\n' "$name" >&2
+		exit 1
+	fi
+	if [ -e "$WRAPPER_CALLS" ]; then
+		printf 'FAIL: wrapper ran for invalid external pointer speed (%s)\n' "$name" >&2
+		exit 1
+	fi
+	grep -Fqx "$expected_error" "$td/$name.err" || {
+		printf 'FAIL: missing external-pointer validation error (%s)\n' "$name" >&2
+		cat "$td/$name.err" >&2
+		exit 1
+	}
+}
+
 assert_rejected_scale_case() {
 	name=$1
 	scale=$2
@@ -364,6 +414,7 @@ assert_unset_auto_external_connected_case() {
 	: > "$XINPUT_LOG"
 	rc=0
 	env -u FREERDP_EXTERNAL_OUTPUT -u FREERDP_EXTERNAL_DESKTOP_SCALE \
+		-u FREERDP_EXTERNAL_POINTER_SPEED \
 		FREERDP_ONEMIX_OUTPUT=OneMixPanel \
 		FREERDP_TOUCH_DIAG= EXPECTED_DIAG=0 XINPUT_FAIL=0 NO_EXTERNAL=0 AUTO_SELECTION_FIXTURE=1 \
 		TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
@@ -398,8 +449,13 @@ assert_unset_auto_external_connected_case() {
 		exit 1
 	fi
 	actual_scale=$(tr -d '\n' < "$OBSERVED_EXTERNAL_SCALE")
+	actual_pointer=$(tr -d '\n' < "$OBSERVED_EXTERNAL_POINTER_SPEED")
 	if [ "$actual_scale" != 100 ]; then
 		printf 'FAIL: automatic connected external output did not default external scale to 100 (got %s)\n' "$actual_scale" >&2
+		exit 1
+	fi
+	if [ "$actual_pointer" != 50 ]; then
+		printf 'FAIL: automatic connected external output did not default pointer speed to 50 (got %s)\n' "$actual_pointer" >&2
 		exit 1
 	fi
 	grep -Fqx 'XINPUT: map-to-output GXTP7386:00 27C6:0113 OneMixPanel' "$XINPUT_LOG" || {
@@ -420,6 +476,7 @@ assert_plain_default_no_external_case() {
 	: > "$XINPUT_LOG"
 	rc=0
 	env -u FREERDP_ONEMIX_OUTPUT -u FREERDP_EXTERNAL_OUTPUT \
+		-u FREERDP_EXTERNAL_POINTER_SPEED \
 		FREERDP_TOUCH_DIAG= EXPECTED_DIAG=0 XINPUT_FAIL=0 NO_EXTERNAL=1 \
 		TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
 		> "$td/$name.out" 2> "$td/$name.err" || rc=$?
@@ -438,8 +495,10 @@ assert_plain_default_no_external_case() {
 		exit 1
 	fi
 	actual_scale=$(tr -d '\n' < "$OBSERVED_EXTERNAL_SCALE")
-	if [ "$actual_scale" != unset ] || [ "$(grep -Fc '/scale-desktop:200' "$OBSERVED_ARGS")" -ne 1 ]; then
-		printf 'FAIL: OneMix-only launch did not clear external scale metadata or preserve global 200 scale\n' >&2
+	actual_pointer=$(tr -d '\n' < "$OBSERVED_EXTERNAL_POINTER_SPEED")
+	if [ "$actual_scale" != unset ] || [ "$actual_pointer" != unset ] || \
+		[ "$(grep -Fc '/scale-desktop:200' "$OBSERVED_ARGS")" -ne 1 ]; then
+		printf 'FAIL: OneMix-only launch did not clear external scale/pointer metadata or preserve global 200 scale\n' >&2
 		exit 1
 	fi
 	grep -Fqx 'OUTPUT: --output eDP-1 --mode 1600x2560 --rotate left --primary' "$XRANDR_LOG" || {
@@ -461,10 +520,13 @@ assert_plain_default_no_external_case
 assert_valid_case normal 0 0 1 ExternalPanel 100
 assert_valid_case empty-scale 0 0 1 ExternalPanel 100
 assert_valid_case override 0 0 1 ExternalPanel 140
+assert_valid_case pointer-override 0 0 1 ExternalPanel 100 100 80
+assert_valid_case empty-pointer 0 0 1 ExternalPanel 100 100 EMPTY
 assert_valid_case diagnostic 1 0 1 ExternalPanel 100
 assert_valid_case mouse-only 0 1 1 ExternalPanel 100
 assert_valid_case rollback 0 0 0 '' UNSET
 assert_valid_case stale-scale-rollback 0 0 0 '' 140 UNSET
+assert_valid_case stale-pointer-rollback 0 0 0 '' UNSET UNSET 80
 assert_rejected_case missing-primary '' ExternalPanel 'ERROR: FREERDP_ONEMIX_OUTPUT is required'
 assert_rejected_case duplicate-output OneMixPanel OneMixPanel 'ERROR: FREERDP_ONEMIX_OUTPUT and FREERDP_EXTERNAL_OUTPUT must differ'
 assert_rejected_case missing-external OneMixPanel MissingPanel "ERROR: FREERDP_EXTERNAL_OUTPUT 'MissingPanel' is not connected"
@@ -472,5 +534,9 @@ assert_rejected_scale_case malformed 14x 'ERROR: FREERDP_EXTERNAL_DESKTOP_SCALE 
 assert_rejected_scale_case leading-zero 0140 'ERROR: FREERDP_EXTERNAL_DESKTOP_SCALE must be a whole percent from 100 through 500'
 assert_rejected_scale_case below-range 99 'ERROR: FREERDP_EXTERNAL_DESKTOP_SCALE must be a whole percent from 100 through 500'
 assert_rejected_scale_case above-range 501 'ERROR: FREERDP_EXTERNAL_DESKTOP_SCALE must be a whole percent from 100 through 500'
+assert_rejected_pointer_case pointer-malformed 14x 'ERROR: FREERDP_EXTERNAL_POINTER_SPEED must be a whole percent from 10 through 200'
+assert_rejected_pointer_case pointer-leading-zero 080 'ERROR: FREERDP_EXTERNAL_POINTER_SPEED must be a whole percent from 10 through 200'
+assert_rejected_pointer_case pointer-below-range 9 'ERROR: FREERDP_EXTERNAL_POINTER_SPEED must be a whole percent from 10 through 200'
+assert_rejected_pointer_case pointer-above-range 201 'ERROR: FREERDP_EXTERNAL_POINTER_SPEED must be a whole percent from 10 through 200'
 assert_mapping_failure_case
 printf 'PASS: menu named XRandR layout, validation, mapping, and diagnostic propagation\n'
