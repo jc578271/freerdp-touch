@@ -1621,7 +1621,7 @@ Index: src/client/X11/xf_input.c
  }
  
  static BOOL xf_input_pen_remote(xfContext* xfc, XIDeviceEvent* event, int evtype, int deviceid)
-@@ -754,6 +2002,39 @@ static bool xf_use_rel_mouse(xfContext*
+@@ -754,6 +2002,52 @@ static bool xf_use_rel_mouse(xfContext*
  	return true;
  }
  
@@ -1631,7 +1631,8 @@ Index: src/client/X11/xf_input.c
 + * Walks set valuators the same way xf_input_pen_remote walks event->valuators.
 + * Uses the same 0x78 detent magnitude as Button4/5 and two-finger scroll. */
 +void xf_input_send_wheel_from_valuators(xfContext* xfc, const unsigned char* mask,
-+                                        int mask_len, const double* values)
++                                        int mask_len, const double* values,
++                                        BOOL relative)
 +{
 +	if (!xfc || !mask || mask_len <= 0 || !values)
 +		return;
@@ -1642,13 +1643,25 @@ Index: src/client/X11/xf_input.c
 +		if (XIMaskIsSet(mask, i))
 +		{
 +			double v = *val++;
++			double delta;
 +			if (i < 2)
 +				continue; /* ignore x/y axes */
-+			if (v == 0.0)
++
++			if (relative)
++			{
++				delta = v;
++			}
++			else
++			{
++				double* last = (i == 2) ? &xfc->wheelLastHoriz : &xfc->wheelLastVert;
++				delta = v - *last;
++				*last = v;
++			}
++			if (delta == 0.0)
 +				continue;
 +
 +			UINT16 flags = (i == 2) ? PTR_FLAGS_HWHEEL : PTR_FLAGS_WHEEL;
-+			if ((i == 2) ? (v < 0.0) : (v > 0.0))
++			if ((i == 2) ? (delta < 0.0) : (delta > 0.0))
 +				flags |= PTR_FLAGS_WHEEL_NEGATIVE | (0x100 - 0x78);
 +			else
 +				flags |= 0x78;
@@ -1661,7 +1674,7 @@ Index: src/client/X11/xf_input.c
  int xf_input_event(xfContext* xfc, WINPR_ATTR_UNUSED const XEvent* xevent, XIDeviceEvent* event,
                     int evtype)
  {
-@@ -790,6 +2071,11 @@ int xf_input_event(xfContext* xfc, WINPR
+@@ -790,6 +2084,11 @@ int xf_input_event(xfContext* xfc, WINPR
  			{
  				xf_generic_MotionNotify(xfc, (int)event->event_x, (int)event->event_y,
  				                        event->detail, event->event, xfc->remote_app);
@@ -1669,22 +1682,22 @@ Index: src/client/X11/xf_input.c
 +				 * (not discrete Button4/5 for XI 2.1+). Convert to existing wheel detents. */
 +				xf_input_send_wheel_from_valuators(xfc, event->valuators.mask,
 +				                                   event->valuators.mask_len,
-+				                                   event->valuators.values);
++				                                   event->valuators.values, FALSE);
  			}
  			break;
  		case XI_RawButtonPress:
-@@ -817,6 +2103,10 @@ int xf_input_event(xfContext* xfc, WINPR
+@@ -817,6 +2116,10 @@ int xf_input_event(xfContext* xfc, WINPR
  					y = ev->raw_values[1];
  
  				xf_generic_RawMotionNotify(xfc, (int)x, (int)y, event->event, xfc->remote_app);
 +				/* Physical relative-mouse wheel may deliver wheel valuators on RawMotion too.
 +				 * Convert to existing wheel detents so grab cannot drop wheel. */
 +				xf_input_send_wheel_from_valuators(xfc, ev->valuators.mask,
-+				                                   ev->valuators.mask_len, ev->raw_values);
++				                                   ev->valuators.mask_len, ev->raw_values, TRUE);
  			}
  			break;
  		case XI_DeviceChanged:
-@@ -862,8 +2152,98 @@ static int xf_input_handle_event_remote(
+@@ -862,8 +2165,98 @@ static int xf_input_handle_event_remote(
  
  	if ((cookie.cc->type == GenericEvent) && (cookie.cc->extension == xfc->XInputOpcode))
  	{
@@ -1783,7 +1796,7 @@ Index: src/client/X11/xf_input.c
  			case XI_TouchBegin:
  				xf_input_pens_unhover(xfc);
  				/* fallthrough */
-@@ -876,9 +2256,21 @@ static int xf_input_handle_event_remote(
+@@ -876,9 +2269,21 @@ static int xf_input_handle_event_remote(
  			case XI_Motion:
  			case XI_ButtonRelease:
  			{
@@ -1806,7 +1819,7 @@ Index: src/client/X11/xf_input.c
  
  				if (freerdp_client_is_pen(&xfc->common, deviceid))
  				{
-@@ -889,6 +2281,12 @@ static int xf_input_handle_event_remote(
+@@ -889,6 +2294,12 @@ static int xf_input_handle_event_remote(
  					}
  					break;
  				}
@@ -1819,7 +1832,7 @@ Index: src/client/X11/xf_input.c
  			}
  				/* fallthrough */
  				WINPR_FALLTHROUGH
-@@ -897,10 +2295,10 @@ static int xf_input_handle_event_remote(
+@@ -897,10 +2308,10 @@ static int xf_input_handle_event_remote(
  				xf_input_event(xfc, event, cookie.cc->data, cookie.cc->evtype);
  				break;
  		}
@@ -1831,7 +1844,7 @@ Index: src/client/X11/xf_input.c
  }
  
  #else
-@@ -910,6 +2308,14 @@ int xf_input_init(xfContext* xfc, Window
+@@ -910,6 +2321,14 @@ int xf_input_init(xfContext* xfc, Window
  	return 0;
  }
  
@@ -1846,7 +1859,7 @@ Index: src/client/X11/xf_input.c
  #endif
  
  int xf_input_handle_event(xfContext* xfc, const XEvent* event)
-@@ -921,7 +2327,8 @@ int xf_input_handle_event(xfContext* xfc
+@@ -921,7 +2340,8 @@ int xf_input_handle_event(xfContext* xfc
  	settings = xfc->common.context.settings;
  	WINPR_ASSERT(settings);
  
@@ -1860,7 +1873,7 @@ Index: src/client/X11/xf_input.h
 ===================================================================
 --- src.orig/client/X11/xf_input.h
 +++ src/client/X11/xf_input.h
-@@ -30,4 +30,13 @@
+@@ -30,4 +30,14 @@
  int xf_input_init(xfContext* xfc, Window window);
  int xf_input_handle_event(xfContext* xfc, const XEvent* event);
  
@@ -1871,7 +1884,8 @@ Index: src/client/X11/xf_input.h
 + * Uses the same 0x78 detent encoding as Button4/5 and two-finger scroll.
 + * Empty/NULL input returns without sending. */
 +void xf_input_send_wheel_from_valuators(xfContext* xfc, const unsigned char* mask,
-+                                        int mask_len, const double* values);
++                                        int mask_len, const double* values,
++                                        BOOL relative);
 +
  #endif /* FREERDP_CLIENT_X11_INPUT_H */
 Index: src/client/X11/xf_touch_internal.h
@@ -2163,7 +2177,7 @@ Index: src/client/X11/xfreerdp.h
  	touchContact contacts[MAX_CONTACTS];
  	int active_contacts;
  	int lastEvType;
-@@ -310,6 +312,49 @@ struct xf_context
+@@ -310,6 +312,51 @@ struct xf_context
  	double z_vector;
  	double px_vector;
  	double py_vector;
@@ -2210,6 +2224,8 @@ Index: src/client/X11/xfreerdp.h
 +	BOOL scrollActive;
 +	INT32 scrollLastY;
 +	INT32 scrollAccum;
++	double wheelLastVert;
++	double wheelLastHoriz;
  #endif
  	BOOL xi_rawevent;
  	BOOL xi_event;
@@ -2438,7 +2454,7 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 ===================================================================
 --- /dev/null
 +++ src/client/X11/test/TestXfInputDispatcher.c
-@@ -0,0 +1,653 @@
+@@ -0,0 +1,691 @@
 +#include <X11/Xlib.h>
 +#include <X11/extensions/XInput2.h>
 +
@@ -2952,15 +2968,17 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +	xfc.common.context.input = &input;
 +	mouse_events = (mouse_capture){ 0 };
 +
-+	/* Bit 3 set (Rel Vert Scroll), value +1.0 → Button5 / wheel-down */
-+	unsigned char mask[1] = { 0x08 }; /* bit 3 */
++	unsigned char mask[1] = { 0x08 }; /* bit 3 Rel Vert Scroll */
++	double seed[1] = { 0.0 };
 +	double values[1] = { 1.0 };
 +
-+	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, seed, FALSE);
++	CHECK(mouse_events.count == 0, "first vertical sample only seeds last value");
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values, FALSE);
 +
 +	CHECK(mouse_events.count == 1, "one wheel event emitted");
 +	CHECK(mouse_events.flags[0] == (PTR_FLAGS_WHEEL | PTR_FLAGS_WHEEL_NEGATIVE | (0x100 - 0x78)),
-+	      "positive vertical valuator matches Button5 wheel-down detent");
++	      "positive vertical delta matches Button5 wheel-down detent");
 +
 +	freerdp_settings_free(settings);
 +	return 0;
@@ -2979,15 +2997,16 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +	xfc.common.context.input = &input;
 +	mouse_events = (mouse_capture){ 0 };
 +
-+	/* Bit 3 set, value -1.0 → Button4 / wheel-up */
 +	unsigned char mask[1] = { 0x08 };
++	double seed[1] = { 0.0 };
 +	double values[1] = { -1.0 };
 +
-+	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, seed, FALSE);
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values, FALSE);
 +
 +	CHECK(mouse_events.count == 1, "one wheel event emitted");
 +	CHECK(mouse_events.flags[0] == (PTR_FLAGS_WHEEL | 0x78),
-+	      "negative vertical valuator matches Button4 wheel-up detent");
++	      "negative vertical delta matches Button4 wheel-up detent");
 +
 +	freerdp_settings_free(settings);
 +	return 0;
@@ -3006,15 +3025,16 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +	xfc.common.context.input = &input;
 +	mouse_events = (mouse_capture){ 0 };
 +
-+	/* Bit 2 set (Rel Horiz Scroll), value +1.0 → horizontal wheel */
 +	unsigned char mask[1] = { 0x04 };
++	double seed[1] = { 0.0 };
 +	double values[1] = { 1.0 };
 +
-+	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, seed, FALSE);
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values, FALSE);
 +
 +	CHECK(mouse_events.count == 1, "one wheel event emitted");
 +	CHECK(mouse_events.flags[0] == (PTR_FLAGS_HWHEEL | 0x78),
-+	      "positive horizontal valuator emits hwheel 0x78 detent");
++	      "positive horizontal delta emits hwheel 0x78 detent");
 +
 +	freerdp_settings_free(settings);
 +	return 0;
@@ -3037,7 +3057,7 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +	unsigned char mask[1] = { 0x03 }; /* bits 0 and 1 */
 +	double values[2] = { 5.0, 3.0 };
 +
-+	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values, FALSE);
 +
 +	CHECK(mouse_events.count == 0, "x/y valuators never emit wheel");
 +
@@ -3059,14 +3079,47 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +	mouse_events = (mouse_capture){ 0 };
 +
 +	/* Empty mask */
-+	xf_input_send_wheel_from_valuators(&xfc, NULL, 0, NULL);
++	xf_input_send_wheel_from_valuators(&xfc, NULL, 0, NULL, FALSE);
 +	CHECK(mouse_events.count == 0, "NULL mask emits nothing");
 +
 +	/* Zero mask */
 +	unsigned char mask[1] = { 0x00 };
 +	double values[1] = { 1.0 };
-+	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values, FALSE);
 +	CHECK(mouse_events.count == 0, "zero mask emits nothing");
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++
++static int test_valuator_wheel_vertical_reversal(void)
++{
++	rdpSettings* settings = new_settings();
++	rdpInput input = { 0 };
++	xfContext xfc;
++
++	CHECK(settings != NULL, "settings allocation");
++	init_context(&xfc, settings);
++	input.context = &xfc.common.context;
++	input.MouseEvent = capture_mouse_event;
++	xfc.common.context.input = &input;
++	mouse_events = (mouse_capture){ 0 };
++
++	unsigned char mask[1] = { 0x08 };
++	double a[1] = { 0.0 };
++	double b[1] = { 15.0 };
++	double c[1] = { 5.0 };
++
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, a, FALSE);
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, b, FALSE);
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, c, FALSE);
++
++	CHECK(mouse_events.count == 2, "down then up emit two events");
++	CHECK(mouse_events.flags[0] == (PTR_FLAGS_WHEEL | PTR_FLAGS_WHEEL_NEGATIVE | (0x100 - 0x78)),
++	      "increasing vertical last-value is wheel-down");
++	CHECK(mouse_events.flags[1] == (PTR_FLAGS_WHEEL | 0x78),
++	      "decreasing vertical last-value is wheel-up");
 +
 +	freerdp_settings_free(settings);
 +	return 0;
@@ -3085,6 +3138,7 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +	CHECK(test_pending_three_finger_lift() == 0, "pending three-finger lift scenario");
 +	CHECK(test_valuator_wheel_vertical_positive() == 0, "vertical positive valuator wheel");
 +	CHECK(test_valuator_wheel_vertical_negative() == 0, "vertical negative valuator wheel");
++	CHECK(test_valuator_wheel_vertical_reversal() == 0, "vertical valuator reversal after down");
 +	CHECK(test_valuator_wheel_horizontal() == 0, "horizontal valuator wheel");
 +	CHECK(test_valuator_wheel_axes_0_1_ignored() == 0, "x/y axes ignored for wheel");
 +	CHECK(test_valuator_wheel_empty_or_null() == 0, "empty/NULL valuator input ignored");
