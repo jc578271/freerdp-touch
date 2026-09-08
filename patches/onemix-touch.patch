@@ -1,7 +1,7 @@
-Index: freerdp3-3.15.0+dfsg/channels/rdpei/client/rdpei_main.c
+Index: src/channels/rdpei/client/rdpei_main.c
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/channels/rdpei/client/rdpei_main.c
-+++ freerdp3-3.15.0+dfsg/channels/rdpei/client/rdpei_main.c
+--- src.orig/channels/rdpei/client/rdpei_main.c
++++ src/channels/rdpei/client/rdpei_main.c
 @@ -95,6 +95,7 @@ typedef struct
  	UINT64 lastPollEventTime;
  	BOOL running;
@@ -54,10 +54,10 @@ Index: freerdp3-3.15.0+dfsg/channels/rdpei/client/rdpei_main.c
  	WINPR_ASSERT(rdpei->base.log);
  
  	InitializeCriticalSection(&rdpei->lock);
-Index: freerdp3-3.15.0+dfsg/client/X11/test_scroll_classifier.c
+Index: src/client/X11/test_scroll_classifier.c
 ===================================================================
 --- /dev/null
-+++ freerdp3-3.15.0+dfsg/client/X11/test_scroll_classifier.c
++++ src/client/X11/test_scroll_classifier.c
 @@ -0,0 +1,141 @@
 +/* Standalone regression model of the two-finger disambiguation rule in
 + * xf_input_two_finger_resolve.  Mirrors the exact claim order and thresholds
@@ -200,10 +200,10 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test_scroll_classifier.c
 +	printf("OK\n");
 +	return 0;
 +}
-Index: freerdp3-3.15.0+dfsg/client/X11/xf_client.c
+Index: src/client/X11/xf_client.c
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/client/X11/xf_client.c
-+++ freerdp3-3.15.0+dfsg/client/X11/xf_client.c
+--- src.orig/client/X11/xf_client.c
++++ src/client/X11/xf_client.c
 @@ -802,6 +802,7 @@ void xf_toggle_fullscreen(xfContext* xfc
  	if (xfc->debug)
  		xf_ungrab(xfc);
@@ -223,10 +223,10 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_client.c
  	PubSub_UnsubscribeChannelConnected(instance->context->pubSub,
  	                                   xf_OnChannelConnectedEventHandler);
  	PubSub_UnsubscribeChannelDisconnected(instance->context->pubSub,
-Index: freerdp3-3.15.0+dfsg/client/X11/xf_event.c
+Index: src/client/X11/xf_event.c
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/client/X11/xf_event.c
-+++ freerdp3-3.15.0+dfsg/client/X11/xf_event.c
+--- src.orig/client/X11/xf_event.c
++++ src/client/X11/xf_event.c
 @@ -709,6 +709,7 @@ static BOOL xf_event_FocusOut(xfContext*
  		XUngrabKeyboard(xfc->display, CurrentTime);
  
@@ -255,10 +255,10 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_event.c
  
  	if (!app)
  		return gdi_send_suppress_output(xfc->common.context.gdi, TRUE);
-Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
+Index: src/client/X11/xf_input.c
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/client/X11/xf_input.c
-+++ freerdp3-3.15.0+dfsg/client/X11/xf_input.c
+--- src.orig/client/X11/xf_input.c
++++ src/client/X11/xf_input.c
 @@ -39,6 +39,8 @@
  #include "xf_utils.h"
  
@@ -1621,7 +1621,70 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  }
  
  static BOOL xf_input_pen_remote(xfContext* xfc, XIDeviceEvent* event, int evtype, int deviceid)
-@@ -862,8 +2110,98 @@ static int xf_input_handle_event_remote(
+@@ -754,6 +2002,39 @@ static bool xf_use_rel_mouse(xfContext*
+ 	return true;
+ }
+ 
++/* Convert XI2 valuator samples (RelVertWheel/RelHorizWheel) into existing RDP wheel detents.
++ * Called from XI_Motion and XI_RawMotion arms for physical mouse wheels under libinput.
++ * Walks set valuators the same way xf_input_pen_remote walks event->valuators.
++ * Ignores axes 0/1 (x/y). Axis 2 → vertical PTR_FLAGS_WHEEL, later axes → PTR_FLAGS_HWHEEL.
++ * Uses the same 0x78 detent magnitude as Button4/5 and two-finger scroll. */
++void xf_input_send_wheel_from_valuators(xfContext* xfc, const unsigned char* mask,
++                                        int mask_len, const double* values)
++{
++	if (!xfc || !mask || mask_len <= 0 || !values)
++		return;
++
++	const double* val = values;
++	for (int i = 0; i < mask_len * 8; i++)
++	{
++		if (XIMaskIsSet(mask, i))
++		{
++			double v = *val++;
++			if (i < 2)
++				continue; /* ignore x/y axes */
++			if (v == 0.0)
++				continue;
++
++			UINT16 flags = (i == 2) ? PTR_FLAGS_WHEEL : PTR_FLAGS_HWHEEL;
++			if (v < 0.0)
++				flags |= PTR_FLAGS_WHEEL_NEGATIVE | (0x100 - 0x78);
++			else
++				flags |= 0x78;
++
++			freerdp_client_send_wheel_event(&xfc->common, flags);
++		}
++	}
++}
++
+ int xf_input_event(xfContext* xfc, WINPR_ATTR_UNUSED const XEvent* xevent, XIDeviceEvent* event,
+                    int evtype)
+ {
+@@ -790,6 +2071,11 @@ int xf_input_event(xfContext* xfc, WINPR
+ 			{
+ 				xf_generic_MotionNotify(xfc, (int)event->event_x, (int)event->event_y,
+ 				                        event->detail, event->event, xfc->remote_app);
++				/* Physical mouse wheel delivers RelVertWheel/RelHorizWheel valuators here
++				 * (not discrete Button4/5). Convert to existing wheel detents. */
++				xf_input_send_wheel_from_valuators(xfc, event->valuators.mask,
++				                                   event->valuators.mask_len,
++				                                   event->valuators.values);
+ 			}
+ 			break;
+ 		case XI_RawButtonPress:
+@@ -817,6 +2103,10 @@ int xf_input_event(xfContext* xfc, WINPR
+ 					y = ev->raw_values[1];
+ 
+ 				xf_generic_RawMotionNotify(xfc, (int)x, (int)y, event->event, xfc->remote_app);
++				/* Physical relative-mouse wheel may deliver wheel valuators on RawMotion too.
++				 * Convert to existing wheel detents so grab cannot drop wheel. */
++				xf_input_send_wheel_from_valuators(xfc, ev->valuators.mask,
++				                                   ev->valuators.mask_len, ev->raw_values);
+ 			}
+ 			break;
+ 		case XI_DeviceChanged:
+@@ -862,8 +2152,98 @@ static int xf_input_handle_event_remote(
  
  	if ((cookie.cc->type == GenericEvent) && (cookie.cc->extension == xfc->XInputOpcode))
  	{
@@ -1720,7 +1783,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  			case XI_TouchBegin:
  				xf_input_pens_unhover(xfc);
  				/* fallthrough */
-@@ -876,9 +2214,21 @@ static int xf_input_handle_event_remote(
+@@ -876,9 +2256,21 @@ static int xf_input_handle_event_remote(
  			case XI_Motion:
  			case XI_ButtonRelease:
  			{
@@ -1743,7 +1806,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  
  				if (freerdp_client_is_pen(&xfc->common, deviceid))
  				{
-@@ -889,6 +2239,12 @@ static int xf_input_handle_event_remote(
+@@ -889,6 +2281,12 @@ static int xf_input_handle_event_remote(
  					}
  					break;
  				}
@@ -1756,7 +1819,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  			}
  				/* fallthrough */
  				WINPR_FALLTHROUGH
-@@ -897,10 +2253,10 @@ static int xf_input_handle_event_remote(
+@@ -897,10 +2295,10 @@ static int xf_input_handle_event_remote(
  				xf_input_event(xfc, event, cookie.cc->data, cookie.cc->evtype);
  				break;
  		}
@@ -1768,7 +1831,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  }
  
  #else
-@@ -910,6 +2266,14 @@ int xf_input_init(xfContext* xfc, Window
+@@ -910,6 +2308,14 @@ int xf_input_init(xfContext* xfc, Window
  	return 0;
  }
  
@@ -1783,7 +1846,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  #endif
  
  int xf_input_handle_event(xfContext* xfc, const XEvent* event)
-@@ -921,7 +2285,8 @@ int xf_input_handle_event(xfContext* xfc
+@@ -921,7 +2327,8 @@ int xf_input_handle_event(xfContext* xfc
  	settings = xfc->common.context.settings;
  	WINPR_ASSERT(settings);
  
@@ -1793,21 +1856,28 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.c
  	{
  		return xf_input_handle_event_remote(xfc, event);
  	}
-Index: freerdp3-3.15.0+dfsg/client/X11/xf_input.h
+Index: src/client/X11/xf_input.h
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/client/X11/xf_input.h
-+++ freerdp3-3.15.0+dfsg/client/X11/xf_input.h
-@@ -30,4 +30,6 @@
+--- src.orig/client/X11/xf_input.h
++++ src/client/X11/xf_input.h
+@@ -30,4 +30,13 @@
  int xf_input_init(xfContext* xfc, Window window);
  int xf_input_handle_event(xfContext* xfc, const XEvent* event);
  
 +void xf_touch_force_cancel(xfContext* xfc);
 +
++/* Send wheel events from XI2 valuator samples (physical mouse wheel on XI_Motion/XI_RawMotion).
++ * Ignores axes 0/1 (x/y). Axis 2 → vertical wheel, later axes → horizontal wheel.
++ * Uses the same 0x78 detent encoding as Button4/5 and two-finger scroll.
++ * Empty/NULL input returns without sending. */
++void xf_input_send_wheel_from_valuators(xfContext* xfc, const unsigned char* mask,
++                                        int mask_len, const double* values);
++
  #endif /* FREERDP_CLIENT_X11_INPUT_H */
-Index: freerdp3-3.15.0+dfsg/client/X11/xf_touch_internal.h
+Index: src/client/X11/xf_touch_internal.h
 ===================================================================
 --- /dev/null
-+++ freerdp3-3.15.0+dfsg/client/X11/xf_touch_internal.h
++++ src/client/X11/xf_touch_internal.h
 @@ -0,0 +1,264 @@
 +/*
 + * xf_touch_internal.h — Shared pure helpers for the X11 touch gesture layer.
@@ -2073,10 +2143,10 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_touch_internal.h
 +}
 +
 +#endif /* XF_TOUCH_INTERNAL_H */
-Index: freerdp3-3.15.0+dfsg/client/X11/xfreerdp.h
+Index: src/client/X11/xfreerdp.h
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/client/X11/xfreerdp.h
-+++ freerdp3-3.15.0+dfsg/client/X11/xfreerdp.h
+--- src.orig/client/X11/xfreerdp.h
++++ src/client/X11/xfreerdp.h
 @@ -124,6 +124,7 @@ typedef struct
  } button_map;
  
@@ -2143,10 +2213,10 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xfreerdp.h
  #endif
  	BOOL xi_rawevent;
  	BOOL xi_event;
-Index: freerdp3-3.15.0+dfsg/client/common/cmdline.c
+Index: src/client/common/cmdline.c
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/client/common/cmdline.c
-+++ freerdp3-3.15.0+dfsg/client/common/cmdline.c
+--- src.orig/client/common/cmdline.c
++++ src/client/common/cmdline.c
 @@ -1171,6 +1171,57 @@ static int freerdp_client_command_line_p
  		if (!freerdp_settings_set_bool(settings, FreeRDP_MultiTouchGestures, enable))
  			return fail_at(arg, COMMAND_LINE_ERROR);
@@ -2205,10 +2275,10 @@ Index: freerdp3-3.15.0+dfsg/client/common/cmdline.c
  	CommandLineSwitchCase(arg, "echo")
  	{
  		if (!freerdp_settings_set_bool(settings, FreeRDP_SupportEchoChannel, enable))
-Index: freerdp3-3.15.0+dfsg/client/common/cmdline.h
+Index: src/client/common/cmdline.h
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/client/common/cmdline.h
-+++ freerdp3-3.15.0+dfsg/client/common/cmdline.h
+--- src.orig/client/common/cmdline.h
++++ src/client/common/cmdline.h
 @@ -494,6 +494,12 @@ static const COMMAND_LINE_ARGUMENT_A glo
  #endif
  	{ "toggle-fullscreen", COMMAND_LINE_VALUE_BOOL, NULL, BoolValueTrue, NULL, -1, NULL,
@@ -2222,10 +2292,10 @@ Index: freerdp3-3.15.0+dfsg/client/common/cmdline.h
  	{ "tune", COMMAND_LINE_VALUE_REQUIRED, "<setting:value>,<setting:value>", "", NULL, -1, NULL,
  	  "[experimental] directly manipulate freerdp settings, use with extreme caution!" },
  #if defined(WITH_FREERDP_DEPRECATED_COMMANDLINE)
-Index: freerdp3-3.15.0+dfsg/debian/changelog
+Index: src/debian/changelog
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/debian/changelog
-+++ freerdp3-3.15.0+dfsg/debian/changelog
+--- src.orig/debian/changelog
++++ src/debian/changelog
 @@ -1,3 +1,10 @@
 +freerdp3 (3.15.0+dfsg-2.1+deb13u3+onemix1) trixie; urgency=medium
 +
@@ -2237,10 +2307,10 @@ Index: freerdp3-3.15.0+dfsg/debian/changelog
  freerdp3 (3.15.0+dfsg-2.1+deb13u3) trixie; urgency=medium
  
    * security fix from 3.25.0:
-Index: freerdp3-3.15.0+dfsg/include/freerdp/settings_types_private.h
+Index: src/include/freerdp/settings_types_private.h
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/include/freerdp/settings_types_private.h
-+++ freerdp3-3.15.0+dfsg/include/freerdp/settings_types_private.h
+--- src.orig/include/freerdp/settings_types_private.h
++++ src/include/freerdp/settings_types_private.h
 @@ -612,8 +612,11 @@ struct rdp_settings
  	SETTINGS_DEPRECATED(ALIGN64 BOOL SuspendInput);          /* 2636 */
  	SETTINGS_DEPRECATED(ALIGN64 char* KeyboardPipeName);     /* 2637 */
@@ -2255,10 +2325,10 @@ Index: freerdp3-3.15.0+dfsg/include/freerdp/settings_types_private.h
  
  	/* Brush Capabilities */
  	SETTINGS_DEPRECATED(ALIGN64 UINT32 BrushSupportLevel); /* 2688 */
-Index: freerdp3-3.15.0+dfsg/libfreerdp/common/settings_getters.c
+Index: src/libfreerdp/common/settings_getters.c
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/libfreerdp/common/settings_getters.c
-+++ freerdp3-3.15.0+dfsg/libfreerdp/common/settings_getters.c
+--- src.orig/libfreerdp/common/settings_getters.c
++++ src/libfreerdp/common/settings_getters.c
 @@ -382,6 +382,9 @@ BOOL freerdp_settings_get_bool(WINPR_ATT
  		case FreeRDP_MultiTouchInput:
  			return settings->MultiTouchInput;
@@ -2308,10 +2378,10 @@ Index: freerdp3-3.15.0+dfsg/libfreerdp/common/settings_getters.c
  		case FreeRDP_VCChunkSize:
  			settings->VCChunkSize = cnv.c;
  			break;
-Index: freerdp3-3.15.0+dfsg/libfreerdp/common/settings_str.h
+Index: src/libfreerdp/common/settings_str.h
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/libfreerdp/common/settings_str.h
-+++ freerdp3-3.15.0+dfsg/libfreerdp/common/settings_str.h
+--- src.orig/libfreerdp/common/settings_str.h
++++ src/libfreerdp/common/settings_str.h
 @@ -254,6 +254,8 @@ static const struct settings_str_entry s
  	{ FreeRDP_TcpKeepAlive, FREERDP_SETTINGS_TYPE_BOOL, "FreeRDP_TcpKeepAlive" },
  	{ FreeRDP_TlsSecurity, FREERDP_SETTINGS_TYPE_BOOL, "FreeRDP_TlsSecurity" },
@@ -2332,10 +2402,10 @@ Index: freerdp3-3.15.0+dfsg/libfreerdp/common/settings_str.h
  	{ FreeRDP_VCChunkSize, FREERDP_SETTINGS_TYPE_UINT32, "FreeRDP_VCChunkSize" },
  	{ FreeRDP_VCFlags, FREERDP_SETTINGS_TYPE_UINT32, "FreeRDP_VCFlags" },
  	{ FreeRDP_MonitorLocalShiftX, FREERDP_SETTINGS_TYPE_INT32, "FreeRDP_MonitorLocalShiftX" },
-Index: freerdp3-3.15.0+dfsg/client/X11/test/CMakeLists.txt
+Index: src/client/X11/test/CMakeLists.txt
 ===================================================================
 --- /dev/null
-+++ freerdp3-3.15.0+dfsg/client/X11/test/CMakeLists.txt
++++ src/client/X11/test/CMakeLists.txt
 @@ -0,0 +1,27 @@
 +set(MODULE_NAME "TestXfInputDispatcher")
 +
@@ -2364,11 +2434,11 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/CMakeLists.txt
 +)
 +add_test(NAME ${SCALE_MODULE_NAME} COMMAND ${TESTING_OUTPUT_DIRECTORY}/${SCALE_MODULE_NAME})
 +set_property(TARGET ${SCALE_MODULE_NAME} PROPERTY FOLDER "FreeRDP/Client/X11/Test")
-Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
+Index: src/client/X11/test/TestXfInputDispatcher.c
 ===================================================================
 --- /dev/null
-+++ freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
-@@ -0,0 +1,511 @@
++++ src/client/X11/test/TestXfInputDispatcher.c
+@@ -0,0 +1,653 @@
 +#include <X11/Xlib.h>
 +#include <X11/extensions/XInput2.h>
 +
@@ -2865,6 +2935,143 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 +	return 0;
 +}
 +
++/* Valuator wheel tests: physical mouse wheel delivers RelVertWheel/RelHorizWheel
++ * valuators on XI_Motion (not discrete Button4/5). The helper converts those
++ * to the same 0x78 detent encoding used by Button4/5 and two-finger scroll. */
++
++static int test_valuator_wheel_vertical_positive(void)
++{
++	rdpSettings* settings = new_settings();
++	rdpInput input = { 0 };
++	xfContext xfc;
++
++	CHECK(settings != NULL, "settings allocation");
++	init_context(&xfc, settings);
++	input.context = &xfc.common.context;
++	input.MouseEvent = capture_mouse_event;
++	xfc.common.context.input = &input;
++	mouse_events = (mouse_capture){ 0 };
++
++	/* Bit 2 set (RelVertWheel), value +1.0 → vertical wheel up */
++	unsigned char mask[1] = { 0x04 }; /* bits: 2 */
++	double values[1] = { 1.0 };
++
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
++
++	CHECK(mouse_events.count == 1, "one wheel event emitted");
++	CHECK(mouse_events.flags[0] == (PTR_FLAGS_WHEEL | 0x78),
++	      "positive vertical valuator emits wheel-up 0x78 detent");
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++static int test_valuator_wheel_vertical_negative(void)
++{
++	rdpSettings* settings = new_settings();
++	rdpInput input = { 0 };
++	xfContext xfc;
++
++	CHECK(settings != NULL, "settings allocation");
++	init_context(&xfc, settings);
++	input.context = &xfc.common.context;
++	input.MouseEvent = capture_mouse_event;
++	xfc.common.context.input = &input;
++	mouse_events = (mouse_capture){ 0 };
++
++	/* Bit 2 set, value -1.0 → vertical wheel down */
++	unsigned char mask[1] = { 0x04 };
++	double values[1] = { -1.0 };
++
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
++
++	CHECK(mouse_events.count == 1, "one wheel event emitted");
++	CHECK(mouse_events.flags[0] == (PTR_FLAGS_WHEEL | PTR_FLAGS_WHEEL_NEGATIVE | (0x100 - 0x78)),
++	      "negative vertical valuator emits wheel-down detent");
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++static int test_valuator_wheel_horizontal(void)
++{
++	rdpSettings* settings = new_settings();
++	rdpInput input = { 0 };
++	xfContext xfc;
++
++	CHECK(settings != NULL, "settings allocation");
++	init_context(&xfc, settings);
++	input.context = &xfc.common.context;
++	input.MouseEvent = capture_mouse_event;
++	xfc.common.context.input = &input;
++	mouse_events = (mouse_capture){ 0 };
++
++	/* Bit 3 set (RelHorizWheel), value +1.0 → horizontal wheel */
++	unsigned char mask[1] = { 0x08 };
++	double values[1] = { 1.0 };
++
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
++
++	CHECK(mouse_events.count == 1, "one wheel event emitted");
++	CHECK(mouse_events.flags[0] == (PTR_FLAGS_HWHEEL | 0x78),
++	      "positive horizontal valuator emits hwheel 0x78 detent");
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++static int test_valuator_wheel_axes_0_1_ignored(void)
++{
++	rdpSettings* settings = new_settings();
++	rdpInput input = { 0 };
++	xfContext xfc;
++
++	CHECK(settings != NULL, "settings allocation");
++	init_context(&xfc, settings);
++	input.context = &xfc.common.context;
++	input.MouseEvent = capture_mouse_event;
++	xfc.common.context.input = &input;
++	mouse_events = (mouse_capture){ 0 };
++
++	/* Only axes 0 and 1 set (x/y motion) — must emit nothing */
++	unsigned char mask[1] = { 0x03 }; /* bits 0 and 1 */
++	double values[2] = { 5.0, 3.0 };
++
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
++
++	CHECK(mouse_events.count == 0, "x/y valuators never emit wheel");
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++static int test_valuator_wheel_empty_or_null(void)
++{
++	rdpSettings* settings = new_settings();
++	rdpInput input = { 0 };
++	xfContext xfc;
++
++	CHECK(settings != NULL, "settings allocation");
++	init_context(&xfc, settings);
++	input.context = &xfc.common.context;
++	input.MouseEvent = capture_mouse_event;
++	xfc.common.context.input = &input;
++	mouse_events = (mouse_capture){ 0 };
++
++	/* Empty mask */
++	xf_input_send_wheel_from_valuators(&xfc, NULL, 0, NULL);
++	CHECK(mouse_events.count == 0, "NULL mask emits nothing");
++
++	/* Zero mask */
++	unsigned char mask[1] = { 0x00 };
++	double values[1] = { 1.0 };
++	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
++	CHECK(mouse_events.count == 0, "zero mask emits nothing");
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
 +int main(void)
 +{
 +	CHECK(configure_log_capture(), "configure WLog callback appender");
@@ -2876,14 +3083,19 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 +	CHECK(test_diagnostic_lifecycle() == 0, "diagnostic lifecycle scenario");
 +	CHECK(test_third_finger_compaction() == 0, "third-finger compaction scenario");
 +	CHECK(test_pending_three_finger_lift() == 0, "pending three-finger lift scenario");
++	CHECK(test_valuator_wheel_vertical_positive() == 0, "vertical positive valuator wheel");
++	CHECK(test_valuator_wheel_vertical_negative() == 0, "vertical negative valuator wheel");
++	CHECK(test_valuator_wheel_horizontal() == 0, "horizontal valuator wheel");
++	CHECK(test_valuator_wheel_axes_0_1_ignored() == 0, "x/y axes ignored for wheel");
++	CHECK(test_valuator_wheel_empty_or_null() == 0, "empty/NULL valuator input ignored");
 +	(void)WLog_CloseAppender(WLog_GetRoot());
 +	(void)puts("OK");
 +	return 0;
 +}
-Index: freerdp3-3.15.0+dfsg/client/X11/CMakeLists.txt
+Index: src/client/X11/CMakeLists.txt
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/client/X11/CMakeLists.txt
-+++ freerdp3-3.15.0+dfsg/client/X11/CMakeLists.txt
+--- src.orig/client/X11/CMakeLists.txt
++++ src/client/X11/CMakeLists.txt
 @@ -194,3 +194,7 @@ add_subdirectory(cli)
  add_subdirectory(man)
  
@@ -2892,10 +3104,10 @@ Index: freerdp3-3.15.0+dfsg/client/X11/CMakeLists.txt
 +if(BUILD_TESTING_INTERNAL OR BUILD_TESTING)
 +  add_subdirectory(test)
 +endif()
-Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfMonitorScale.c
+Index: src/client/X11/test/TestXfMonitorScale.c
 ===================================================================
 --- /dev/null
-+++ freerdp3-3.15.0+dfsg/client/X11/test/TestXfMonitorScale.c
++++ src/client/X11/test/TestXfMonitorScale.c
 @@ -0,0 +1,144 @@
 +#include <freerdp/settings.h>
 +#include <freerdp/settings_types.h>
@@ -3041,10 +3253,10 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfMonitorScale.c
 +	(void)puts("OK");
 +	return 0;
 +}
-Index: freerdp3-3.15.0+dfsg/client/X11/xf_disp.c
+Index: src/client/X11/xf_disp.c
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/client/X11/xf_disp.c
-+++ freerdp3-3.15.0+dfsg/client/X11/xf_disp.c
+--- src.orig/client/X11/xf_disp.c
++++ src/client/X11/xf_disp.c
 @@ -421,10 +421,8 @@ UINT xf_disp_sendLayout(DispClientContex
  				break;
  		}
@@ -3058,10 +3270,10 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_disp.c
  	}
  
  	ret = IFCALLRESULT(CHANNEL_RC_OK, disp->SendMonitorLayout, disp, nmonitors, layouts);
-Index: freerdp3-3.15.0+dfsg/client/X11/xf_monitor.c
+Index: src/client/X11/xf_monitor.c
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/client/X11/xf_monitor.c
-+++ freerdp3-3.15.0+dfsg/client/X11/xf_monitor.c
+--- src.orig/client/X11/xf_monitor.c
++++ src/client/X11/xf_monitor.c
 @@ -138,6 +138,77 @@ static BOOL xf_is_monitor_id_active(xfCo
  	return FALSE;
  }
@@ -3151,10 +3363,10 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_monitor.c
  	rc = freerdp_settings_set_monitor_def_array_sorted(settings, rdpmonitors, nmonitors);
  
  fail:
-Index: freerdp3-3.15.0+dfsg/client/X11/xf_monitor.h
+Index: src/client/X11/xf_monitor.h
 ===================================================================
---- freerdp3-3.15.0+dfsg.orig/client/X11/xf_monitor.h
-+++ freerdp3-3.15.0+dfsg/client/X11/xf_monitor.h
+--- src.orig/client/X11/xf_monitor.h
++++ src/client/X11/xf_monitor.h
 @@ -44,5 +44,7 @@ typedef struct
  FREERDP_API int xf_list_monitors(xfContext* xfc);
  FREERDP_API BOOL xf_detect_monitors(xfContext* xfc, UINT32* pWidth, UINT32* pHeight);
