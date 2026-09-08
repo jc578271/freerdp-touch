@@ -1648,7 +1648,7 @@ Index: src/client/X11/xf_input.c
 +				continue;
 +
 +			UINT16 flags = (i == 2) ? PTR_FLAGS_HWHEEL : PTR_FLAGS_WHEEL;
-+			if (v < 0.0)
++			if ((i == 2) ? (v < 0.0) : (v > 0.0))
 +				flags |= PTR_FLAGS_WHEEL_NEGATIVE | (0x100 - 0x78);
 +			else
 +				flags |= 0x78;
@@ -2952,15 +2952,15 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +	xfc.common.context.input = &input;
 +	mouse_events = (mouse_capture){ 0 };
 +
-+	/* Bit 3 set (Rel Vert Scroll), value +1.0 → vertical wheel up */
++	/* Bit 3 set (Rel Vert Scroll), value +1.0 → Button5 / wheel-down */
 +	unsigned char mask[1] = { 0x08 }; /* bit 3 */
 +	double values[1] = { 1.0 };
 +
 +	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
 +
 +	CHECK(mouse_events.count == 1, "one wheel event emitted");
-+	CHECK(mouse_events.flags[0] == (PTR_FLAGS_WHEEL | 0x78),
-+	      "positive vertical valuator emits wheel-up 0x78 detent");
++	CHECK(mouse_events.flags[0] == (PTR_FLAGS_WHEEL | PTR_FLAGS_WHEEL_NEGATIVE | (0x100 - 0x78)),
++	      "positive vertical valuator matches Button5 wheel-down detent");
 +
 +	freerdp_settings_free(settings);
 +	return 0;
@@ -2979,15 +2979,15 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +	xfc.common.context.input = &input;
 +	mouse_events = (mouse_capture){ 0 };
 +
-+	/* Bit 3 set, value -1.0 → vertical wheel down */
++	/* Bit 3 set, value -1.0 → Button4 / wheel-up */
 +	unsigned char mask[1] = { 0x08 };
 +	double values[1] = { -1.0 };
 +
 +	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
 +
 +	CHECK(mouse_events.count == 1, "one wheel event emitted");
-+	CHECK(mouse_events.flags[0] == (PTR_FLAGS_WHEEL | PTR_FLAGS_WHEEL_NEGATIVE | (0x100 - 0x78)),
-+	      "negative vertical valuator emits wheel-down detent");
++	CHECK(mouse_events.flags[0] == (PTR_FLAGS_WHEEL | 0x78),
++	      "negative vertical valuator matches Button4 wheel-up detent");
 +
 +	freerdp_settings_free(settings);
 +	return 0;
