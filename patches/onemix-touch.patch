@@ -2336,7 +2336,7 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/CMakeLists.txt
 ===================================================================
 --- /dev/null
 +++ freerdp3-3.15.0+dfsg/client/X11/test/CMakeLists.txt
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,27 @@
 +set(MODULE_NAME "TestXfInputDispatcher")
 +
 +add_executable(${MODULE_NAME} TestXfInputDispatcher.c)
@@ -2353,6 +2353,17 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/CMakeLists.txt
 +
 +add_test(NAME ${MODULE_NAME} COMMAND ${TESTING_OUTPUT_DIRECTORY}/${MODULE_NAME})
 +set_property(TARGET ${MODULE_NAME} PROPERTY FOLDER "FreeRDP/Client/X11/Test")
++
++set(SCALE_MODULE_NAME "TestXfMonitorScale")
++
++add_executable(${SCALE_MODULE_NAME} TestXfMonitorScale.c)
++target_include_directories(${SCALE_MODULE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
++target_link_libraries(${SCALE_MODULE_NAME} PRIVATE xfreerdp-client)
++set_target_properties(${SCALE_MODULE_NAME} PROPERTIES
++  RUNTIME_OUTPUT_DIRECTORY "${TESTING_OUTPUT_DIRECTORY}"
++)
++add_test(NAME ${SCALE_MODULE_NAME} COMMAND ${TESTING_OUTPUT_DIRECTORY}/${SCALE_MODULE_NAME})
++set_property(TARGET ${SCALE_MODULE_NAME} PROPERTY FOLDER "FreeRDP/Client/X11/Test")
 Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfInputDispatcher.c
 ===================================================================
 --- /dev/null
@@ -2881,3 +2892,152 @@ Index: freerdp3-3.15.0+dfsg/client/X11/CMakeLists.txt
 +if(BUILD_TESTING_INTERNAL OR BUILD_TESTING)
 +  add_subdirectory(test)
 +endif()
+Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfMonitorScale.c
+===================================================================
+--- /dev/null
++++ freerdp3-3.15.0+dfsg/client/X11/test/TestXfMonitorScale.c
+@@ -0,0 +1,144 @@
++#include <freerdp/settings.h>
++#include <freerdp/settings_types.h>
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "../xf_monitor.h"
++
++#define EXTERNAL_SCALE_ENV "FREERDP_EXTERNAL_DESKTOP_SCALE"
++
++#define CHECK(condition, message) \
++	do \
++	{ \
++		if (!(condition)) \
++		{ \
++			(void)fprintf(stderr, "FAIL: %s\n", message); \
++			return 1; \
++		} \
++	} while (0)
++
++static rdpSettings* new_settings(void)
++{
++	rdpSettings* settings = freerdp_settings_new(0);
++
++	if (!settings)
++		return NULL;
++	if (!freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor, 200) ||
++	    !freerdp_settings_set_uint32(settings, FreeRDP_DeviceScaleFactor, 100) ||
++	    !freerdp_settings_set_bool(settings, FreeRDP_HasMonitorAttributes, FALSE))
++	{
++		freerdp_settings_free(settings);
++		return NULL;
++	}
++	return settings;
++}
++
++static void init_monitors(rdpMonitor monitors[2])
++{
++	memset(monitors, 0, sizeof(rdpMonitor) * 2);
++	monitors[0].is_primary = TRUE;
++	monitors[0].width = 1600;
++	monitors[0].height = 2560;
++	monitors[1].x = 1600;
++	monitors[1].width = 1920;
++	monitors[1].height = 1080;
++}
++
++static int check_scales(const rdpMonitor monitors[2], UINT32 primary, UINT32 secondary)
++{
++	CHECK(monitors[0].attributes.desktopScaleFactor == primary,
++	      "primary monitor desktop scale");
++	CHECK(monitors[1].attributes.desktopScaleFactor == secondary,
++	      "secondary monitor desktop scale");
++	CHECK(monitors[0].attributes.deviceScaleFactor == 100 &&
++	          monitors[1].attributes.deviceScaleFactor == 100,
++	      "both monitor device scales");
++	return 0;
++}
++
++static int test_default_and_override(void)
++{
++	rdpSettings* settings = new_settings();
++	rdpMonitor monitors[2];
++
++	CHECK(settings != NULL, "settings allocation");
++	init_monitors(monitors);
++	(void)setenv(EXTERNAL_SCALE_ENV, "100", 1);
++	CHECK(xf_monitor_apply_scale_attributes(settings, monitors, 2),
++	      "default external scale accepted");
++	CHECK(check_scales(monitors, 200, 100) == 0, "default external scale values");
++	CHECK(freerdp_settings_get_bool(settings, FreeRDP_HasMonitorAttributes),
++	      "monitor attributes enabled for external scale");
++
++	freerdp_settings_free(settings);
++	settings = new_settings();
++	CHECK(settings != NULL, "override settings allocation");
++	init_monitors(monitors);
++	(void)setenv(EXTERNAL_SCALE_ENV, "140", 1);
++	CHECK(xf_monitor_apply_scale_attributes(settings, monitors, 2),
++	      "external scale override accepted");
++	CHECK(check_scales(monitors, 200, 140) == 0, "external scale override values");
++	CHECK(freerdp_settings_get_bool(settings, FreeRDP_HasMonitorAttributes),
++	      "monitor attributes enabled for override");
++
++	unsetenv(EXTERNAL_SCALE_ENV);
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++static int test_absent_override(void)
++{
++	rdpSettings* settings = new_settings();
++	rdpMonitor monitors[2];
++
++	CHECK(settings != NULL, "absent-value settings allocation");
++	init_monitors(monitors);
++	unsetenv(EXTERNAL_SCALE_ENV);
++	CHECK(xf_monitor_apply_scale_attributes(settings, monitors, 2),
++	      "absent external scale accepted");
++	CHECK(check_scales(monitors, 200, 200) == 0, "absent external scale values");
++	CHECK(!freerdp_settings_get_bool(settings, FreeRDP_HasMonitorAttributes),
++	      "absent external scale does not enable monitor attributes");
++
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++static int test_rejected_value(const char* value)
++{
++	rdpSettings* settings = new_settings();
++	rdpMonitor monitors[2];
++	const MONITOR_ATTRIBUTES primary = { 11, 22, 33, 44, 55 };
++	const MONITOR_ATTRIBUTES secondary = { 66, 77, 88, 99, 111 };
++
++	CHECK(settings != NULL, "rejected-value settings allocation");
++	init_monitors(monitors);
++	monitors[0].attributes = primary;
++	monitors[1].attributes = secondary;
++	(void)setenv(EXTERNAL_SCALE_ENV, value, 1);
++	CHECK(!xf_monitor_apply_scale_attributes(settings, monitors, 2),
++	      "invalid external scale rejected");
++	CHECK(memcmp(&monitors[0].attributes, &primary, sizeof(primary)) == 0 &&
++	          memcmp(&monitors[1].attributes, &secondary, sizeof(secondary)) == 0,
++	      "invalid external scale leaves monitor records unchanged");
++	CHECK(!freerdp_settings_get_bool(settings, FreeRDP_HasMonitorAttributes),
++	      "invalid external scale leaves extension state unchanged");
++
++	unsetenv(EXTERNAL_SCALE_ENV);
++	freerdp_settings_free(settings);
++	return 0;
++}
++
++int main(void)
++{
++	CHECK(test_default_and_override() == 0, "default and override scenarios");
++	CHECK(test_absent_override() == 0, "absent override scenario");
++	CHECK(test_rejected_value("0140") == 0, "leading-zero rejection");
++	CHECK(test_rejected_value("14x") == 0, "malformed rejection");
++	CHECK(test_rejected_value("99") == 0, "below-range rejection");
++	CHECK(test_rejected_value("501") == 0, "above-range rejection");
++	(void)puts("OK");
++	return 0;
++}
