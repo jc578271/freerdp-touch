@@ -31,6 +31,7 @@ export MOCK_BIN="$td/bin"
 export MOCK_WRAPPER="$td/mock-wrapper"
 export RENDERED_XINITRC="$td/rendered-xinitrc"
 export OBSERVED_DIAG="$td/observed-diag"
+export OBSERVED_EXTERNAL_SCALE="$td/observed-external-scale"
 export OBSERVED_MOUSE_ONLY="$td/observed-mouse-only"
 export OBSERVED_ARGS="$td/observed-args"
 export WRAPPER_CALLS="$td/wrapper-calls"
@@ -94,6 +95,7 @@ printf '%s\n' \
 	'set -eu' \
 	'printf "%s\\n" called >> "$WRAPPER_CALLS"' \
 	'printf "%s\\n" "${FREERDP_TOUCH_DIAG:-}" > "$OBSERVED_DIAG"' \
+	'printf "%s\\n" "${FREERDP_EXTERNAL_DESKTOP_SCALE-unset}" > "$OBSERVED_EXTERNAL_SCALE"' \
 	'mouse_only=0' \
 	'for arg in "$@"; do' \
 	'  [ "$arg" = "--mouse-only" ] && mouse_only=1' \
@@ -145,34 +147,42 @@ run_menu() {
 	diag=$4
 	mode=$5
 	map_fail=${6:-0}
+	scale=${7-UNSET}
 	input_file="$td/$name.input"
 	printf '3\n\n\n6\n' > "$input_file"
 
-	if [ "$external" = EMPTY ]; then
+	(
+		FREERDP_ONEMIX_OUTPUT="$onemix"
+		FREERDP_TOUCH_DIAG="$diag"
+		EXPECTED_DIAG=$([ "$diag" = 1 ] && printf 1 || printf 0)
+		XINPUT_FAIL="$map_fail"
+		NO_EXTERNAL=0
+		DEFAULT_EXTERNAL=0
+		TERM=dumb
+		export FREERDP_ONEMIX_OUTPUT FREERDP_TOUCH_DIAG EXPECTED_DIAG XINPUT_FAIL \
+			NO_EXTERNAL DEFAULT_EXTERNAL TERM
+
+		if [ "$external" = UNSET ]; then
+			unset FREERDP_EXTERNAL_OUTPUT
+		else
+			FREERDP_EXTERNAL_OUTPUT="$external"
+			export FREERDP_EXTERNAL_OUTPUT
+		fi
+
+		case "$scale" in
+			UNSET) unset FREERDP_EXTERNAL_DESKTOP_SCALE ;;
+			EMPTY) FREERDP_EXTERNAL_DESKTOP_SCALE=; export FREERDP_EXTERNAL_DESKTOP_SCALE ;;
+			*) FREERDP_EXTERNAL_DESKTOP_SCALE="$scale"; export FREERDP_EXTERNAL_DESKTOP_SCALE ;;
+		esac
+
 		if [ -n "$mode" ]; then
-			env FREERDP_EXTERNAL_OUTPUT= FREERDP_ONEMIX_OUTPUT="$onemix" \
-				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
-				XINPUT_FAIL="$map_fail" NO_EXTERNAL=0 DEFAULT_EXTERNAL=0 TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" "$mode" < "$input_file" \
+			PATH="$MOCK_BIN:$PATH" "$menu" "$mode" < "$input_file" \
 				> "$td/$name.out" 2> "$td/$name.err"
 		else
-			env FREERDP_EXTERNAL_OUTPUT= FREERDP_ONEMIX_OUTPUT="$onemix" \
-				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
-				XINPUT_FAIL="$map_fail" NO_EXTERNAL=0 DEFAULT_EXTERNAL=0 TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
+			PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
 				> "$td/$name.out" 2> "$td/$name.err"
 		fi
-	else
-		if [ -n "$mode" ]; then
-			env FREERDP_ONEMIX_OUTPUT="$onemix" FREERDP_EXTERNAL_OUTPUT="$external" \
-				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
-				XINPUT_FAIL="$map_fail" NO_EXTERNAL=0 DEFAULT_EXTERNAL=0 TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" "$mode" < "$input_file" \
-				> "$td/$name.out" 2> "$td/$name.err"
-		else
-			env FREERDP_ONEMIX_OUTPUT="$onemix" FREERDP_EXTERNAL_OUTPUT="$external" \
-				FREERDP_TOUCH_DIAG="$diag" EXPECTED_DIAG="$([ "$diag" = 1 ] && printf 1 || printf 0)" \
-				XINPUT_FAIL="$map_fail" NO_EXTERNAL=0 DEFAULT_EXTERNAL=0 TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
-				> "$td/$name.out" 2> "$td/$name.err"
-		fi
-	fi
+	)
 }
 
 assert_valid_case() {
@@ -181,16 +191,17 @@ assert_valid_case() {
 	expected_mouse_only=$3
 	expected_multimon=$4
 	external=$5
+	expected_scale=$6
 
-	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_DIAG" "$OBSERVED_MOUSE_ONLY" \
-		"$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
+	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_DIAG" "$OBSERVED_EXTERNAL_SCALE" \
+		"$OBSERVED_MOUSE_ONLY" "$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
 	: > "$XRANDR_LOG"
 	: > "$XINPUT_LOG"
 	EXPECTED_DIAG=$expected_diag
 	export EXPECTED_DIAG
 	rc=0
 	run_menu "$name" OneMixPanel "$external" "$([ "$expected_diag" = 1 ] && printf 1 || printf '')" \
-		"$([ "$expected_mouse_only" = 1 ] && printf -- --mouse-only || printf '')" || rc=$?
+		"$([ "$expected_mouse_only" = 1 ] && printf -- --mouse-only || printf '')" 0 "$expected_scale" || rc=$?
 	if [ "$rc" -ne 0 ]; then
 		printf 'FAIL: menu exited with rc=%s (%s)\n' "$rc" "$name" >&2
 		cat "$td/$name.err" >&2
@@ -204,10 +215,13 @@ assert_valid_case() {
 		exit 1
 	fi
 	actual_diag=$(tr -d '\n' < "$OBSERVED_DIAG")
+	actual_external_scale=$(tr -d '\n' < "$OBSERVED_EXTERNAL_SCALE")
 	actual_mouse_only=$(tr -d '\n' < "$OBSERVED_MOUSE_ONLY")
 	expected_diag_value=$([ "$expected_diag" = 1 ] && printf 1 || printf '')
-	if [ "$actual_diag" != "$expected_diag_value" ] || [ "$actual_mouse_only" != "$expected_mouse_only" ]; then
-		printf 'FAIL: wrapper environment or mouse-only argument mismatch (%s)\n' "$name" >&2
+	if [ "$actual_diag" != "$expected_diag_value" ] || [ "$actual_external_scale" != "$expected_scale" ] || \
+		[ "$actual_mouse_only" != "$expected_mouse_only" ]; then
+		printf 'FAIL: wrapper environment or mouse-only argument mismatch (%s): scale=%s expected=%s\n' \
+			"$name" "$actual_external_scale" "$expected_scale" >&2
 		exit 1
 	fi
 	if [ "$(wc -l < "$WRAPPER_CALLS")" -ne 1 ]; then
@@ -223,6 +237,11 @@ assert_valid_case() {
 			printf 'FAIL: missing XRandR monitor listing (%s)\n' "$name" >&2; exit 1; }
 		grep -Fqx '/multimon' "$OBSERVED_ARGS" || {
 			printf 'FAIL: missing /multimon passthrough (%s)\n' "$name" >&2; exit 1; }
+		if [ "$(grep -Fc '/scale-desktop:200' "$OBSERVED_ARGS")" -ne 1 ] || \
+			grep -Fq '/scale-desktop:100' "$OBSERVED_ARGS"; then
+			printf 'FAIL: dual-display launch did not keep exactly one global 200 scale (%s)\n' "$name" >&2
+			exit 1
+		fi
 		grep -Fqx 'XINPUT: map-to-output GXTP7386:00 27C6:0113 OneMixPanel' "$XINPUT_LOG" || {
 			printf 'FAIL: missing output-bound OneMix touchscreen map (%s)\n' "$name" >&2; exit 1; }
 		if [ "$(grep -Fc 'XINPUT:' "$XINPUT_LOG")" -ne 1 ]; then
@@ -286,6 +305,32 @@ assert_rejected_case() {
 	}
 }
 
+assert_rejected_scale_case() {
+	name=$1
+	scale=$2
+	expected_error=$3
+
+	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_EXTERNAL_SCALE" "$OBSERVED_ARGS" \
+		"$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
+	: > "$XRANDR_LOG"
+	: > "$XINPUT_LOG"
+	rc=0
+	run_menu "$name" OneMixPanel ExternalPanel '' '' 0 "$scale" || rc=$?
+	if [ "$rc" -eq 0 ]; then
+		printf 'FAIL: invalid external scale was accepted (%s)\n' "$name" >&2
+		exit 1
+	fi
+	if [ -e "$WRAPPER_CALLS" ]; then
+		printf 'FAIL: wrapper ran for invalid external scale (%s)\n' "$name" >&2
+		exit 1
+	fi
+	grep -Fqx "$expected_error" "$td/$name.err" || {
+		printf 'FAIL: missing external-scale validation error (%s)\n' "$name" >&2
+		cat "$td/$name.err" >&2
+		exit 1
+	}
+}
+
 assert_mapping_failure_case() {
 	name=map-failure
 	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
@@ -311,12 +356,13 @@ assert_unset_auto_external_connected_case() {
 	name=plain-auto-external
 	input_file="$td/$name.input"
 	printf '3\n\n\n6\n' > "$input_file"
-	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_DIAG" "$OBSERVED_MOUSE_ONLY" \
-		"$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
+	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_DIAG" "$OBSERVED_EXTERNAL_SCALE" \
+		"$OBSERVED_MOUSE_ONLY" "$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
 	: > "$XRANDR_LOG"
 	: > "$XINPUT_LOG"
 	rc=0
-	env -u FREERDP_EXTERNAL_OUTPUT FREERDP_ONEMIX_OUTPUT=OneMixPanel \
+	env -u FREERDP_EXTERNAL_OUTPUT -u FREERDP_EXTERNAL_DESKTOP_SCALE \
+		FREERDP_ONEMIX_OUTPUT=OneMixPanel \
 		FREERDP_TOUCH_DIAG= EXPECTED_DIAG=0 XINPUT_FAIL=0 NO_EXTERNAL=0 AUTO_SELECTION_FIXTURE=1 \
 		TERM=dumb PATH="$MOCK_BIN:$PATH" "$menu" < "$input_file" \
 		> "$td/$name.out" 2> "$td/$name.err" || rc=$?
@@ -344,6 +390,16 @@ assert_unset_auto_external_connected_case() {
 		printf 'FAIL: monitor listing did not report the selected USB-C-7 output\n' >&2; exit 1; }
 	grep -Fqx '/multimon' "$OBSERVED_ARGS" || {
 		printf 'FAIL: automatic connected external output missed /multimon\n' >&2; exit 1; }
+	if [ "$(grep -Fc '/scale-desktop:200' "$OBSERVED_ARGS")" -ne 1 ] || \
+		grep -Fq '/scale-desktop:100' "$OBSERVED_ARGS"; then
+		printf 'FAIL: automatic connected external output changed global desktop scale\n' >&2
+		exit 1
+	fi
+	actual_scale=$(tr -d '\n' < "$OBSERVED_EXTERNAL_SCALE")
+	if [ "$actual_scale" != 100 ]; then
+		printf 'FAIL: automatic connected external output did not default external scale to 100 (got %s)\n' "$actual_scale" >&2
+		exit 1
+	fi
 	grep -Fqx 'XINPUT: map-to-output GXTP7386:00 27C6:0113 OneMixPanel' "$XINPUT_LOG" || {
 		printf 'FAIL: automatic connected external output missed the output-bound touch map\n' >&2; exit 1; }
 	if grep -Fq 'XINPUT: set-prop' "$XINPUT_LOG"; then
@@ -356,8 +412,8 @@ assert_plain_default_no_external_case() {
 	name=plain-no-external
 	input_file="$td/$name.input"
 	printf '3\n\n\n6\n' > "$input_file"
-	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_DIAG" "$OBSERVED_MOUSE_ONLY" \
-		"$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
+	rm -f "$STARTX_PASSED" "$STARTX_ERROR" "$OBSERVED_DIAG" "$OBSERVED_EXTERNAL_SCALE" \
+		"$OBSERVED_MOUSE_ONLY" "$OBSERVED_ARGS" "$WRAPPER_CALLS" "$XRANDR_LOG" "$XINPUT_LOG"
 	: > "$XRANDR_LOG"
 	: > "$XINPUT_LOG"
 	rc=0
@@ -379,6 +435,11 @@ assert_plain_default_no_external_case() {
 		printf 'FAIL: plain menu without an external monitor did not invoke the wrapper once\n' >&2
 		exit 1
 	fi
+	actual_scale=$(tr -d '\n' < "$OBSERVED_EXTERNAL_SCALE")
+	if [ "$actual_scale" != unset ] || [ "$(grep -Fc '/scale-desktop:200' "$OBSERVED_ARGS")" -ne 1 ]; then
+		printf 'FAIL: OneMix-only launch did not clear external scale metadata or preserve global 200 scale\n' >&2
+		exit 1
+	fi
 	grep -Fqx 'OUTPUT: --output eDP-1 --mode 1600x2560 --rotate left --primary' "$XRANDR_LOG" || {
 		printf 'FAIL: plain menu did not configure the default OneMix output\n' >&2; exit 1; }
 	if grep -Fq 'OUTPUT: --output DP-1' "$XRANDR_LOG" || grep -Fq 'ExternalPanel' "$XRANDR_LOG" || grep -Fqx '/multimon' "$OBSERVED_ARGS"; then
@@ -395,12 +456,19 @@ assert_plain_default_no_external_case() {
 
 assert_unset_auto_external_connected_case
 assert_plain_default_no_external_case
-assert_valid_case normal 0 0 1 ExternalPanel
-assert_valid_case diagnostic 1 0 1 ExternalPanel
-assert_valid_case mouse-only 0 1 1 ExternalPanel
-assert_valid_case rollback 0 0 0 EMPTY
+assert_valid_case normal 0 0 1 ExternalPanel 100
+assert_valid_case empty-scale 0 0 1 ExternalPanel 100
+assert_valid_case override 0 0 1 ExternalPanel 140
+assert_valid_case diagnostic 1 0 1 ExternalPanel 100
+assert_valid_case mouse-only 0 1 1 ExternalPanel 100
+assert_valid_case rollback 0 0 0 EMPTY UNSET
+assert_valid_case stale-scale-rollback 0 0 0 EMPTY 140
 assert_rejected_case missing-primary '' ExternalPanel 'ERROR: FREERDP_ONEMIX_OUTPUT is required'
 assert_rejected_case duplicate-output OneMixPanel OneMixPanel 'ERROR: FREERDP_ONEMIX_OUTPUT and FREERDP_EXTERNAL_OUTPUT must differ'
 assert_rejected_case missing-external OneMixPanel MissingPanel "ERROR: FREERDP_EXTERNAL_OUTPUT 'MissingPanel' is not connected"
+assert_rejected_scale_case malformed 14x 'ERROR: FREERDP_EXTERNAL_DESKTOP_SCALE must be a whole percent from 100 through 500'
+assert_rejected_scale_case leading-zero 0140 'ERROR: FREERDP_EXTERNAL_DESKTOP_SCALE must be a whole percent from 100 through 500'
+assert_rejected_scale_case below-range 99 'ERROR: FREERDP_EXTERNAL_DESKTOP_SCALE must be a whole percent from 100 through 500'
+assert_rejected_scale_case above-range 501 'ERROR: FREERDP_EXTERNAL_DESKTOP_SCALE must be a whole percent from 100 through 500'
 assert_mapping_failure_case
 printf 'PASS: menu named XRandR layout, validation, mapping, and diagnostic propagation\n'
