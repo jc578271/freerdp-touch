@@ -1625,10 +1625,10 @@ Index: src/client/X11/xf_input.c
  	return true;
  }
  
-+/* Convert XI2 valuator samples (RelVertWheel/RelHorizWheel) into existing RDP wheel detents.
-+ * Called from XI_Motion and XI_RawMotion arms for physical mouse wheels under libinput.
++/* Convert XI2 scroll valuators into existing RDP wheel detents.
++ * xf86-input-libinput: Rel X=0, Rel Y=1, Rel Horiz Scroll=2, Rel Vert Scroll=3.
++ * Called from XI_Motion and XI_RawMotion. XI 2.1+ clients do not get Button4/5.
 + * Walks set valuators the same way xf_input_pen_remote walks event->valuators.
-+ * Ignores axes 0/1 (x/y). Axis 2 → vertical PTR_FLAGS_WHEEL, later axes → PTR_FLAGS_HWHEEL.
 + * Uses the same 0x78 detent magnitude as Button4/5 and two-finger scroll. */
 +void xf_input_send_wheel_from_valuators(xfContext* xfc, const unsigned char* mask,
 +                                        int mask_len, const double* values)
@@ -1647,7 +1647,7 @@ Index: src/client/X11/xf_input.c
 +			if (v == 0.0)
 +				continue;
 +
-+			UINT16 flags = (i == 2) ? PTR_FLAGS_WHEEL : PTR_FLAGS_HWHEEL;
++			UINT16 flags = (i == 2) ? PTR_FLAGS_HWHEEL : PTR_FLAGS_WHEEL;
 +			if (v < 0.0)
 +				flags |= PTR_FLAGS_WHEEL_NEGATIVE | (0x100 - 0x78);
 +			else
@@ -1665,8 +1665,8 @@ Index: src/client/X11/xf_input.c
  			{
  				xf_generic_MotionNotify(xfc, (int)event->event_x, (int)event->event_y,
  				                        event->detail, event->event, xfc->remote_app);
-+				/* Physical mouse wheel delivers RelVertWheel/RelHorizWheel valuators here
-+				 * (not discrete Button4/5). Convert to existing wheel detents. */
++				/* Physical mouse wheel delivers Rel Horiz/Vert Scroll valuators here
++				 * (not discrete Button4/5 for XI 2.1+). Convert to existing wheel detents. */
 +				xf_input_send_wheel_from_valuators(xfc, event->valuators.mask,
 +				                                   event->valuators.mask_len,
 +				                                   event->valuators.values);
@@ -1867,7 +1867,7 @@ Index: src/client/X11/xf_input.h
 +void xf_touch_force_cancel(xfContext* xfc);
 +
 +/* Send wheel events from XI2 valuator samples (physical mouse wheel on XI_Motion/XI_RawMotion).
-+ * Ignores axes 0/1 (x/y). Axis 2 → vertical wheel, later axes → horizontal wheel.
++ * Ignores axes 0/1 (x/y). Axis 2 → horizontal (Rel Horiz Scroll), axis 3 → vertical (Rel Vert Scroll).
 + * Uses the same 0x78 detent encoding as Button4/5 and two-finger scroll.
 + * Empty/NULL input returns without sending. */
 +void xf_input_send_wheel_from_valuators(xfContext* xfc, const unsigned char* mask,
@@ -2935,9 +2935,9 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +	return 0;
 +}
 +
-+/* Valuator wheel tests: physical mouse wheel delivers RelVertWheel/RelHorizWheel
-+ * valuators on XI_Motion (not discrete Button4/5). The helper converts those
-+ * to the same 0x78 detent encoding used by Button4/5 and two-finger scroll. */
++/* Valuator wheel tests: xf86-input-libinput delivers Rel Horiz Scroll on axis 2
++ * and Rel Vert Scroll on axis 3 (not discrete Button4/5 for XI 2.1+ clients).
++ * The helper converts those to the same 0x78 detent encoding as Button4/5. */
 +
 +static int test_valuator_wheel_vertical_positive(void)
 +{
@@ -2952,8 +2952,8 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +	xfc.common.context.input = &input;
 +	mouse_events = (mouse_capture){ 0 };
 +
-+	/* Bit 2 set (RelVertWheel), value +1.0 → vertical wheel up */
-+	unsigned char mask[1] = { 0x04 }; /* bits: 2 */
++	/* Bit 3 set (Rel Vert Scroll), value +1.0 → vertical wheel up */
++	unsigned char mask[1] = { 0x08 }; /* bit 3 */
 +	double values[1] = { 1.0 };
 +
 +	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
@@ -2979,8 +2979,8 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +	xfc.common.context.input = &input;
 +	mouse_events = (mouse_capture){ 0 };
 +
-+	/* Bit 2 set, value -1.0 → vertical wheel down */
-+	unsigned char mask[1] = { 0x04 };
++	/* Bit 3 set, value -1.0 → vertical wheel down */
++	unsigned char mask[1] = { 0x08 };
 +	double values[1] = { -1.0 };
 +
 +	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
@@ -3006,8 +3006,8 @@ Index: src/client/X11/test/TestXfInputDispatcher.c
 +	xfc.common.context.input = &input;
 +	mouse_events = (mouse_capture){ 0 };
 +
-+	/* Bit 3 set (RelHorizWheel), value +1.0 → horizontal wheel */
-+	unsigned char mask[1] = { 0x08 };
++	/* Bit 2 set (Rel Horiz Scroll), value +1.0 → horizontal wheel */
++	unsigned char mask[1] = { 0x04 };
 +	double values[1] = { 1.0 };
 +
 +	xf_input_send_wheel_from_valuators(&xfc, mask, 1, values);
