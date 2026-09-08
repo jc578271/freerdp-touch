@@ -227,7 +227,287 @@ Index: src/client/X11/xf_event.c
 ===================================================================
 --- src.orig/client/X11/xf_event.c
 +++ src/client/X11/xf_event.c
-@@ -709,6 +709,7 @@ static BOOL xf_event_FocusOut(xfContext*
+@@ -24,6 +24,8 @@
+ #include <X11/Xutil.h>
+ 
+ #include <string.h>
++#include <stdlib.h>
++#include <stdint.h>
+ #include <math.h>
+ 
+ #include <winpr/assert.h>
+@@ -326,6 +328,222 @@ void xf_adjust_coordinates_to_screen(xfC
+ 	*y = (UINT32)ty;
+ }
+ 
++static BOOL xf_pointer_parse_speed(const char* value, UINT32* percent)
++{
++	size_t len = 0;
++	UINT32 parsed = 0;
++
++	if (!value || !percent)
++		return FALSE;
++
++	len = strlen(value);
++	if (len < 2 || len > 3 || value[0] == '0')
++		return FALSE;
++
++	for (size_t i = 0; i < len; i++)
++	{
++		if (value[i] < '0' || value[i] > '9')
++			return FALSE;
++		parsed = parsed * 10 + (UINT32)(value[i] - '0');
++	}
++
++	if (parsed < 10 || parsed > 200)
++		return FALSE;
++
++	*percent = parsed;
++	return TRUE;
++}
++
++static INT64 xf_pointer_i64_abs(INT64 v)
++{
++	return (v < 0) ? -v : v;
++}
++
++static INT64 xf_pointer_gcd(INT64 a, INT64 b)
++{
++	a = xf_pointer_i64_abs(a);
++	b = xf_pointer_i64_abs(b);
++	while (b)
++	{
++		const INT64 t = b;
++		b = a % b;
++		a = t;
++	}
++	return a;
++}
++
++BOOL xf_pointer_map_coordinates(int* x, int* y, const rdpMonitor* monitors, UINT32 nmonitors,
++                                const RECTANGLE_16* crtcs)
++{
++	int px = 0;
++	int py = 0;
++	INT64 bestDist = 0;
++	int bestIndex = -1;
++	int hit = -1;
++
++	if (!x || !y || !monitors || !crtcs || nmonitors < 2)
++		return FALSE;
++
++	px = *x;
++	py = *y;
++
++	for (UINT32 i = 0; i < nmonitors; i++)
++	{
++		const int left = (int)crtcs[i].left;
++		const int top = (int)crtcs[i].top;
++		const int right = (int)crtcs[i].right;
++		const int bottom = (int)crtcs[i].bottom;
++
++		if (px >= left && px <= right && py >= top && py <= bottom)
++		{
++			hit = (int)i;
++			break;
++		}
++
++		{
++			int cx = px;
++			int cy = py;
++			INT64 dx = 0;
++			INT64 dy = 0;
++			INT64 dist = 0;
++
++			if (cx < left)
++				cx = left;
++			else if (cx > right)
++				cx = right;
++			if (cy < top)
++				cy = top;
++			else if (cy > bottom)
++				cy = bottom;
++
++			dx = (INT64)px - cx;
++			dy = (INT64)py - cy;
++			dist = dx * dx + dy * dy;
++			if (bestIndex < 0 || dist < bestDist)
++			{
++				bestDist = dist;
++				bestIndex = (int)i;
++			}
++		}
++	}
++
++	if (hit < 0)
++		hit = bestIndex;
++	if (hit < 0)
++		return FALSE;
++
++	{
++		const RECTANGLE_16* crtc = &crtcs[hit];
++		const rdpMonitor* mon = &monitors[hit];
++		const int crtcW = (int)crtc->right - (int)crtc->left + 1;
++		const int crtcH = (int)crtc->bottom - (int)crtc->top + 1;
++		int lx = px - (int)crtc->left;
++		int ly = py - (int)crtc->top;
++
++		if (lx < 0)
++			lx = 0;
++		if (ly < 0)
++			ly = 0;
++		if (crtcW > 0 && lx >= crtcW)
++			lx = crtcW - 1;
++		if (crtcH > 0 && ly >= crtcH)
++			ly = crtcH - 1;
++
++		if (crtcW > 0 && crtcH > 0 && (crtcW != mon->width || crtcH != mon->height))
++		{
++			lx = (int)(((INT64)lx * mon->width) / crtcW);
++			ly = (int)(((INT64)ly * mon->height) / crtcH);
++			if (mon->width > 0 && lx >= mon->width)
++				lx = mon->width - 1;
++			if (mon->height > 0 && ly >= mon->height)
++				ly = mon->height - 1;
++		}
++
++		*x = mon->x + lx;
++		*y = mon->y + ly;
++	}
++
++	return TRUE;
++}
++
++BOOL xf_pointer_scale_accel(int orig_num, int orig_den, UINT32 percent, int* out_num,
++                            int* out_den)
++{
++	INT64 n = 0;
++	INT64 d = 0;
++	INT64 g = 0;
++
++	if (!out_num || !out_den || orig_num <= 0 || orig_den <= 0 || percent == 0)
++		return FALSE;
++
++	n = (INT64)orig_num * (INT64)percent;
++	d = (INT64)orig_den * 100;
++	g = xf_pointer_gcd(n, d);
++	if (g <= 0)
++		return FALSE;
++	n /= g;
++	d /= g;
++	if (n <= 0 || d <= 0 || n > INT32_MAX || d > INT32_MAX)
++		return FALSE;
++
++	*out_num = (int)n;
++	*out_den = (int)d;
++	return TRUE;
++}
++
++double xf_pointer_libinput_accel(UINT32 percent)
++{
++	double v = ((double)percent - 100.0) / 100.0;
++
++	if (v < -1.0)
++		return -1.0;
++	if (v > 1.0)
++		return 1.0;
++	return v;
++}
++
++BOOL xf_pointer_resolve_external_speed(const rdpMonitor* monitors, UINT32 nmonitors,
++                                       UINT32* percent)
++{
++	const char* value = NULL;
++	UINT32 primary = 0;
++	UINT32 secondary = 0;
++	BOOL havePrimary = FALSE;
++	BOOL haveSecondary = FALSE;
++
++	if (!monitors || !percent || nmonitors < 2)
++		return FALSE;
++
++	value = getenv("FREERDP_EXTERNAL_POINTER_SPEED");
++	if (value && value[0] != '\0')
++		return xf_pointer_parse_speed(value, percent);
++
++	for (UINT32 i = 0; i < nmonitors; i++)
++	{
++		if (monitors[i].is_primary)
++		{
++			primary = monitors[i].attributes.desktopScaleFactor;
++			havePrimary = TRUE;
++		}
++		else if (!haveSecondary)
++		{
++			secondary = monitors[i].attributes.desktopScaleFactor;
++			haveSecondary = TRUE;
++		}
++	}
++
++	if (!havePrimary || !haveSecondary || primary == 0)
++		return FALSE;
++
++	{
++		const UINT32 derived = (100u * secondary) / primary;
++		if (derived < 10 || derived > 200)
++			return FALSE;
++		*percent = derived;
++		return TRUE;
++	}
++}
++
+ void xf_event_adjust_coordinates(xfContext* xfc, int* x, int* y)
+ {
+ 	if (!xfc || !xfc->common.context.settings || !y || !x)
+@@ -337,12 +555,41 @@ void xf_event_adjust_coordinates(xfConte
+ 		rdpSettings* settings = xfc->common.context.settings;
+ 		if (xf_picture_transform_required(xfc))
+ 		{
+-			double xScalingFactor = freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth) /
+-			                        (double)xfc->scaledWidth;
+-			double yScalingFactor = freerdp_settings_get_uint32(settings, FreeRDP_DesktopHeight) /
+-			                        (double)xfc->scaledHeight;
+-			*x = (int)((*x - xfc->offset_x) * xScalingFactor);
+-			*y = (int)((*y - xfc->offset_y) * yScalingFactor);
++			BOOL mapped = FALSE;
++			const UINT32 nmonitors = freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount);
++			const rdpMonitor* monitors =
++			    freerdp_settings_get_pointer(settings, FreeRDP_MonitorDefArray);
++
++			if (nmonitors > 1 && nmonitors <= 16 && monitors && xfc->vscreen.monitors)
++			{
++				RECTANGLE_16 crtcs[16] = { 0 };
++				BOOL have = TRUE;
++
++				for (UINT32 i = 0; i < nmonitors; i++)
++				{
++					const UINT32 orig = monitors[i].orig_screen;
++					if (orig >= xfc->vscreen.nmonitors)
++					{
++						have = FALSE;
++						break;
++					}
++					crtcs[i] = xfc->vscreen.monitors[orig].area;
++				}
++				if (have)
++					mapped = xf_pointer_map_coordinates(x, y, monitors, nmonitors, crtcs);
++			}
++
++			if (!mapped)
++			{
++				double xScalingFactor =
++				    freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth) /
++				    (double)xfc->scaledWidth;
++				double yScalingFactor =
++				    freerdp_settings_get_uint32(settings, FreeRDP_DesktopHeight) /
++				    (double)xfc->scaledHeight;
++				*x = (int)((*x - xfc->offset_x) * xScalingFactor);
++				*y = (int)((*y - xfc->offset_y) * yScalingFactor);
++			}
+ 		}
+ 
+ #endif
+@@ -709,6 +956,7 @@ static BOOL xf_event_FocusOut(xfContext*
  		XUngrabKeyboard(xfc->display, CurrentTime);
  
  	xf_keyboard_release_all_keypress(xfc);
@@ -235,7 +515,7 @@ Index: src/client/X11/xf_event.c
  	if (app)
  		xf_rail_send_activate(xfc, event->window, FALSE);
  
-@@ -839,6 +840,8 @@ static BOOL xf_event_ConfigureNotify(xfC
+@@ -839,6 +1087,8 @@ static BOOL xf_event_ConfigureNotify(xfC
  
  		if (xfc->window->width != event->width || xfc->window->height != event->height)
  		{
@@ -244,7 +524,7 @@ Index: src/client/X11/xf_event.c
  			xfc->window->width = event->width;
  			xfc->window->height = event->height;
  #ifdef WITH_XRENDER
-@@ -949,7 +952,10 @@ static BOOL xf_event_UnmapNotify(xfConte
+@@ -949,7 +1199,10 @@ static BOOL xf_event_UnmapNotify(xfConte
  	WINPR_ASSERT(event);
  
  	if (!app)
@@ -259,7 +539,14 @@ Index: src/client/X11/xf_input.c
 ===================================================================
 --- src.orig/client/X11/xf_input.c
 +++ src/client/X11/xf_input.c
-@@ -39,6 +39,8 @@
+@@ -33,12 +33,15 @@
+ #include <math.h>
+ #include <float.h>
+ #include <limits.h>
++#include <string.h>
+ 
+ #include "xf_event.h"
+ #include "xf_input.h"
  #include "xf_utils.h"
  
  #include <winpr/assert.h>
@@ -268,7 +555,7 @@ Index: src/client/X11/xf_input.c
  #include <winpr/wtypes.h>
  #include <freerdp/log.h>
  #define TAG CLIENT_TAG("x11")
-@@ -50,6 +52,34 @@
+@@ -50,6 +53,34 @@
  
  #define MIN_FINGER_DIST 5
  
@@ -303,7 +590,7 @@ Index: src/client/X11/xf_input.c
  static int xf_input_event(xfContext* xfc, WINPR_ATTR_UNUSED const XEvent* xevent,
                            XIDeviceEvent* event, int evtype);
  
-@@ -99,6 +129,29 @@ static BOOL register_input_events(xfCont
+@@ -99,6 +130,29 @@ static BOOL register_input_events(xfCont
  		if (strcmp(dev->name, "Virtual core pointer") == 0)
  			continue;
  
@@ -333,7 +620,7 @@ Index: src/client/X11/xf_input.c
  		for (int j = 0; j < dev->num_classes; j++)
  		{
  			const XIAnyClassInfo* class = dev->classes[j];
-@@ -106,7 +159,8 @@ static BOOL register_input_events(xfCont
+@@ -106,7 +160,8 @@ static BOOL register_input_events(xfCont
  			switch (class->type)
  			{
  				case XITouchClass:
@@ -343,7 +630,7 @@ Index: src/client/X11/xf_input.c
  					{
  						const XITouchClassInfo* t = (const XITouchClassInfo*)class;
  						if (t->mode == XIDirectTouch)
-@@ -119,12 +173,21 @@ static BOOL register_input_events(xfCont
+@@ -119,12 +174,21 @@ static BOOL register_input_events(xfCont
  							XISetMask(masks[nmasks], XI_TouchBegin);
  							XISetMask(masks[nmasks], XI_TouchUpdate);
  							XISetMask(masks[nmasks], XI_TouchEnd);
@@ -365,7 +652,7 @@ Index: src/client/X11/xf_input.c
  					WLog_DBG(TAG, "%s button device (id: %d, mode: %d)", dev->name, dev->deviceid,
  					         t->num_buttons);
  					XISetMask(masks[nmasks], XI_ButtonPress);
-@@ -241,6 +304,54 @@ static BOOL register_device_events(xfCon
+@@ -241,6 +305,54 @@ static BOOL register_device_events(xfCon
  	return TRUE;
  }
  
@@ -420,7 +707,7 @@ Index: src/client/X11/xf_input.c
  int xf_input_init(xfContext* xfc, Window window)
  {
  	int major = XI_2_Major;
-@@ -256,6 +367,51 @@ int xf_input_init(xfContext* xfc, Window
+@@ -256,6 +368,51 @@ int xf_input_init(xfContext* xfc, Window
  	xfc->px_vector = 0;
  	xfc->py_vector = 0;
  	xfc->active_contacts = 0;
@@ -472,7 +759,7 @@ Index: src/client/X11/xf_input.c
  
  	if (!XQueryExtension(xfc->display, "XInputExtension", &opcode, &event, &error))
  	{
-@@ -282,6 +438,28 @@ int xf_input_init(xfContext* xfc, Window
+@@ -282,6 +439,28 @@ int xf_input_init(xfContext* xfc, Window
  			return -1;
  		if (!register_device_events(xfc, window))
  			return -1;
@@ -501,7 +788,7 @@ Index: src/client/X11/xf_input.c
  	}
  
  	return 0;
-@@ -638,6 +816,832 @@ static void xf_input_show_cursor(xfConte
+@@ -638,6 +817,832 @@ static void xf_input_show_cursor(xfConte
  #endif
  }
  
@@ -1334,7 +1621,7 @@ Index: src/client/X11/xf_input.c
  static int xf_input_touch_remote(xfContext* xfc, XIDeviceEvent* event, int evtype)
  {
  	int x = 0;
-@@ -645,31 +1649,275 @@ static int xf_input_touch_remote(xfConte
+@@ -645,31 +1650,275 @@ static int xf_input_touch_remote(xfConte
  	int touchId = 0;
  	RdpeiClientContext* rdpei = xfc->common.rdpei;
  
@@ -1621,7 +1908,7 @@ Index: src/client/X11/xf_input.c
  }
  
  static BOOL xf_input_pen_remote(xfContext* xfc, XIDeviceEvent* event, int evtype, int deviceid)
-@@ -754,6 +2002,52 @@ static bool xf_use_rel_mouse(xfContext*
+@@ -754,6 +2003,179 @@ static bool xf_use_rel_mouse(xfContext*
  	return true;
  }
  
@@ -1671,13 +1958,141 @@ Index: src/client/X11/xf_input.c
 +	}
 +}
 +
++static int xf_pointer_core_device_id(xfContext* xfc)
++{
++	int ndevices = 0;
++	XIDeviceInfo* info = NULL;
++
++	if (xfc->pointerCoreDeviceId != 0)
++		return xfc->pointerCoreDeviceId;
++
++	info = XIQueryDevice(xfc->display, XIAllDevices, &ndevices);
++	if (!info)
++	{
++		xfc->pointerCoreDeviceId = -1;
++		return -1;
++	}
++
++	xfc->pointerCoreDeviceId = -1;
++	for (int i = 0; i < ndevices; i++)
++	{
++		if (info[i].name && strcmp(info[i].name, "Virtual core pointer") == 0)
++		{
++			xfc->pointerCoreDeviceId = info[i].deviceid;
++			break;
++		}
++	}
++	XIFreeDeviceInfo(info);
++	return xfc->pointerCoreDeviceId;
++}
++
++static void xf_pointer_set_libinput_speed(xfContext* xfc, double speed)
++{
++	Atom accel = None;
++	Atom float_atom = None;
++	int deviceid = 0;
++	float value = 0.0f;
++
++	deviceid = xf_pointer_core_device_id(xfc);
++	if (deviceid <= 0)
++		return;
++
++	accel = XInternAtom(xfc->display, "libinput Accel Speed", True);
++	float_atom = XInternAtom(xfc->display, "FLOAT", True);
++	if (accel == None || float_atom == None)
++		return;
++
++	value = (float)speed;
++	XIChangeProperty(xfc->display, deviceid, accel, float_atom, 32, PropModeReplace,
++	                 (unsigned char*)&value, 1);
++}
++
++static void xf_pointer_sync_accel(xfContext* xfc, int x, int y)
++{
++	rdpSettings* settings = NULL;
++	const rdpMonitor* monitors = NULL;
++	UINT32 nmonitors = 0;
++	int hit = -1;
++
++	if (!xfc || !xfc->display || !xfc->common.context.settings)
++		return;
++
++	settings = xfc->common.context.settings;
++	nmonitors = freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount);
++	if (nmonitors < 2 || nmonitors > 16)
++		return;
++
++	monitors = freerdp_settings_get_pointer(settings, FreeRDP_MonitorDefArray);
++	if (!monitors || !xfc->vscreen.monitors)
++		return;
++
++	for (UINT32 i = 0; i < nmonitors; i++)
++	{
++		const UINT32 orig = monitors[i].orig_screen;
++		const RECTANGLE_16* area = NULL;
++		if (orig >= xfc->vscreen.nmonitors)
++			return;
++		area = &xfc->vscreen.monitors[orig].area;
++		if (x >= (int)area->left && x <= (int)area->right && y >= (int)area->top &&
++		    y <= (int)area->bottom)
++		{
++			hit = (int)i;
++			break;
++		}
++	}
++	if (hit < 0)
++		return;
++
++	if (xfc->pointerAccelHaveLast && xfc->pointerLastCrtc == hit)
++		return;
++
++	if (!xfc->pointerAccelCached)
++	{
++		XGetPointerControl(xfc->display, &xfc->pointerAccelNum, &xfc->pointerAccelDen,
++		                   &xfc->pointerAccelThreshold);
++		if (xfc->pointerAccelNum <= 0 || xfc->pointerAccelDen <= 0)
++			return;
++		xfc->pointerAccelCached = TRUE;
++	}
++
++	if (!xfc->pointerSpeedResolved)
++	{
++		xfc->pointerSpeedValid =
++		    xf_pointer_resolve_external_speed(monitors, nmonitors, &xfc->pointerSpeedPercent);
++		xfc->pointerSpeedResolved = TRUE;
++	}
++	if (!xfc->pointerSpeedValid)
++		return;
++
++	if (monitors[hit].is_primary)
++	{
++		XChangePointerControl(xfc->display, True, True, xfc->pointerAccelNum, xfc->pointerAccelDen,
++		                      xfc->pointerAccelThreshold);
++		xf_pointer_set_libinput_speed(xfc, 0.0);
++	}
++	else
++	{
++		int num = 0;
++		int den = 0;
++		if (!xf_pointer_scale_accel(xfc->pointerAccelNum, xfc->pointerAccelDen,
++		                            xfc->pointerSpeedPercent, &num, &den))
++			return;
++		XChangePointerControl(xfc->display, True, True, num, den, xfc->pointerAccelThreshold);
++		xf_pointer_set_libinput_speed(xfc, xf_pointer_libinput_accel(xfc->pointerSpeedPercent));
++	}
++
++	xfc->pointerLastCrtc = hit;
++	xfc->pointerAccelHaveLast = TRUE;
++}
++
  int xf_input_event(xfContext* xfc, WINPR_ATTR_UNUSED const XEvent* xevent, XIDeviceEvent* event,
                     int evtype)
  {
-@@ -790,6 +2084,11 @@ int xf_input_event(xfContext* xfc, WINPR
+@@ -790,6 +2212,12 @@ int xf_input_event(xfContext* xfc, WINPR
  			{
  				xf_generic_MotionNotify(xfc, (int)event->event_x, (int)event->event_y,
  				                        event->detail, event->event, xfc->remote_app);
++				xf_pointer_sync_accel(xfc, (int)event->event_x, (int)event->event_y);
 +				/* Physical mouse wheel delivers Rel Horiz/Vert Scroll valuators here
 +				 * (not discrete Button4/5 for XI 2.1+). Convert to existing wheel detents. */
 +				xf_input_send_wheel_from_valuators(xfc, event->valuators.mask,
@@ -1686,7 +2101,7 @@ Index: src/client/X11/xf_input.c
  			}
  			break;
  		case XI_RawButtonPress:
-@@ -817,6 +2116,10 @@ int xf_input_event(xfContext* xfc, WINPR
+@@ -817,6 +2245,10 @@ int xf_input_event(xfContext* xfc, WINPR
  					y = ev->raw_values[1];
  
  				xf_generic_RawMotionNotify(xfc, (int)x, (int)y, event->event, xfc->remote_app);
@@ -1697,7 +2112,7 @@ Index: src/client/X11/xf_input.c
  			}
  			break;
  		case XI_DeviceChanged:
-@@ -862,8 +2165,98 @@ static int xf_input_handle_event_remote(
+@@ -862,8 +2294,98 @@ static int xf_input_handle_event_remote(
  
  	if ((cookie.cc->type == GenericEvent) && (cookie.cc->extension == xfc->XInputOpcode))
  	{
@@ -1796,7 +2211,7 @@ Index: src/client/X11/xf_input.c
  			case XI_TouchBegin:
  				xf_input_pens_unhover(xfc);
  				/* fallthrough */
-@@ -876,9 +2269,21 @@ static int xf_input_handle_event_remote(
+@@ -876,9 +2398,21 @@ static int xf_input_handle_event_remote(
  			case XI_Motion:
  			case XI_ButtonRelease:
  			{
@@ -1819,7 +2234,7 @@ Index: src/client/X11/xf_input.c
  
  				if (freerdp_client_is_pen(&xfc->common, deviceid))
  				{
-@@ -889,6 +2294,12 @@ static int xf_input_handle_event_remote(
+@@ -889,6 +2423,12 @@ static int xf_input_handle_event_remote(
  					}
  					break;
  				}
@@ -1832,7 +2247,7 @@ Index: src/client/X11/xf_input.c
  			}
  				/* fallthrough */
  				WINPR_FALLTHROUGH
-@@ -897,10 +2308,10 @@ static int xf_input_handle_event_remote(
+@@ -897,10 +2437,10 @@ static int xf_input_handle_event_remote(
  				xf_input_event(xfc, event, cookie.cc->data, cookie.cc->evtype);
  				break;
  		}
@@ -1844,7 +2259,7 @@ Index: src/client/X11/xf_input.c
  }
  
  #else
-@@ -910,6 +2321,14 @@ int xf_input_init(xfContext* xfc, Window
+@@ -910,6 +2450,14 @@ int xf_input_init(xfContext* xfc, Window
  	return 0;
  }
  
@@ -1859,7 +2274,7 @@ Index: src/client/X11/xf_input.c
  #endif
  
  int xf_input_handle_event(xfContext* xfc, const XEvent* event)
-@@ -921,7 +2340,8 @@ int xf_input_handle_event(xfContext* xfc
+@@ -921,7 +2469,8 @@ int xf_input_handle_event(xfContext* xfc
  	settings = xfc->common.context.settings;
  	WINPR_ASSERT(settings);
  
@@ -2177,7 +2592,7 @@ Index: src/client/X11/xfreerdp.h
  	touchContact contacts[MAX_CONTACTS];
  	int active_contacts;
  	int lastEvType;
-@@ -310,6 +312,51 @@ struct xf_context
+@@ -310,6 +312,61 @@ struct xf_context
  	double z_vector;
  	double px_vector;
  	double py_vector;
@@ -2226,6 +2641,16 @@ Index: src/client/X11/xfreerdp.h
 +	INT32 scrollAccum;
 +	double wheelLastVert;
 +	double wheelLastHoriz;
++	BOOL pointerAccelCached;
++	BOOL pointerAccelHaveLast;
++	BOOL pointerSpeedResolved;
++	BOOL pointerSpeedValid;
++	int pointerAccelNum;
++	int pointerAccelDen;
++	int pointerAccelThreshold;
++	int pointerLastCrtc;
++	UINT32 pointerSpeedPercent;
++	int pointerCoreDeviceId;
  #endif
  	BOOL xi_rawevent;
  	BOOL xi_event;
@@ -2422,7 +2847,7 @@ Index: src/client/X11/test/CMakeLists.txt
 ===================================================================
 --- /dev/null
 +++ src/client/X11/test/CMakeLists.txt
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,38 @@
 +set(MODULE_NAME "TestXfInputDispatcher")
 +
 +add_executable(${MODULE_NAME} TestXfInputDispatcher.c)
@@ -2450,6 +2875,17 @@ Index: src/client/X11/test/CMakeLists.txt
 +)
 +add_test(NAME ${SCALE_MODULE_NAME} COMMAND ${TESTING_OUTPUT_DIRECTORY}/${SCALE_MODULE_NAME})
 +set_property(TARGET ${SCALE_MODULE_NAME} PROPERTY FOLDER "FreeRDP/Client/X11/Test")
++
++set(POINTER_MODULE_NAME "TestXfPointerMap")
++
++add_executable(${POINTER_MODULE_NAME} TestXfPointerMap.c)
++target_include_directories(${POINTER_MODULE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
++target_link_libraries(${POINTER_MODULE_NAME} PRIVATE xfreerdp-client)
++set_target_properties(${POINTER_MODULE_NAME} PROPERTIES
++  RUNTIME_OUTPUT_DIRECTORY "${TESTING_OUTPUT_DIRECTORY}"
++)
++add_test(NAME ${POINTER_MODULE_NAME} COMMAND ${TESTING_OUTPUT_DIRECTORY}/${POINTER_MODULE_NAME})
++set_property(TARGET ${POINTER_MODULE_NAME} PROPERTY FOLDER "FreeRDP/Client/X11/Test")
 Index: src/client/X11/test/TestXfInputDispatcher.c
 ===================================================================
 --- /dev/null
@@ -3429,3 +3865,245 @@ Index: src/client/X11/xf_monitor.h
 +                                                   rdpMonitor* monitors, UINT32 nmonitors);
  
  #endif /* FREERDP_CLIENT_X11_MONITOR_H */
+Index: src/client/X11/test/TestXfPointerMap.c
+===================================================================
+--- /dev/null
++++ src/client/X11/test/TestXfPointerMap.c
+@@ -0,0 +1,218 @@
++#include <freerdp/settings.h>
++#include <freerdp/settings_types.h>
++#include <freerdp/types.h>
++
++#include <math.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "../xf_event.h"
++
++#define CHECK(condition, message) \
++	do \
++	{ \
++		if (!(condition)) \
++		{ \
++			(void)fprintf(stderr, "FAIL: %s\n", message); \
++			return 1; \
++		} \
++	} while (0)
++
++static void init_above_fixture(rdpMonitor monitors[2], RECTANGLE_16 crtcs[2])
++{
++	memset(monitors, 0, sizeof(rdpMonitor) * 2);
++	memset(crtcs, 0, sizeof(RECTANGLE_16) * 2);
++
++	/* External CRTC 1920x1080 at (0,0) — secondary remote monitor. */
++	monitors[0].x = 0;
++	monitors[0].y = 0;
++	monitors[0].width = 1920;
++	monitors[0].height = 1080;
++	monitors[0].is_primary = FALSE;
++	monitors[0].orig_screen = 0;
++	monitors[0].attributes.desktopScaleFactor = 100;
++	crtcs[0].left = 0;
++	crtcs[0].top = 0;
++	crtcs[0].right = 1919;
++	crtcs[0].bottom = 1079;
++
++	/* OneMix primary CRTC 2560x1600 at (0,1080). */
++	monitors[1].x = 0;
++	monitors[1].y = 1080;
++	monitors[1].width = 2560;
++	monitors[1].height = 1600;
++	monitors[1].is_primary = TRUE;
++	monitors[1].orig_screen = 1;
++	monitors[1].attributes.desktopScaleFactor = 200;
++	crtcs[1].left = 0;
++	crtcs[1].top = 1080;
++	crtcs[1].right = 2559;
++	crtcs[1].bottom = 2679;
++}
++
++static int point_on_monitor(int x, int y, const rdpMonitor* mon)
++{
++	return x >= mon->x && x < mon->x + mon->width && y >= mon->y && y < mon->y + mon->height;
++}
++
++static int test_above_fixture(void)
++{
++	rdpMonitor monitors[2];
++	RECTANGLE_16 crtcs[2];
++	int x = 0;
++	int y = 0;
++	const int global_y = (int)(1080.0 * 1600.0 / 2680.0);
++
++	init_above_fixture(monitors, crtcs);
++
++	/* Today's global y factor 1600/2680 maps OneMix y=1080 to 644 (still external). */
++	CHECK(global_y == 644, "document current global squash mapping OneMix y=1080 to 644");
++
++	x = 100;
++	y = 1080;
++	CHECK(xf_pointer_map_coordinates(&x, &y, monitors, 2, crtcs), "map OneMix CRTC point");
++	CHECK(point_on_monitor(x, y, &monitors[1]), "OneMix CRTC point stays on primary rdpMonitor");
++	CHECK(!point_on_monitor(x, y, &monitors[0]), "OneMix CRTC point is not on secondary rdpMonitor");
++
++	x = 100;
++	y = 100;
++	CHECK(xf_pointer_map_coordinates(&x, &y, monitors, 2, crtcs), "map external CRTC point");
++	CHECK(point_on_monitor(x, y, &monitors[0]), "external CRTC point stays on secondary rdpMonitor");
++	CHECK(!point_on_monitor(x, y, &monitors[1]), "external CRTC point is not on primary rdpMonitor");
++
++	return 0;
++}
++
++static int test_shared_edge(void)
++{
++	rdpMonitor monitors[2];
++	RECTANGLE_16 crtcs[2];
++	int x = 0;
++	int y = 0;
++
++	init_above_fixture(monitors, crtcs);
++
++	x = 200;
++	y = 1080;
++	CHECK(xf_pointer_map_coordinates(&x, &y, monitors, 2, crtcs), "map OneMix side of shared edge");
++	CHECK(point_on_monitor(x, y, &monitors[1]), "OneMix side of shared edge maps to primary");
++
++	x = 200;
++	y = 1079;
++	CHECK(xf_pointer_map_coordinates(&x, &y, monitors, 2, crtcs), "map external side of shared edge");
++	CHECK(point_on_monitor(x, y, &monitors[0]), "external side of shared edge maps to secondary");
++
++	return 0;
++}
++
++static int test_scale_accel(void)
++{
++	int num = 0;
++	int den = 0;
++
++	CHECK(xf_pointer_scale_accel(2, 1, 100, &num, &den), "scale accel 100%");
++	CHECK(num == 2 && den == 1, "orig 2/1 at 100% stays 2/1");
++
++	CHECK(xf_pointer_scale_accel(2, 1, 50, &num, &den), "scale accel 50%");
++	CHECK(num == 1 && den == 1, "orig 2/1 at 50% reduces to 1/1");
++
++	CHECK(xf_pointer_scale_accel(2, 1, 10, &num, &den), "scale accel 10%");
++	CHECK(num == 1 && den == 5, "orig 2/1 at 10% reduces to 1/5");
++
++	return 0;
++}
++
++static int test_libinput_accel(void)
++{
++	CHECK(fabs(xf_pointer_libinput_accel(100) - 0.0) < 1e-9, "libinput 100 -> 0.0");
++	CHECK(fabs(xf_pointer_libinput_accel(50) - (-0.5)) < 1e-9, "libinput 50 -> -0.5");
++	CHECK(fabs(xf_pointer_libinput_accel(10) - (-0.9)) < 1e-9, "libinput 10 -> -0.9");
++	CHECK(fabs(xf_pointer_libinput_accel(200) - 1.0) < 1e-9, "libinput 200 -> 1.0");
++	return 0;
++}
++
++static int test_resolve_speed(void)
++{
++	rdpMonitor monitors[2];
++	RECTANGLE_16 crtcs[2];
++	UINT32 percent = 0;
++	UINT32 sentinel = 0;
++
++	init_above_fixture(monitors, crtcs);
++	unsetenv("FREERDP_EXTERNAL_POINTER_SPEED");
++	percent = 0;
++	CHECK(xf_pointer_resolve_external_speed(monitors, 2, &percent), "absent env derives speed");
++	CHECK(percent == 50, "absent env with 200/100 derives 50");
++
++	(void)setenv("FREERDP_EXTERNAL_POINTER_SPEED", "", 1);
++	percent = 0;
++	CHECK(xf_pointer_resolve_external_speed(monitors, 2, &percent), "empty env derives speed");
++	CHECK(percent == 50, "empty env with 200/100 derives 50");
++
++	(void)setenv("FREERDP_EXTERNAL_POINTER_SPEED", "80", 1);
++	percent = 0;
++	CHECK(xf_pointer_resolve_external_speed(monitors, 2, &percent), "canonical 80 accepted");
++	CHECK(percent == 80, "canonical 80 stored");
++
++	sentinel = 12345;
++	percent = sentinel;
++	(void)setenv("FREERDP_EXTERNAL_POINTER_SPEED", "080", 1);
++	CHECK(!xf_pointer_resolve_external_speed(monitors, 2, &percent), "leading-zero rejected");
++	CHECK(percent == sentinel, "leading-zero leaves out-param");
++
++	percent = sentinel;
++	(void)setenv("FREERDP_EXTERNAL_POINTER_SPEED", "14x", 1);
++	CHECK(!xf_pointer_resolve_external_speed(monitors, 2, &percent), "non-digit rejected");
++	CHECK(percent == sentinel, "non-digit leaves out-param");
++
++	percent = sentinel;
++	(void)setenv("FREERDP_EXTERNAL_POINTER_SPEED", "9", 1);
++	CHECK(!xf_pointer_resolve_external_speed(monitors, 2, &percent), "9 rejected");
++	CHECK(percent == sentinel, "9 leaves out-param");
++
++	percent = sentinel;
++	(void)setenv("FREERDP_EXTERNAL_POINTER_SPEED", "201", 1);
++	CHECK(!xf_pointer_resolve_external_speed(monitors, 2, &percent), "201 rejected");
++	CHECK(percent == sentinel, "201 leaves out-param");
++
++	unsetenv("FREERDP_EXTERNAL_POINTER_SPEED");
++	return 0;
++}
++
++static int test_single_monitor(void)
++{
++	rdpMonitor monitors[1];
++	RECTANGLE_16 crtcs[1];
++	int x = 42;
++	int y = 99;
++	UINT32 percent = 7;
++
++	memset(monitors, 0, sizeof(monitors));
++	memset(crtcs, 0, sizeof(crtcs));
++	monitors[0].is_primary = TRUE;
++	monitors[0].width = 2560;
++	monitors[0].height = 1600;
++	crtcs[0].right = 2559;
++	crtcs[0].bottom = 1599;
++
++	CHECK(!xf_pointer_map_coordinates(&x, &y, monitors, 1, crtcs),
++	      "single monitor leaves global XRender path");
++	CHECK(x == 42 && y == 99, "single monitor does not rewrite coordinates");
++	CHECK(!xf_pointer_resolve_external_speed(monitors, 1, &percent),
++	      "single monitor does not report an accel change");
++	CHECK(percent == 7, "single monitor leaves accel out-param");
++	return 0;
++}
++
++int main(void)
++{
++	CHECK(test_above_fixture() == 0, "above fixture mapping");
++	CHECK(test_shared_edge() == 0, "shared horizontal edge");
++	CHECK(test_scale_accel() == 0, "accel fraction cases");
++	CHECK(test_libinput_accel() == 0, "libinput mapping");
++	CHECK(test_resolve_speed() == 0, "env default/override/reject");
++	CHECK(test_single_monitor() == 0, "single-monitor fallback");
++	(void)puts("OK");
++	return 0;
++}
+Index: src/client/X11/xf_event.h
+===================================================================
+--- src.orig/client/X11/xf_event.h
++++ src/client/X11/xf_event.h
+@@ -37,6 +37,14 @@ void xf_event_SendClientEvent(xfContext*
+ void xf_event_adjust_coordinates(xfContext* xfc, int* x, int* y);
+ void xf_adjust_coordinates_to_screen(xfContext* xfc, UINT32* x, UINT32* y);
+ 
++BOOL xf_pointer_map_coordinates(int* x, int* y, const rdpMonitor* monitors, UINT32 nmonitors,
++                                const RECTANGLE_16* crtcs);
++BOOL xf_pointer_scale_accel(int orig_num, int orig_den, UINT32 percent, int* out_num,
++                            int* out_den);
++double xf_pointer_libinput_accel(UINT32 percent);
++BOOL xf_pointer_resolve_external_speed(const rdpMonitor* monitors, UINT32 nmonitors,
++                                       UINT32* percent);
++
+ BOOL xf_generic_MotionNotify(xfContext* xfc, int x, int y, int state, Window window, BOOL app);
+ BOOL xf_generic_RawMotionNotify(xfContext* xfc, int x, int y, Window window, BOOL app);
+ BOOL xf_generic_ButtonEvent(xfContext* xfc, int x, int y, int button, Window window, BOOL app,
