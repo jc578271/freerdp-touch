@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
-stopped_at: Completed quick task 260908-1fa
-last_updated: "2026-09-08T08:17:13+07:00"
+stopped_at: Resolved debug session external-scale-stays-200
+last_updated: "2026-09-08T09:50:17+07:00"
 last_activity: 2026-09-08
-last_activity_desc: "Completed quick task 260908-1fa: add independently configurable external monitor desktop scale"
+last_activity_desc: "Resolved debug session external-scale-stays-200: invoke per-monitor scale helper from xf_detect_monitors"
 progress:
   total_phases: 4
   completed_phases: 4
@@ -32,7 +32,7 @@ progress:
 Phase: 4 of 4 (Diagnostics, Packaging & Launch Configuration)
 Plan: 7 of 7 in current phase
 Status: Verification waiver recorded; technical evidence remains gaps_found; normal GSD phase/milestone closure pending
-Last activity: 2026-09-08 - Completed quick task 260908-1fa: add independently configurable external monitor desktop scale
+Last activity: 2026-09-08 - Resolved debug session external-scale-stays-200: invoke per-monitor scale helper from xf_detect_monitors
 
 Progress: [██████████] 100%
 
@@ -146,12 +146,12 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Last session:** 2026-09-08T08:17:13+07:00
-**Stopped at:** Completed quick task 260908-1fa
+**Last session:** 2026-09-08T09:50:17+07:00
+**Stopped at:** Resolved debug session external-scale-stays-200
 **Resume file:** None
 
-- **Last action**: Added per-monitor remote desktop scale metadata plus validated secondary-scale launcher handoff and regressions.
-- **Next action**: Run the pending native OneMix 3/native-X11 external-scale and OneMix-only hardware UAT before normal phase/milestone closure.
+- **Last action**: Invoked the per-monitor scale helper from `xf_detect_monitors` and rebuilt the four-package `+onemix1` closure so `xfreerdp3` reads `FREERDP_EXTERNAL_DESKTOP_SCALE`.
+- **Next action**: Reinstall the rebuilt bundle and confirm native-X11 Windows Display settings show 200% on OneMix and 100% on the external display.
 
 ---
 *State initialized: 2026-08-05*

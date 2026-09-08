@@ -4,6 +4,16 @@ Resolved debug sessions. Used by `gsd-debugger` to surface known-pattern hypothe
 
 ---
 
+## external-scale-stays-200 — Per-monitor helper never invoked, LTO dropped getenv
+- **Date:** 2026-09-08
+- **Error patterns:** external monitor remains 200%, FREERDP_EXTERNAL_DESKTOP_SCALE, /scale-desktop:200, /multimon, helper-only quilt hunk
+- **Root cause(s):** The quilt hunk that should have called `xf_monitor_apply_scale_attributes()` from `xf_detect_monitors()` never applied; the helper remained dead code, LTO removed `getenv("FREERDP_EXTERNAL_DESKTOP_SCALE")`, and Windows received only the global 200% scale.
+- **Fix:** Refresh the patch with a context-anchored helper call immediately before `freerdp_settings_set_monitor_def_array_sorted()`.
+- **Files changed:** patches/onemix-touch.patch, tests/patch_application_check.sh
+- **Why not caught:** `TestXfMonitorScale` called the helper directly and never asserted that `xf_detect_monitors` invoked it; quilt can report success while a zero-context hunk is skipped.
+- **Recurrence guard:** `tests/patch_application_check.sh` requires both the helper definition and a production call before monitor-array storage.
+---
+
 ## menu-startx-crash — Valid tty3 Xorg launch rejected by unrelated host Xwayland
 - **Date:** 2026-08-08
 - **Error patterns:** startx/Xorg error, menu option 3 exits before Windows RDP, Xwayland, Xorg display
