@@ -3041,3 +3041,104 @@ Index: freerdp3-3.15.0+dfsg/client/X11/test/TestXfMonitorScale.c
 +	(void)puts("OK");
 +	return 0;
 +}
+Index: freerdp3-3.15.0+dfsg/client/X11/xf_disp.c
+===================================================================
+--- freerdp3-3.15.0+dfsg.orig/client/X11/xf_disp.c
++++ freerdp3-3.15.0+dfsg/client/X11/xf_disp.c
+@@ -424,4 +424,2 @@
+-		layout->DesktopScaleFactor =
+-		    freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor);
+-		layout->DeviceScaleFactor =
+-		    freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor);
++		layout->DesktopScaleFactor = monitor->attributes.desktopScaleFactor;
++		layout->DeviceScaleFactor = monitor->attributes.deviceScaleFactor;
+Index: freerdp3-3.15.0+dfsg/client/X11/xf_monitor.c
+===================================================================
+--- freerdp3-3.15.0+dfsg.orig/client/X11/xf_monitor.c
++++ freerdp3-3.15.0+dfsg/client/X11/xf_monitor.c
+@@ -141,1 +141,72 @@
++static BOOL xf_monitor_parse_external_scale(const char* value, UINT32* scale)
++{
++	UINT32 parsed = 0;
++
++	if (!value || strlen(value) != 3 || value[0] == '0')
++		return FALSE;
++
++	for (size_t i = 0; i < 3; i++)
++	{
++		if (value[i] < '0' || value[i] > '9')
++			return FALSE;
++		parsed = parsed * 10 + (UINT32)(value[i] - '0');
++	}
++
++	if (parsed < 100 || parsed > 500)
++		return FALSE;
++
++	*scale = parsed;
++	return TRUE;
++}
++
++BOOL xf_monitor_apply_scale_attributes(rdpSettings* settings, rdpMonitor* monitors, UINT32 nmonitors)
++{
++	UINT32 desktopScale = 0;
++	UINT32 deviceScale = 0;
++	UINT32 externalScale = 0;
++	const char* externalValue = NULL;
++	BOOL hasOverride = FALSE;
++	BOOL primaryFound = FALSE;
++
++	if (!settings || !monitors || nmonitors == 0)
++		return FALSE;
++
++	desktopScale = freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor);
++	deviceScale = freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor);
++
++	if (nmonitors > 1)
++	{
++		externalValue = getenv("FREERDP_EXTERNAL_DESKTOP_SCALE");
++		if (externalValue)
++		{
++			if (!xf_monitor_parse_external_scale(externalValue, &externalScale))
++				return FALSE;
++			hasOverride = TRUE;
++		}
++
++		for (UINT32 i = 0; i < nmonitors; i++)
++		{
++			if (monitors[i].is_primary)
++			{
++				primaryFound = TRUE;
++				break;
++			}
++		}
++		if (!primaryFound)
++			return FALSE;
++	}
++
++	if (hasOverride && !freerdp_settings_set_bool(settings, FreeRDP_HasMonitorAttributes, TRUE))
++		return FALSE;
++
++	for (UINT32 i = 0; i < nmonitors; i++)
++	{
++		monitors[i].attributes.desktopScaleFactor =
++		    (monitors[i].is_primary || !hasOverride) ? desktopScale : externalScale;
++		monitors[i].attributes.deviceScaleFactor = deviceScale;
++	}
++
++	return TRUE;
++}
++
+ BOOL xf_detect_monitors(xfContext* xfc, UINT32* pMaxWidth, UINT32* pMaxHeight)
+
+@@ -628,0 +699,4 @@
++		if (!xf_monitor_apply_scale_attributes(
++		        settings, rdpmonitors, WINPR_ASSERTING_INT_CAST(UINT32, nmonitors)))
++			goto fail;
++
+Index: freerdp3-3.15.0+dfsg/client/X11/xf_monitor.h
+===================================================================
+--- freerdp3-3.15.0+dfsg.orig/client/X11/xf_monitor.h
++++ freerdp3-3.15.0+dfsg/client/X11/xf_monitor.h
+@@ -46,0 +46,2 @@
++FREERDP_API BOOL xf_monitor_apply_scale_attributes(rdpSettings* settings,
++                                                   rdpMonitor* monitors, UINT32 nmonitors);
