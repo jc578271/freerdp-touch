@@ -3045,18 +3045,27 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_disp.c
 ===================================================================
 --- freerdp3-3.15.0+dfsg.orig/client/X11/xf_disp.c
 +++ freerdp3-3.15.0+dfsg/client/X11/xf_disp.c
-@@ -424,4 +424,2 @@
+@@ -421,10 +421,8 @@ UINT xf_disp_sendLayout(DispClientContex
+ 				break;
+ 		}
+ 
 -		layout->DesktopScaleFactor =
 -		    freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor);
 -		layout->DeviceScaleFactor =
 -		    freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor);
 +		layout->DesktopScaleFactor = monitor->attributes.desktopScaleFactor;
 +		layout->DeviceScaleFactor = monitor->attributes.deviceScaleFactor;
+ 	}
+ 
+ 	ret = IFCALLRESULT(CHANNEL_RC_OK, disp->SendMonitorLayout, disp, nmonitors, layouts);
 Index: freerdp3-3.15.0+dfsg/client/X11/xf_monitor.c
 ===================================================================
 --- freerdp3-3.15.0+dfsg.orig/client/X11/xf_monitor.c
 +++ freerdp3-3.15.0+dfsg/client/X11/xf_monitor.c
-@@ -141,1 +141,72 @@
+@@ -138,6 +138,77 @@ static BOOL xf_is_monitor_id_active(xfCo
+ 	return FALSE;
+ }
+ 
 +static BOOL xf_monitor_parse_external_scale(const char* value, UINT32* scale)
 +{
 +	UINT32 parsed = 0;
@@ -3129,16 +3138,28 @@ Index: freerdp3-3.15.0+dfsg/client/X11/xf_monitor.c
 +}
 +
  BOOL xf_detect_monitors(xfContext* xfc, UINT32* pMaxWidth, UINT32* pMaxHeight)
-
-@@ -628,0 +699,4 @@
-+		if (!xf_monitor_apply_scale_attributes(
-+		        settings, rdpmonitors, WINPR_ASSERTING_INT_CAST(UINT32, nmonitors)))
-+			goto fail;
+ {
+ 	BOOL rc = FALSE;
+@@ -641,6 +712,10 @@ BOOL xf_detect_monitors(xfContext* xfc,
+ 			goto fail;
+ 	}
+ 
++	if (!xf_monitor_apply_scale_attributes(
++	        settings, rdpmonitors, WINPR_ASSERTING_INT_CAST(UINT32, nmonitors)))
++		goto fail;
 +
+ 	rc = freerdp_settings_set_monitor_def_array_sorted(settings, rdpmonitors, nmonitors);
+ 
+ fail:
 Index: freerdp3-3.15.0+dfsg/client/X11/xf_monitor.h
 ===================================================================
 --- freerdp3-3.15.0+dfsg.orig/client/X11/xf_monitor.h
 +++ freerdp3-3.15.0+dfsg/client/X11/xf_monitor.h
-@@ -46,0 +46,2 @@
+@@ -44,5 +44,7 @@ typedef struct
+ FREERDP_API int xf_list_monitors(xfContext* xfc);
+ FREERDP_API BOOL xf_detect_monitors(xfContext* xfc, UINT32* pWidth, UINT32* pHeight);
+ FREERDP_API void xf_monitors_free(xfContext* xfc);
 +FREERDP_API BOOL xf_monitor_apply_scale_attributes(rdpSettings* settings,
 +                                                   rdpMonitor* monitors, UINT32 nmonitors);
+ 
+ #endif /* FREERDP_CLIENT_X11_MONITOR_H */
