@@ -6,7 +6,7 @@ current_phase: 4
 current_phase_name: diagnostics-packaging-launch-configuration
 status: verifying
 stopped_at: Resolved debug session external-scale-stays-200
-last_updated: "2026-09-08T10:50:00+07:00"
+last_updated: "2026-09-08T05:27:24.366Z"
 last_activity: 2026-09-08
 last_activity_desc: "Completed quick task 260908-dyi: physical mouse wheel scrolls RDP under local-only touch"
 progress:
@@ -140,6 +140,7 @@ Progress: [██████████] 100%
 | 260907-x9e | Auto-detect the first connected private-X-server external output while preserving explicit overrides and OneMix touch mapping | 2026-09-07 | 6767470 | [260907-x9e-t-ng-ph-t-hi-n-m-n-h-nh-ngo-i-trong-scri](./quick/260907-x9e-t-ng-ph-t-hi-n-m-n-h-nh-ngo-i-trong-scri/) |
 | 260908-1fa | thêm param để scale riêng màn phụ | 2026-09-08 | 0de8802 | [260908-1fa-th-m-param-scale-ri-ng-m-n-ph](./quick/260908-1fa-th-m-param-scale-ri-ng-m-n-ph/) |
 | 260908-dyi | hiện tại khi tôi kết nối rdp mà cắm chuột, thì con lăn chuột lúc cuộn ko work | 2026-09-08 | fd3803f | [260908-dyi-hi-n-t-i-khi-t-i-k-t-n-i-rdp-m-c-m-chu-t](./quick/260908-dyi-hi-n-t-i-khi-t-i-k-t-n-i-rdp-m-c-m-chu-t/) |
+| 24 | update lại script menu, tôi muốn màn phụ nằm bên trên màn chính onemix | 2026-09-08 | a842267 | — |
 
 ### Research Flags (carried from research summary)
 
