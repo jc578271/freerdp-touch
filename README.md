@@ -248,9 +248,10 @@ argument; the launcher retains exactly one global `/scale-desktop:200`.
 #### Dual-monitor pointer speed
 
 The patched client keeps the original X pointer acceleration on the OneMix
-CRTC and scales only the external CRTC by `FREERDP_EXTERNAL_POINTER_SPEED`.
-When an external output is selected, that environment value defaults to 50
-(range 10 through 200, canonical whole percent, no leading zeros). It is
+CRTC and scales only the external CRTC by `FREERDP_EXTERNAL_POINTER_SPEED`
+as a linear `percent/100` displacement on relative pointer slaves (10 is
+0.1x travel). When an external output is selected, that environment value
+defaults to 50 (range 10 through 200, canonical whole percent, no leading zeros). It is
 environment metadata consumed by the patched client, not a FreeRDP CLI flag,
 and it combines with `FREERDP_EXTERNAL_DESKTOP_SCALE` without adding a second
 `/scale-desktop` argument. OneMix-only launches (`FREERDP_EXTERNAL_OUTPUT=`)

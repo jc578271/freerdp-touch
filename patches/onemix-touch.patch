@@ -236,7 +236,7 @@ Index: src/client/X11/xf_event.c
  #include <math.h>
  
  #include <winpr/assert.h>
-@@ -326,6 +328,222 @@ void xf_adjust_coordinates_to_screen(xfC
+@@ -326,6 +328,189 @@ void xf_adjust_coordinates_to_screen(xfC
  	*y = (UINT32)ty;
  }
  
@@ -264,24 +264,6 @@ Index: src/client/X11/xf_event.c
 +
 +	*percent = parsed;
 +	return TRUE;
-+}
-+
-+static INT64 xf_pointer_i64_abs(INT64 v)
-+{
-+	return (v < 0) ? -v : v;
-+}
-+
-+static INT64 xf_pointer_gcd(INT64 a, INT64 b)
-+{
-+	a = xf_pointer_i64_abs(a);
-+	b = xf_pointer_i64_abs(b);
-+	while (b)
-+	{
-+		const INT64 t = b;
-+		b = a % b;
-+		a = t;
-+	}
-+	return a;
 +}
 +
 +BOOL xf_pointer_map_coordinates(int* x, int* y, const rdpMonitor* monitors, UINT32 nmonitors,
@@ -378,40 +360,25 @@ Index: src/client/X11/xf_event.c
 +	return TRUE;
 +}
 +
-+BOOL xf_pointer_scale_accel(int orig_num, int orig_den, UINT32 percent, int* out_num,
-+                            int* out_den)
++BOOL xf_pointer_matrix_scale(UINT32 percent, float matrix[9])
 +{
-+	INT64 n = 0;
-+	INT64 d = 0;
-+	INT64 g = 0;
++	float s = 0.0f;
 +
-+	if (!out_num || !out_den || orig_num <= 0 || orig_den <= 0 || percent == 0)
++	if (!matrix || percent < 10 || percent > 200)
 +		return FALSE;
 +
-+	n = (INT64)orig_num * (INT64)percent;
-+	d = (INT64)orig_den * 100;
-+	g = xf_pointer_gcd(n, d);
-+	if (g <= 0)
-+		return FALSE;
-+	n /= g;
-+	d /= g;
-+	if (n <= 0 || d <= 0 || n > INT32_MAX || d > INT32_MAX)
-+		return FALSE;
-+
-+	*out_num = (int)n;
-+	*out_den = (int)d;
++	/* ponytail: uniform s/s/1 CTM; per-axis or translation if a device needs it */
++	s = (float)percent / 100.0f;
++	matrix[0] = s;
++	matrix[1] = 0.0f;
++	matrix[2] = 0.0f;
++	matrix[3] = 0.0f;
++	matrix[4] = s;
++	matrix[5] = 0.0f;
++	matrix[6] = 0.0f;
++	matrix[7] = 0.0f;
++	matrix[8] = 1.0f;
 +	return TRUE;
-+}
-+
-+double xf_pointer_libinput_accel(UINT32 percent)
-+{
-+	double v = ((double)percent - 100.0) / 100.0;
-+
-+	if (v < -1.0)
-+		return -1.0;
-+	if (v > 1.0)
-+		return 1.0;
-+	return v;
 +}
 +
 +BOOL xf_pointer_resolve_external_speed(const rdpMonitor* monitors, UINT32 nmonitors,
@@ -459,7 +426,7 @@ Index: src/client/X11/xf_event.c
  void xf_event_adjust_coordinates(xfContext* xfc, int* x, int* y)
  {
  	if (!xfc || !xfc->common.context.settings || !y || !x)
-@@ -337,12 +555,41 @@ void xf_event_adjust_coordinates(xfConte
+@@ -337,12 +522,41 @@ void xf_event_adjust_coordinates(xfConte
  		rdpSettings* settings = xfc->common.context.settings;
  		if (xf_picture_transform_required(xfc))
  		{
@@ -507,7 +474,7 @@ Index: src/client/X11/xf_event.c
  		}
  
  #endif
-@@ -709,6 +956,7 @@ static BOOL xf_event_FocusOut(xfContext*
+@@ -709,6 +923,7 @@ static BOOL xf_event_FocusOut(xfContext*
  		XUngrabKeyboard(xfc->display, CurrentTime);
  
  	xf_keyboard_release_all_keypress(xfc);
@@ -515,7 +482,7 @@ Index: src/client/X11/xf_event.c
  	if (app)
  		xf_rail_send_activate(xfc, event->window, FALSE);
  
-@@ -839,6 +1087,8 @@ static BOOL xf_event_ConfigureNotify(xfC
+@@ -839,6 +1054,8 @@ static BOOL xf_event_ConfigureNotify(xfC
  
  		if (xfc->window->width != event->width || xfc->window->height != event->height)
  		{
@@ -524,7 +491,7 @@ Index: src/client/X11/xf_event.c
  			xfc->window->width = event->width;
  			xfc->window->height = event->height;
  #ifdef WITH_XRENDER
-@@ -949,7 +1199,10 @@ static BOOL xf_event_UnmapNotify(xfConte
+@@ -949,7 +1166,10 @@ static BOOL xf_event_UnmapNotify(xfConte
  	WINPR_ASSERT(event);
  
  	if (!app)
@@ -1908,7 +1875,7 @@ Index: src/client/X11/xf_input.c
  }
  
  static BOOL xf_input_pen_remote(xfContext* xfc, XIDeviceEvent* event, int evtype, int deviceid)
-@@ -754,6 +2003,179 @@ static bool xf_use_rel_mouse(xfContext*
+@@ -754,6 +2003,190 @@ static bool xf_use_rel_mouse(xfContext*
  	return true;
  }
  
@@ -1958,53 +1925,79 @@ Index: src/client/X11/xf_input.c
 +	}
 +}
 +
-+static int xf_pointer_core_device_id(xfContext* xfc)
++static BOOL xf_pointer_slave_is_relative(const XIDeviceInfo* info)
++{
++	BOOL has_rel = FALSE;
++
++	if (!info || info->use != XISlavePointer || !info->enabled || !info->name)
++		return FALSE;
++	if (strstr(info->name, "XTEST"))
++		return FALSE;
++
++	for (int j = 0; j < info->num_classes; j++)
++	{
++		const XIAnyClassInfo* cls = info->classes[j];
++		if (!cls)
++			continue;
++		if (cls->type == XITouchClass)
++			return FALSE;
++		if (cls->type == XIValuatorClass)
++		{
++			const XIValuatorClassInfo* v = (const XIValuatorClassInfo*)cls;
++			if (v->mode == XIModeAbsolute)
++				return FALSE;
++			if (v->mode == XIModeRelative)
++				has_rel = TRUE;
++		}
++	}
++	return has_rel;
++}
++
++static BOOL xf_pointer_device_has_ctm(Display* dpy, int deviceid, Atom ctm)
++{
++	Atom actual_type = None;
++	int actual_format = 0;
++	unsigned long nitems = 0;
++	unsigned long bytes_after = 0;
++	unsigned char* data = NULL;
++	int rc = 0;
++
++	rc = XIGetProperty(dpy, deviceid, ctm, 0, 9, False, AnyPropertyType, &actual_type,
++	                   &actual_format, &nitems, &bytes_after, &data);
++	if (data)
++		XFree(data);
++	return rc == Success && actual_type != None && actual_format == 32 && nitems >= 9;
++}
++
++static void xf_pointer_apply_relative_scale(xfContext* xfc, float values[9])
 +{
 +	int ndevices = 0;
 +	XIDeviceInfo* info = NULL;
++	Atom ctm = None;
++	Atom float_atom = None;
 +
-+	if (xfc->pointerCoreDeviceId != 0)
-+		return xfc->pointerCoreDeviceId;
++	if (!xfc || !xfc->display || !values)
++		return;
++
++	ctm = XInternAtom(xfc->display, "Coordinate Transformation Matrix", True);
++	float_atom = XInternAtom(xfc->display, "FLOAT", True);
++	if (ctm == None || float_atom == None)
++		return;
 +
 +	info = XIQueryDevice(xfc->display, XIAllDevices, &ndevices);
 +	if (!info)
-+	{
-+		xfc->pointerCoreDeviceId = -1;
-+		return -1;
-+	}
++		return;
 +
-+	xfc->pointerCoreDeviceId = -1;
 +	for (int i = 0; i < ndevices; i++)
 +	{
-+		if (info[i].name && strcmp(info[i].name, "Virtual core pointer") == 0)
-+		{
-+			xfc->pointerCoreDeviceId = info[i].deviceid;
-+			break;
-+		}
++		if (!xf_pointer_slave_is_relative(&info[i]))
++			continue;
++		if (!xf_pointer_device_has_ctm(xfc->display, info[i].deviceid, ctm))
++			continue;
++		XIChangeProperty(xfc->display, info[i].deviceid, ctm, float_atom, 32, PropModeReplace,
++		                 (unsigned char*)values, 9);
 +	}
 +	XIFreeDeviceInfo(info);
-+	return xfc->pointerCoreDeviceId;
-+}
-+
-+static void xf_pointer_set_libinput_speed(xfContext* xfc, double speed)
-+{
-+	Atom accel = None;
-+	Atom float_atom = None;
-+	int deviceid = 0;
-+	float value = 0.0f;
-+
-+	deviceid = xf_pointer_core_device_id(xfc);
-+	if (deviceid <= 0)
-+		return;
-+
-+	accel = XInternAtom(xfc->display, "libinput Accel Speed", True);
-+	float_atom = XInternAtom(xfc->display, "FLOAT", True);
-+	if (accel == None || float_atom == None)
-+		return;
-+
-+	value = (float)speed;
-+	XIChangeProperty(xfc->display, deviceid, accel, float_atom, 32, PropModeReplace,
-+	                 (unsigned char*)&value, 1);
 +}
 +
 +static void xf_pointer_sync_accel(xfContext* xfc, int x, int y)
@@ -2013,6 +2006,7 @@ Index: src/client/X11/xf_input.c
 +	const rdpMonitor* monitors = NULL;
 +	UINT32 nmonitors = 0;
 +	int hit = -1;
++	float matrix[9];
 +
 +	if (!xfc || !xfc->display || !xfc->common.context.settings)
 +		return;
@@ -2046,15 +2040,6 @@ Index: src/client/X11/xf_input.c
 +	if (xfc->pointerAccelHaveLast && xfc->pointerLastCrtc == hit)
 +		return;
 +
-+	if (!xfc->pointerAccelCached)
-+	{
-+		XGetPointerControl(xfc->display, &xfc->pointerAccelNum, &xfc->pointerAccelDen,
-+		                   &xfc->pointerAccelThreshold);
-+		if (xfc->pointerAccelNum <= 0 || xfc->pointerAccelDen <= 0)
-+			return;
-+		xfc->pointerAccelCached = TRUE;
-+	}
-+
 +	if (!xfc->pointerSpeedResolved)
 +	{
 +		xfc->pointerSpeedValid =
@@ -2066,20 +2051,13 @@ Index: src/client/X11/xf_input.c
 +
 +	if (monitors[hit].is_primary)
 +	{
-+		XChangePointerControl(xfc->display, True, True, xfc->pointerAccelNum, xfc->pointerAccelDen,
-+		                      xfc->pointerAccelThreshold);
-+		xf_pointer_set_libinput_speed(xfc, 0.0);
-+	}
-+	else
-+	{
-+		int num = 0;
-+		int den = 0;
-+		if (!xf_pointer_scale_accel(xfc->pointerAccelNum, xfc->pointerAccelDen,
-+		                            xfc->pointerSpeedPercent, &num, &den))
++		if (!xf_pointer_matrix_scale(100, matrix))
 +			return;
-+		XChangePointerControl(xfc->display, True, True, num, den, xfc->pointerAccelThreshold);
-+		xf_pointer_set_libinput_speed(xfc, xf_pointer_libinput_accel(xfc->pointerSpeedPercent));
 +	}
++	else if (!xf_pointer_matrix_scale(xfc->pointerSpeedPercent, matrix))
++		return;
++
++	xf_pointer_apply_relative_scale(xfc, matrix);
 +
 +	xfc->pointerLastCrtc = hit;
 +	xfc->pointerAccelHaveLast = TRUE;
@@ -2088,7 +2066,7 @@ Index: src/client/X11/xf_input.c
  int xf_input_event(xfContext* xfc, WINPR_ATTR_UNUSED const XEvent* xevent, XIDeviceEvent* event,
                     int evtype)
  {
-@@ -790,6 +2212,12 @@ int xf_input_event(xfContext* xfc, WINPR
+@@ -790,6 +2223,12 @@ int xf_input_event(xfContext* xfc, WINPR
  			{
  				xf_generic_MotionNotify(xfc, (int)event->event_x, (int)event->event_y,
  				                        event->detail, event->event, xfc->remote_app);
@@ -2101,7 +2079,7 @@ Index: src/client/X11/xf_input.c
  			}
  			break;
  		case XI_RawButtonPress:
-@@ -817,6 +2245,10 @@ int xf_input_event(xfContext* xfc, WINPR
+@@ -817,6 +2256,10 @@ int xf_input_event(xfContext* xfc, WINPR
  					y = ev->raw_values[1];
  
  				xf_generic_RawMotionNotify(xfc, (int)x, (int)y, event->event, xfc->remote_app);
@@ -2112,7 +2090,7 @@ Index: src/client/X11/xf_input.c
  			}
  			break;
  		case XI_DeviceChanged:
-@@ -862,8 +2294,98 @@ static int xf_input_handle_event_remote(
+@@ -862,8 +2305,98 @@ static int xf_input_handle_event_remote(
  
  	if ((cookie.cc->type == GenericEvent) && (cookie.cc->extension == xfc->XInputOpcode))
  	{
@@ -2211,7 +2189,7 @@ Index: src/client/X11/xf_input.c
  			case XI_TouchBegin:
  				xf_input_pens_unhover(xfc);
  				/* fallthrough */
-@@ -876,9 +2398,21 @@ static int xf_input_handle_event_remote(
+@@ -876,9 +2409,21 @@ static int xf_input_handle_event_remote(
  			case XI_Motion:
  			case XI_ButtonRelease:
  			{
@@ -2234,7 +2212,7 @@ Index: src/client/X11/xf_input.c
  
  				if (freerdp_client_is_pen(&xfc->common, deviceid))
  				{
-@@ -889,6 +2423,12 @@ static int xf_input_handle_event_remote(
+@@ -889,6 +2434,12 @@ static int xf_input_handle_event_remote(
  					}
  					break;
  				}
@@ -2247,7 +2225,7 @@ Index: src/client/X11/xf_input.c
  			}
  				/* fallthrough */
  				WINPR_FALLTHROUGH
-@@ -897,10 +2437,10 @@ static int xf_input_handle_event_remote(
+@@ -897,10 +2448,10 @@ static int xf_input_handle_event_remote(
  				xf_input_event(xfc, event, cookie.cc->data, cookie.cc->evtype);
  				break;
  		}
@@ -2259,7 +2237,7 @@ Index: src/client/X11/xf_input.c
  }
  
  #else
-@@ -910,6 +2450,14 @@ int xf_input_init(xfContext* xfc, Window
+@@ -910,6 +2461,14 @@ int xf_input_init(xfContext* xfc, Window
  	return 0;
  }
  
@@ -2274,7 +2252,7 @@ Index: src/client/X11/xf_input.c
  #endif
  
  int xf_input_handle_event(xfContext* xfc, const XEvent* event)
-@@ -921,7 +2469,8 @@ int xf_input_handle_event(xfContext* xfc
+@@ -921,7 +2480,8 @@ int xf_input_handle_event(xfContext* xfc
  	settings = xfc->common.context.settings;
  	WINPR_ASSERT(settings);
  
@@ -2592,7 +2570,7 @@ Index: src/client/X11/xfreerdp.h
  	touchContact contacts[MAX_CONTACTS];
  	int active_contacts;
  	int lastEvType;
-@@ -310,6 +312,61 @@ struct xf_context
+@@ -310,6 +312,56 @@ struct xf_context
  	double z_vector;
  	double px_vector;
  	double py_vector;
@@ -2641,16 +2619,11 @@ Index: src/client/X11/xfreerdp.h
 +	INT32 scrollAccum;
 +	double wheelLastVert;
 +	double wheelLastHoriz;
-+	BOOL pointerAccelCached;
 +	BOOL pointerAccelHaveLast;
 +	BOOL pointerSpeedResolved;
 +	BOOL pointerSpeedValid;
-+	int pointerAccelNum;
-+	int pointerAccelDen;
-+	int pointerAccelThreshold;
 +	int pointerLastCrtc;
 +	UINT32 pointerSpeedPercent;
-+	int pointerCoreDeviceId;
  #endif
  	BOOL xi_rawevent;
  	BOOL xi_event;
@@ -3869,7 +3842,7 @@ Index: src/client/X11/test/TestXfPointerMap.c
 ===================================================================
 --- /dev/null
 +++ src/client/X11/test/TestXfPointerMap.c
-@@ -0,0 +1,218 @@
+@@ -0,0 +1,230 @@
 +#include <freerdp/settings.h>
 +#include <freerdp/settings_types.h>
 +#include <freerdp/types.h>
@@ -3978,29 +3951,42 @@ Index: src/client/X11/test/TestXfPointerMap.c
 +	return 0;
 +}
 +
-+static int test_scale_accel(void)
++static int matrix_is_scale(const float m[9], float s)
 +{
-+	int num = 0;
-+	int den = 0;
-+
-+	CHECK(xf_pointer_scale_accel(2, 1, 100, &num, &den), "scale accel 100%");
-+	CHECK(num == 2 && den == 1, "orig 2/1 at 100% stays 2/1");
-+
-+	CHECK(xf_pointer_scale_accel(2, 1, 50, &num, &den), "scale accel 50%");
-+	CHECK(num == 1 && den == 1, "orig 2/1 at 50% reduces to 1/1");
-+
-+	CHECK(xf_pointer_scale_accel(2, 1, 10, &num, &den), "scale accel 10%");
-+	CHECK(num == 1 && den == 5, "orig 2/1 at 10% reduces to 1/5");
-+
-+	return 0;
++	return fabs((double)m[0] - (double)s) < 1e-6 && fabs((double)m[4] - (double)s) < 1e-6 &&
++	       fabs((double)m[8] - 1.0) < 1e-6 && fabs((double)m[1]) < 1e-6 &&
++	       fabs((double)m[2]) < 1e-6 && fabs((double)m[3]) < 1e-6 && fabs((double)m[5]) < 1e-6 &&
++	       fabs((double)m[6]) < 1e-6 && fabs((double)m[7]) < 1e-6;
 +}
 +
-+static int test_libinput_accel(void)
++static int test_matrix_scale(void)
 +{
-+	CHECK(fabs(xf_pointer_libinput_accel(100) - 0.0) < 1e-9, "libinput 100 -> 0.0");
-+	CHECK(fabs(xf_pointer_libinput_accel(50) - (-0.5)) < 1e-9, "libinput 50 -> -0.5");
-+	CHECK(fabs(xf_pointer_libinput_accel(10) - (-0.9)) < 1e-9, "libinput 10 -> -0.9");
-+	CHECK(fabs(xf_pointer_libinput_accel(200) - 1.0) < 1e-9, "libinput 200 -> 1.0");
++	float m[9];
++	float ten[9];
++	float hundred[9];
++
++	CHECK(xf_pointer_matrix_scale(10, m), "scale 10 accepted");
++	CHECK(matrix_is_scale(m, 0.1f), "10% is 0.1x identity-scale CTM");
++
++	CHECK(xf_pointer_matrix_scale(50, m), "scale 50 accepted");
++	CHECK(matrix_is_scale(m, 0.5f), "50% is 0.5x");
++
++	CHECK(xf_pointer_matrix_scale(100, m), "scale 100 accepted");
++	CHECK(matrix_is_scale(m, 1.0f), "100% is identity");
++
++	CHECK(xf_pointer_matrix_scale(200, m), "scale 200 accepted");
++	CHECK(matrix_is_scale(m, 2.0f), "200% is 2.0x");
++
++	CHECK(xf_pointer_matrix_scale(10, ten), "scale 10 for linear contract");
++	CHECK(xf_pointer_matrix_scale(100, hundred), "scale 100 for linear contract");
++	CHECK(fabs((double)ten[0] * 10.0 - (double)hundred[0]) < 1e-6,
++	      "10% * 10 equals 100% (linear displacement)");
++	CHECK(fabs((double)ten[4] * 10.0 - (double)hundred[4]) < 1e-6,
++	      "10% * 10 equals 100% on Y");
++
++	CHECK(!xf_pointer_matrix_scale(9, m), "9 rejected");
++	CHECK(!xf_pointer_matrix_scale(201, m), "201 rejected");
++	CHECK(!xf_pointer_matrix_scale(100, NULL), "NULL matrix rejected");
 +	return 0;
 +}
 +
@@ -4081,8 +4067,7 @@ Index: src/client/X11/test/TestXfPointerMap.c
 +{
 +	CHECK(test_above_fixture() == 0, "above fixture mapping");
 +	CHECK(test_shared_edge() == 0, "shared horizontal edge");
-+	CHECK(test_scale_accel() == 0, "accel fraction cases");
-+	CHECK(test_libinput_accel() == 0, "libinput mapping");
++	CHECK(test_matrix_scale() == 0, "linear CTM scale");
 +	CHECK(test_resolve_speed() == 0, "env default/override/reject");
 +	CHECK(test_single_monitor() == 0, "single-monitor fallback");
 +	(void)puts("OK");
@@ -4092,15 +4077,13 @@ Index: src/client/X11/xf_event.h
 ===================================================================
 --- src.orig/client/X11/xf_event.h
 +++ src/client/X11/xf_event.h
-@@ -37,6 +37,14 @@ void xf_event_SendClientEvent(xfContext*
+@@ -37,6 +37,12 @@ void xf_event_SendClientEvent(xfContext*
  void xf_event_adjust_coordinates(xfContext* xfc, int* x, int* y);
  void xf_adjust_coordinates_to_screen(xfContext* xfc, UINT32* x, UINT32* y);
  
 +BOOL xf_pointer_map_coordinates(int* x, int* y, const rdpMonitor* monitors, UINT32 nmonitors,
 +                                const RECTANGLE_16* crtcs);
-+BOOL xf_pointer_scale_accel(int orig_num, int orig_den, UINT32 percent, int* out_num,
-+                            int* out_den);
-+double xf_pointer_libinput_accel(UINT32 percent);
++BOOL xf_pointer_matrix_scale(UINT32 percent, float matrix[9]);
 +BOOL xf_pointer_resolve_external_speed(const rdpMonitor* monitors, UINT32 nmonitors,
 +                                       UINT32* percent);
 +
